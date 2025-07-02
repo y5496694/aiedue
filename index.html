@@ -116,8 +116,8 @@
                     <button data-tab="main" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">대시보드</button>
                     <button data-tab="shop" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">상점</button>
                     <button data-tab="homework" id="homework-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">오늘의 숙제</button>
-                    <button data-tab="learning-problems" id="learning-problems-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">학습 문제</button>
-                    <button data-tab="task-management" id="task-management-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">업무 관리</button>
+                    <button data-tab="life-rules-management" id="life-rules-management-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">생활 규칙 관리</button>
+                    <button data-tab="learning-problems" id="learning-problems-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">학습 문제 관리</button>
                 </nav>
             </div>
 
@@ -206,9 +206,16 @@
                     <!-- Learning problems will be rendered here -->
                 </div>
             </div>
-             <div id="task-management-tab-content" class="tab-content">
-                <h2 class="text-2xl font-bold mb-4">📋 업무 관리</h2>
-                <p>이 기능은 현재 개발 중입니다.</p>
+             <div id="life-rules-management-tab-content" class="tab-content">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">📜 생활 규칙 관리</h2>
+                    <div class="space-x-2">
+                         <button id="add-life-rule-btn" class="btn bg-green-500 hover:bg-green-600 text-white">+ 새 규칙 만들기</button>
+                    </div>
+                </div>
+                <div id="life-rule-list" class="bg-white p-4 rounded-lg shadow">
+                    <!-- Life rules will be rendered here -->
+                </div>
             </div>
         </div>
         
@@ -325,11 +332,24 @@
             </form>
         </div>
     </div>
-    <div id="management-modal" class="modal-overlay hidden">
+    <div id="life-rule-modal" class="modal-overlay hidden">
         <div class="modal-content">
-            <span class="close-button" id="close-management-modal-btn">&times;</span>
-            <h3 id="management-modal-title" class="text-xl font-bold mb-4">관리 대상 학생 선택</h3>
-            <div id="management-student-list" class="space-y-2 max-h-96 overflow-y-auto"></div>
+            <span class="close-button" id="close-life-rule-modal-btn">&times;</span>
+            <h3 id="life-rule-modal-title" class="text-xl font-bold mb-4">생활 규칙 관리</h3>
+            <form id="life-rule-form" class="text-left space-y-3">
+                <input type="hidden" id="life-rule-id">
+                <div>
+                    <label for="life-rule-text" class="block text-sm font-medium">규칙 내용</label>
+                    <input type="text" id="life-rule-text" required class="w-full p-2 border rounded-md form-input" placeholder="예: 스스로 일어나기">
+                </div>
+                <div>
+                    <label for="life-rule-reward" class="block text-sm font-medium">보상 (원)</label>
+                    <input type="number" id="life-rule-reward" required min="0" class="w-full p-2 border rounded-md form-input" placeholder="예: 300">
+                </div>
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary">저장</button>
+                </div>
+            </form>
         </div>
     </div>
     <div id="problem-creation-modal" class="modal-overlay hidden">
@@ -373,13 +393,13 @@
     <div id="assignment-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <span class="close-button" id="close-assignment-modal-btn">&times;</span>
-            <h3 id="assignment-modal-title" class="text-xl font-bold mb-4">학습 문제 배부</h3>
-            <p id="assignment-problem-title" class="mb-4 text-gray-600"></p>
+            <h3 id="assignment-modal-title" class="text-xl font-bold mb-4">배부하기</h3>
+            <p id="assignment-item-title" class="mb-4 text-gray-600"></p>
             <div id="assignment-student-list" class="space-y-2 max-h-60 overflow-y-auto text-left border p-2 rounded-md">
                 <!-- Student list for assignment will be here -->
             </div>
             <div class="mt-6 text-right">
-                <button id="assign-homework-btn" class="btn btn-primary">선택한 학생에게 배부</button>
+                <button id="assign-item-btn" class="btn btn-primary">선택한 학생에게 배부</button>
             </div>
         </div>
     </div>
@@ -391,15 +411,14 @@
          * 중요: Firestore 보안 규칙 안내 (Important: Firestore Security Rules Guide)
          * =================================================================================================
          *
-         * 학생 로그인이 "Missing or insufficient permissions" 오류와 함께 실패하는 경우,
+         * 앱 기능이 "Missing or insufficient permissions" 오류와 함께 실패하는 경우,
          * 이는 Firebase의 보안 규칙이 데이터 조회를 차단하고 있기 때문입니다.
-         * 아래 규칙을 복사하여 Firebase 프로젝트의 [Firestore Database > 규칙] 탭에 붙여넣어 주세요.
-         * 이 규칙은 학생 로그인을 허용하고 기본적인 데이터 접근을 제어합니다.
+         * 아래 규칙 전체를 복사하여 Firebase 프로젝트의 [Firestore Database > 규칙] 탭에 붙여넣어 주세요.
          *
-         * If student login fails with a "Missing or insufficient permissions" error,
+         * If app features fail with a "Missing or insufficient permissions" error,
          * it's because Firebase security rules are blocking the data query.
-         * Please copy the rules below and paste them into the [Firestore Database > Rules] tab
-         * in your Firebase project. These rules allow student login and control basic data access.
+         * Please copy the entire ruleset below and paste it into the [Firestore Database > Rules] tab
+         * in your Firebase project.
          *
          * --- COPY FROM HERE ---
          
@@ -419,11 +438,15 @@
                   // Allow user creation (registration)
                   allow create: if true; 
                   
-                  // Allow LIST operations ONLY for teachers. Student login is now handled by direct auth, not queries.
+                  // Allow LIST operations ONLY for teachers.
                   allow list: if isTeacher();
                   
                   match /assignedHomework/{homeworkId} {
                     allow read, write: if request.auth.uid == userId || isTeacher();
+                  }
+                  
+                  match /assignedLifeRules/{ruleId} {
+                     allow read, write: if request.auth.uid == userId || isTeacher();
                   }
                 }
 
@@ -441,11 +464,16 @@
                     allow read: if true;
                     allow write: if isTeacher();
                 }
+                
+                match /lifeRules/{ruleId} {
+                    allow read: if request.auth != null;
+                    allow write: if isTeacher();
+                }
 
                 match /metadata/{docId} {
-                   // Allow anyone to read/write the counters doc for registration.
-                   // Only teachers can access other metadata docs.
-                   allow read, write: if docId == 'counters' || isTeacher();
+                  // Allow anyone to read/write the counters doc for registration.
+                  // Only teachers can access other metadata docs.
+                  allow read, write: if docId == 'counters' || isTeacher();
                 }
               }
             }
@@ -480,7 +508,8 @@
         const MAX_HISTORY_LENGTH = 200;
         let currentProblemSet = null; // For AI problem creation
         let currentAssignmentId = null; // For student homework completion
-        let currentLearningProblemId = null; // For teacher assignment
+        let currentAssignmentItemId = null; // For teacher assignment (homework or life rule)
+        let currentAssignmentType = null; // 'homework' or 'lifeRule'
 
         // --- DOM Elements ---
         const views = {
@@ -501,8 +530,8 @@
         const closeAiModalBtn = document.getElementById('closeAiModalBtn');
         const adjustStudentModal = document.getElementById('adjust-student-modal');
         const shopItemModal = document.getElementById('shop-item-modal');
+        const lifeRuleModal = document.getElementById('life-rule-modal');
         const homeworkModal = document.getElementById('homework-modal');
-        const managementModal = document.getElementById('management-modal');
         const problemCreationModal = document.getElementById('problem-creation-modal');
         const assignmentModal = document.getElementById('assignment-modal');
         const assignCodeModal = document.getElementById('assign-code-modal');
@@ -615,7 +644,7 @@
             
             document.getElementById('homework-dashboard-tab').style.display = role === 'student' ? 'inline-block' : 'none';
             document.getElementById('learning-problems-dashboard-tab').style.display = role === 'teacher' ? 'inline-block' : 'none';
-            document.getElementById('task-management-dashboard-tab').style.display = role === 'teacher' ? 'inline-block' : 'none';
+            document.getElementById('life-rules-management-dashboard-tab').style.display = role === 'teacher' ? 'inline-block' : 'none';
 
             if (role === 'teacher') {
                 titleEl.textContent = `${currentUserData.name || '교사'} 대시보드`;
@@ -633,8 +662,14 @@
             loadAndRenderMarketTabs();
             loadAndRenderShopItems();
             renderDashboardMainContent(role);
-            if (role === 'student') renderHomework();
-            if (role === 'teacher') loadLearningProblems();
+            if (role === 'student') {
+                renderHomework();
+                renderLifeRulesForStudent();
+            }
+            if (role === 'teacher') {
+                loadLearningProblems();
+                loadLifeRules();
+            }
             startStockUpdates();
             document.getElementById('teacher-add-shop-item-btn').classList.toggle('hidden', role !== 'teacher');
         }
@@ -1045,9 +1080,6 @@
             }
         });
         
-        // Teacher Registration (REMOVED)
-        // document.getElementById('teacher-register-btn').addEventListener('click', ...);
-        
         // Admin page logic
         document.getElementById('randomizePricesBtn').addEventListener('click', async () => {
             showModal("진행 중", "주가 변경 중...");
@@ -1339,7 +1371,7 @@
             }
             await updateDoc(doc(db, "users", studentToAdjustId), {
                 balance: increment(amount),
-                coins: increment(amount) // Keep 'coins' field for backend consistency if needed
+                coins: increment(amount)
             });
             showModal('성공', '금액 조정이 완료되었습니다.');
             document.getElementById('won-adjustment-amount').value = '';
@@ -1360,30 +1392,29 @@
                 container.innerHTML = `<h3 class="text-lg font-bold mb-3">📜 오늘의 생활 규칙</h3><div id="life-rules-container" class="space-y-2"></div>`;
                 renderLifeRulesForStudent();
             } else if (role === 'teacher') {
-                container.innerHTML = `
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button id="manage-rules-btn" class="btn btn-primary py-3">생활규칙 관리하기</button>
-                         <p class="text-center text-gray-500 p-3">숙제 관리는 '학습 문제' 탭에서 할 수 있습니다.</p>
-                    </div>
-                `;
-                document.getElementById('manage-rules-btn').addEventListener('click', () => openManageModal('rules'));
+                container.innerHTML = `<p class="text-center text-gray-500 p-3">생활 규칙 및 숙제 관리는 상단 탭 메뉴를 이용해주세요.</p>`;
             }
         }
 
-        function renderLifeRulesForStudent() {
+        async function renderLifeRulesForStudent() {
             const container = document.getElementById('life-rules-container');
             if (!container) return;
+            container.innerHTML = '<p class="text-sm text-gray-500">규칙을 불러오는 중...</p>';
+
+            const q = query(collection(db, `users/${currentUserData.id}/assignedLifeRules`));
+            const querySnapshot = await getDocs(q);
+            
+            if (querySnapshot.empty) {
+                container.innerHTML = '<p class="text-sm text-gray-500">오늘 지켜야 할 생활 규칙이 없습니다.</p>';
+                return;
+            }
+
             container.innerHTML = '';
-            const rules = [
-                { id: 'rule1', text: '일찍 일어나기', reward: 300 },
-                { id: 'rule2', text: '숙제 먼저 하기', reward: 300 },
-                { id: 'rule3', text: '30분 이상 책 읽기', reward: 300 },
-            ];
             const today = new Date();
-            rules.forEach(rule => {
-                const completedRules = currentUserData.completedRules || {};
-                const lastCompleted = completedRules[rule.id];
-                const isCompletedToday = lastCompleted && isSameDay(lastCompleted.toDate(), today);
+            querySnapshot.forEach(docSnap => {
+                const rule = { id: docSnap.id, ...docSnap.data() };
+                const lastCompleted = rule.lastCompletedAt?.toDate();
+                const isCompletedToday = lastCompleted && isSameDay(lastCompleted, today);
 
                 const div = document.createElement('div');
                 div.className = 'flex justify-between items-center bg-gray-50 p-3 rounded-md';
@@ -1401,11 +1432,16 @@
                     const ruleId = e.target.dataset.ruleid;
                     const reward = Number(e.target.dataset.reward);
                     const userRef = doc(db, "users", currentUserData.id);
+                    const ruleRef = doc(db, `users/${currentUserData.id}/assignedLifeRules`, ruleId);
+
                     await updateDoc(userRef, {
                         balance: increment(reward),
-                        coins: increment(reward),
-                        [`completedRules.${ruleId}`]: serverTimestamp()
+                        coins: increment(reward)
                     });
+                    await updateDoc(ruleRef, {
+                        lastCompletedAt: serverTimestamp()
+                    });
+
                     const userDoc = await getDoc(userRef);
                     currentUserData = { id: userDoc.id, ...userDoc.data() };
                     showModal('참 잘했어요!', `${formatCurrency(reward)}을(를) 획득했습니다!`);
@@ -1415,29 +1451,6 @@
             });
         }
         
-        async function openManageModal(type) {
-            const title = type === 'rules' ? '생활규칙 관리' : '오늘의 숙제 관리';
-            document.getElementById('management-modal-title').textContent = title;
-            const listEl = document.getElementById('management-student-list');
-            listEl.innerHTML = '<p>학생 목록을 불러오는 중...</p>';
-            managementModal.style.display = 'flex';
-
-            const usersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
-            listEl.innerHTML = '';
-            usersSnapshot.forEach(docSnap => {
-                const student = {id: docSnap.id, ...docSnap.data()};
-                const div = document.createElement('div');
-                div.className = 'p-2 hover:bg-gray-100 cursor-pointer rounded';
-                div.textContent = `${student.name} (코드: ${student.userCode})`;
-                div.addEventListener('click', () => {
-                    showModal('알림', `${student.name} 학생의 ${title} 기능은 현재 개발 중입니다.`);
-                    managementModal.style.display = 'none';
-                });
-                listEl.appendChild(div);
-            });
-        }
-        document.getElementById('close-management-modal-btn').addEventListener('click', () => managementModal.style.display = 'none');
-
         // --- TTS ---
         function speak(text) {
             if ('speechSynthesis' in window) {
@@ -1609,7 +1622,7 @@
                                         <p class="text-sm text-gray-500">${problemSet.topic} (${problemSet.problems.length}문제, ${formatCurrency(problemSet.reward)})</p>
                                     </div>
                                     <div class="space-x-2">
-                                        <button data-id="${problemSet.id}" class="assign-problem-btn btn bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-1">배부</button>
+                                        <button data-id="${problemSet.id}" data-title="${problemSet.title}" class="assign-homework-btn btn bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-1">배부</button>
                                         <button data-id="${problemSet.id}" class="edit-problem-btn btn bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1">수정</button>
                                         <button data-id="${problemSet.id}" class="delete-problem-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>
                                     </div>
@@ -1619,7 +1632,7 @@
                     </div>
                 `;
 
-                container.querySelectorAll('.assign-problem-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignmentModal(e.target.dataset.id)));
+                container.querySelectorAll('.assign-homework-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignmentModal('homework', e.target.dataset.id, e.target.dataset.title)));
                 container.querySelectorAll('.edit-problem-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                     const problemDoc = await getDoc(doc(db, "learningProblems", e.target.dataset.id));
                     openProblemCreationModal({id: problemDoc.id, ...problemDoc.data()});
@@ -1648,17 +1661,13 @@
             }
         }
 
-        // Teacher: Open assignment modal
-        async function openAssignmentModal(problemId) {
-            currentLearningProblemId = problemId;
-            const problemDoc = await getDoc(doc(db, "learningProblems", problemId));
-            if (!problemDoc.exists()) {
-                showModal('오류', '존재하지 않는 학습 문제입니다.');
-                return;
-            }
-            const problemSet = problemDoc.data();
+        // Teacher: Open assignment modal (for both homework and life rules)
+        async function openAssignmentModal(type, itemId, itemTitle) {
+            currentAssignmentType = type;
+            currentAssignmentItemId = itemId;
             
-            document.getElementById('assignment-problem-title').textContent = `"${problemSet.title}" 배부하기`;
+            document.getElementById('assignment-modal-title').textContent = `${type === 'homework' ? '숙제' : '생활 규칙'} 배부하기`;
+            document.getElementById('assignment-item-title').textContent = `"${itemTitle}"`;
             const studentListEl = document.getElementById('assignment-student-list');
             studentListEl.innerHTML = '학생 목록 로딩 중...';
             assignmentModal.style.display = 'flex';
@@ -1679,8 +1688,8 @@
             }).join('');
         }
 
-        // Teacher: Assign homework to selected students
-        document.getElementById('assign-homework-btn').addEventListener('click', async () => {
+        // Teacher: Assign item to selected students
+        document.getElementById('assign-item-btn').addEventListener('click', async () => {
             const selectedStudentIds = Array.from(document.querySelectorAll('#assignment-student-list input:checked'))
                 .map(input => input.dataset.studentid);
             
@@ -1689,22 +1698,37 @@
                 return;
             }
 
-            const problemDoc = await getDoc(doc(db, "learningProblems", currentLearningProblemId));
-            const problemSet = problemDoc.data();
-
             try {
-                for (const studentId of selectedStudentIds) {
-                    const assignmentData = {
-                        problemId: currentLearningProblemId,
-                        title: problemSet.title,
-                        reward: problemSet.reward,
-                        status: 'assigned',
-                        assignedAt: serverTimestamp()
-                    };
-                    await addDoc(collection(db, `users/${studentId}/assignedHomework`), assignmentData);
+                if (currentAssignmentType === 'homework') {
+                    const problemDoc = await getDoc(doc(db, "learningProblems", currentAssignmentItemId));
+                    const problemSet = problemDoc.data();
+                    for (const studentId of selectedStudentIds) {
+                        const assignmentData = {
+                            problemId: currentAssignmentItemId,
+                            title: problemSet.title,
+                            reward: problemSet.reward,
+                            status: 'assigned',
+                            assignedAt: serverTimestamp()
+                        };
+                        await addDoc(collection(db, `users/${studentId}/assignedHomework`), assignmentData);
+                    }
+                } else if (currentAssignmentType === 'lifeRule') {
+                    const ruleDoc = await getDoc(doc(db, "lifeRules", currentAssignmentItemId));
+                    const rule = ruleDoc.data();
+                    for (const studentId of selectedStudentIds) {
+                         const assignmentData = {
+                            ruleId: currentAssignmentItemId,
+                            text: rule.text,
+                            reward: rule.reward,
+                            assignedAt: serverTimestamp(),
+                            lastCompletedAt: null
+                        };
+                        // Use setDoc with ruleId to prevent duplicate assignments
+                        await setDoc(doc(db, `users/${studentId}/assignedLifeRules`, currentAssignmentItemId), assignmentData);
+                    }
                 }
                 assignmentModal.style.display = 'none';
-                showModal('성공', `${selectedStudentIds.length}명의 학생에게 숙제를 배부했습니다.`);
+                showModal('성공', `${selectedStudentIds.length}명의 학생에게 배부를 완료했습니다.`);
             } catch (error) {
                 showModal('배부 실패', `오류: ${error.message}`);
                 console.error(error);
@@ -1867,10 +1891,108 @@
             }
         });
 
+        // --- Teacher: Life Rule Management ---
+        document.getElementById('add-life-rule-btn').addEventListener('click', () => openLifeRuleModal());
+
+        async function loadLifeRules() {
+            const container = document.getElementById('life-rule-list');
+            container.innerHTML = `<p class="text-center text-gray-500">생활 규칙 목록을 불러오는 중입니다...</p>`;
+            try {
+                const q = query(collection(db, "lifeRules"), where("teacherId", "==", currentAuthUser.uid));
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    container.innerHTML = `<p class="text-center text-gray-500">생성된 생활 규칙이 없습니다.</p>`;
+                    return;
+                }
+                
+                const rules = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                rules.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
+
+                container.innerHTML = `
+                    <div class="divide-y divide-gray-200">
+                        ${rules.map(rule => `
+                            <div class="p-3 flex justify-between items-center">
+                                <div>
+                                    <p class="font-bold">${rule.text}</p>
+                                    <p class="text-sm text-gray-500">보상: ${formatCurrency(rule.reward)}</p>
+                                </div>
+                                <div class="space-x-2">
+                                    <button data-id="${rule.id}" data-title="${rule.text}" class="assign-rule-btn btn bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-1">배부</button>
+                                    <button data-id="${rule.id}" class="edit-rule-btn btn bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1">수정</button>
+                                    <button data-id="${rule.id}" class="delete-rule-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+
+                container.querySelectorAll('.assign-rule-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignmentModal('lifeRule', e.target.dataset.id, e.target.dataset.title)));
+                container.querySelectorAll('.edit-rule-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                    const ruleDoc = await getDoc(doc(db, "lifeRules", e.target.dataset.id));
+                    openLifeRuleModal({id: ruleDoc.id, ...ruleDoc.data()});
+                }));
+                container.querySelectorAll('.delete-rule-btn').forEach(btn => btn.addEventListener('click', (e) => deleteLifeRule(e.target.dataset.id)));
+
+            } catch (error) {
+                console.error("Error loading life rules:", error);
+                container.innerHTML = `<p class="text-center text-red-500">생활 규칙 로드 실패.</p>`;
+            }
+        }
+
+        function openLifeRuleModal(rule = null) {
+            lifeRuleModal.style.display = 'flex';
+            const form = document.getElementById('life-rule-form');
+            form.reset();
+            form.querySelector('#life-rule-id').value = rule?.id || '';
+            form.querySelector('#life-rule-text').value = rule?.text || '';
+            form.querySelector('#life-rule-reward').value = rule?.reward || '';
+        }
+
+        document.getElementById('life-rule-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const ruleId = document.getElementById('life-rule-id').value;
+            const data = {
+                text: document.getElementById('life-rule-text').value,
+                reward: Number(document.getElementById('life-rule-reward').value),
+                teacherId: currentAuthUser.uid,
+                createdAt: serverTimestamp()
+            };
+
+            try {
+                if (ruleId) {
+                    await setDoc(doc(db, "lifeRules", ruleId), data, { merge: true });
+                } else {
+                    await addDoc(collection(db, "lifeRules"), data);
+                }
+                lifeRuleModal.style.display = 'none';
+                loadLifeRules();
+            } catch (error) {
+                showModal('저장 실패', `오류: ${error.message}`);
+            }
+        });
+
+        async function deleteLifeRule(ruleId) {
+            showModal('삭제 확인', '정말로 이 생활 규칙을 삭제하시겠습니까? 학생에게 이미 배부된 규칙에는 영향을 주지 않습니다.');
+            modalConfirmBtn.onclick = async () => {
+                try {
+                    await deleteDoc(doc(db, "lifeRules", ruleId));
+                    modal.style.display = 'none';
+                    showModal('성공', '생활 규칙이 삭제되었습니다.');
+                    loadLifeRules();
+                } catch (error) {
+                    showModal('삭제 실패', `오류: ${error.message}`);
+                }
+                modalConfirmBtn.onclick = () => modal.style.display = 'none';
+            }
+        }
+
         // Close Modals
         document.getElementById('close-homework-modal-btn').addEventListener('click', () => homeworkModal.style.display = 'none');
         document.getElementById('close-problem-creation-modal-btn').addEventListener('click', () => problemCreationModal.style.display = 'none');
         document.getElementById('close-assignment-modal-btn').addEventListener('click', () => assignmentModal.style.display = 'none');
+        document.getElementById('close-life-rule-modal-btn').addEventListener('click', () => lifeRuleModal.style.display = 'none');
+
 
         // --- Initial Load ---
         initializeAuthentication();
