@@ -1,0 +1,1880 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>에이두 스쿨</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" xintegrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f7fafc; }
+        .view { display: none; }
+        .view.active { display: block; }
+        .form-input { transition: all 0.3s; }
+        .form-input:focus { border-color: #F59E0B; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2); }
+        .btn { transition: background-color: 0.3s; }
+        .btn-primary { background-color: #F59E0B; color: white; }
+        .btn-primary:hover { background-color: #D97706; }
+        .btn-secondary { background-color: #6B7280; color: white; }
+        .btn-secondary:hover { background-color: #4B5563; }
+        .modal-overlay {
+            display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background: white; padding: 2rem; border-radius: 0.5rem;
+            text-align: center; max-width: 95%; width: 600px; position: relative;
+        }
+        .modal-content-lg {
+             max-width: 95%; width: 800px;
+        }
+        .close-button { color: #aaa; position: absolute; top: 10px; right: 15px; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid #F59E0B; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 10px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .dashboard-tab.active { border-bottom-color: #F59E0B; color: #F59E0B; font-weight: 600; }
+        .admin-tab.active { border-bottom-color: #DC2626; color: #DC2626; font-weight: 600; }
+        .login-tab.active { border-bottom-color: #F59E0B; color: #F59E0B; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .chart-container { position: relative; width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; height: 300px; max-height: 400px; }
+        .problem-type-fields { display: none; }
+        .btn-disabled { background-color: #D1D5DB; cursor: not-allowed; }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-95 flex flex-col items-center justify-center z-[200]">
+        <div class="loading-spinner"></div>
+        <p class="mt-4 text-gray-600">앱을 준비하는 중입니다...</p>
+    </div>
+
+    <div id="app" class="max-w-7xl mx-auto p-4 md:p-8">
+
+        <!-- Login / Register View -->
+        <div id="login-view" class="view active">
+            <div class="text-center mb-12">
+                <h1 class="text-4xl font-bold text-amber-600">에이두 스쿨</h1>
+                <p class="text-gray-600 mt-2">성장을 위한 즐거운 시작</p>
+            </div>
+            <div class="bg-white p-8 rounded-lg shadow-md max-w-md mx-auto">
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                        <button id="student-login-tab" class="login-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">🧑‍🎓 학생</button>
+                        <button id="teacher-login-tab" class="login-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">🧑‍🏫 교사</button>
+                    </nav>
+                </div>
+                
+                <div id="student-login-content" class="tab-content pt-6">
+                    <div class="mb-4">
+                        <label for="student-code" class="block text-sm font-medium text-gray-700 mb-1">고유 숫자 코드</label>
+                        <input type="text" id="student-code" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="발급받은 코드를 입력하세요">
+                    </div>
+                    <button id="student-login-btn" class="w-full py-2 rounded-md btn btn-primary">학생 로그인</button>
+                </div>
+
+                <div id="teacher-login-content" class="tab-content pt-6">
+                    <div class="mb-4">
+                        <label for="teacher-email" class="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+                        <input type="email" id="teacher-email" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="example@email.com">
+                    </div>
+                    <div class="mb-6">
+                        <label for="teacher-password" class="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+                        <input type="password" id="teacher-password" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="••••••••">
+                    </div>
+                    <button id="teacher-login-btn" class="w-full py-2 rounded-md btn btn-primary">교사 로그인</button>
+                </div>
+                <div class="mt-6 text-center">
+                    <button id="show-student-register-btn" class="w-full text-center text-sm text-amber-600 hover:underline">처음이신가요? 학생 등록하기</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Student Register View -->
+        <div id="student-register-view" class="view">
+             <div class="bg-white p-8 rounded-lg shadow-md max-w-md mx-auto">
+                <h2 class="text-2xl font-bold mb-6 text-center">🧑‍🎓 학생 등록</h2>
+                <div class="mb-4">
+                    <label for="student-name" class="block text-sm font-medium text-gray-700 mb-1">이름</label>
+                    <input type="text" id="student-name" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="이름을 입력하세요">
+                </div>
+                <button id="student-register-btn" class="w-full py-2 rounded-md btn btn-primary mb-4">등록하고 코드 받기</button>
+                <button id="back-to-login-btn" class="w-full text-center text-sm text-gray-600 hover:underline">로그인 화면으로 돌아가기</button>
+            </div>
+        </div>
+        
+        <!-- Main Dashboard Area (Student & Teacher) -->
+        <div id="dashboard-container" class="view">
+             <header class="flex justify-between items-center mb-8">
+                <h1 id="dashboard-title" class="text-3xl font-bold"></h1>
+                <button id="logout-btn" class="py-2 px-4 rounded-md btn btn-secondary">로그아웃</button>
+            </header>
+            
+            <div class="border-b border-gray-200 mb-6">
+                <nav class="-mb-px flex space-x-8" id="dashboard-tabs">
+                    <button data-tab="main" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">대시보드</button>
+                    <button data-tab="shop" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">상점</button>
+                    <button data-tab="homework" id="homework-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">오늘의 숙제</button>
+                    <button data-tab="learning-problems" id="learning-problems-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">학습 문제</button>
+                    <button data-tab="task-management" id="task-management-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">업무 관리</button>
+                </nav>
+            </div>
+
+            <div id="main-tab-content" class="tab-content">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 space-y-6">
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h2 class="text-xl font-bold mb-4">💰 내 지갑 현황</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                <div>
+                                    <p class="text-sm text-gray-500">현재 잔액</p>
+                                    <p id="currentBalance" class="text-3xl font-bold text-sky-600">0 원</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">총 자산 가치</p>
+                                    <p id="totalAssetValue" class="text-3xl font-bold text-emerald-600">0 원</p>
+                                    <p class="text-xs text-stone-500">(현금 + 주식 평가액)</p>
+                                </div>
+                            </div>
+                            <hr class="my-4">
+                            <div id="main-dashboard-bottom-content">
+                                <!-- Student: Life Rules / Teacher: Management Buttons -->
+                            </div>
+                        </div>
+                        <div id="market" class="bg-white p-6 rounded-lg shadow-md">
+                             <h2 class="text-xl font-bold mb-4">📈 주식 시장</h2>
+                             <div>
+                                <div class="border-b border-stone-200 mb-4">
+                                    <nav class="-mb-px flex space-x-8 overflow-x-auto" aria-label="Tabs" id="marketTabsContainer"></nav>
+                                </div>
+                                <div id="marketContent" class="space-y-6"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-6">
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h2 class="text-xl font-bold mb-4">🎨 자산 구성</h2>
+                            <div class="chart-container h-64"><canvas id="assetAllocationChart"></canvas></div>
+                        </div>
+                        <div id="student-info-panel" class="bg-white p-6 rounded-lg shadow-md">
+                            <h2 class="text-xl font-bold mb-4">내 정보</h2>
+                            <p>고유 코드: <strong id="dashboard-code" class="text-lg"></strong></p>
+                        </div>
+                        <div id="teacher-admin-panel" class="hidden bg-white p-6 rounded-lg shadow-md">
+                            <h2 class="text-xl font-bold mb-4 text-red-600">⚙️ 관리자 메뉴</h2>
+                            <button id="admin-page-btn" class="w-full py-2 rounded-md btn bg-red-500 hover:bg-red-600 text-white">관리자 페이지로 이동</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="shop-tab-content" class="tab-content">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">🛍️ 상점</h2>
+                    <button id="teacher-add-shop-item-btn" class="hidden btn btn-primary">+ 추가</button>
+                </div>
+                <div id="shop-item-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <!-- Shop items will be rendered here -->
+                </div>
+            </div>
+            <div id="homework-tab-content" class="tab-content">
+                <h2 class="text-2xl font-bold mb-4">📚 오늘의 숙제</h2>
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">숙제 주제</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="homework-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- Homework rows will be rendered here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="learning-problems-tab-content" class="tab-content">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">📝 학습 문제 관리</h2>
+                    <div class="space-x-2">
+                         <button id="add-ai-math-problem-btn" class="btn bg-blue-500 hover:bg-blue-600 text-white">🤖 AI 수학 문제 만들기</button>
+                    </div>
+                </div>
+                <div id="learning-problem-list" class="bg-white p-4 rounded-lg shadow">
+                    <!-- Learning problems will be rendered here -->
+                </div>
+            </div>
+             <div id="task-management-tab-content" class="tab-content">
+                <h2 class="text-2xl font-bold mb-4">📋 업무 관리</h2>
+                <p>이 기능은 현재 개발 중입니다.</p>
+            </div>
+        </div>
+        
+        <!-- Admin View -->
+        <div id="admin-view" class="view">
+             <header class="flex justify-between items-center mb-8">
+                <h1 class="text-3xl font-bold text-red-700">관리자 페이지</h1>
+                <button id="back-to-dashboard-btn" class="py-2 px-4 rounded-md btn btn-secondary">대시보드로 돌아가기</button>
+            </header>
+            <div id="admin-students-tab-content">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-semibold text-red-600 mb-2">사용자 관리</h3>
+                        <ul id="adminUserList" class="space-y-2 text-sm max-h-96 overflow-y-auto"><li>불러오는 중...</li></ul>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-semibold text-red-600 mb-2">시장 관리</h3>
+                        <button id="randomizePricesBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg text-sm">주가 임의 변경</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    
+    <!-- Modals -->
+    <div id="modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="modal-close-btn">&times;</span>
+            <h3 id="modal-title" class="text-xl font-bold mb-4"></h3>
+            <p id="modal-message" class="mb-6"></p>
+            <button id="modal-confirm-btn" class="py-2 px-6 rounded-md btn btn-primary">확인</button>
+        </div>
+    </div>
+    <div id="homework-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-homework-modal-btn">&times;</span>
+            <h3 id="homework-modal-title" class="text-xl font-bold mb-4"></h3>
+            <div id="homework-modal-content" class="text-left mb-6 max-h-[70vh] overflow-y-auto"></div>
+            <div id="homework-modal-footer" class="mt-6 flex justify-between items-center">
+                 <div id="homework-score-display" class="text-lg font-bold"></div>
+                 <div class="space-x-2">
+                    <button id="grade-all-homework-btn" class="btn btn-secondary">모두 채점</button>
+                    <button id="complete-homework-btn" class="btn btn-primary btn-disabled" disabled>숙제 완료하기</button>
+                 </div>
+            </div>
+        </div>
+    </div>
+    <div id="aiContentModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="closeAiModalBtn">&times;</span>
+            <h3 id="aiModalTitle" class="text-2xl font-bold text-purple-600 mb-3">✨ AI 생성 내용</h3>
+            <div id="aiLoadingSpinner" class="loading-spinner hidden"></div>
+            <p id="aiModalMessage" class="text-stone-700 whitespace-pre-wrap text-lg leading-relaxed"></p>
+        </div>
+    </div>
+    <div id="adjust-student-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-adjust-modal-btn">&times;</span>
+            <h3 id="adjust-modal-title" class="text-xl font-bold mb-4">학생 자산 조정</h3>
+            <div class="text-left space-y-4">
+                <div>
+                    <label class="font-bold">금액 조정 (원)</label>
+                    <div class="flex items-center space-x-2 mt-1">
+                        <input type="number" id="won-adjustment-amount" class="w-full p-2 border rounded-md form-input" placeholder="조정할 금액 (예: 500, -500)">
+                        <button id="adjust-won-btn" class="btn btn-primary px-4 py-2 whitespace-nowrap">조정</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="font-bold">보유 주식 초기화</label>
+                    <div id="student-portfolio-list" class="mt-1 space-y-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+     <div id="assign-code-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-assign-code-modal-btn">&times;</span>
+            <h3 id="assign-code-modal-title" class="text-xl font-bold mb-4">고유 코드 부여/수정</h3>
+            <p class="mb-4 text-gray-600">새로운 고유 코드를 입력하세요. 이 코드는 학생의 새 비밀번호가 됩니다.</p>
+            <div class="text-left space-y-3">
+                <input type="hidden" id="assign-code-userid">
+                 <div>
+                    <label for="new-user-code" class="block text-sm font-medium">새 고유 숫자 코드</label>
+                    <input type="number" id="new-user-code" required class="w-full p-2 border rounded-md form-input">
+                </div>
+                <div class="text-right">
+                    <button id="save-new-code-btn" class="btn btn-primary">저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="shop-item-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-shop-item-modal-btn">&times;</span>
+            <h3 id="shop-item-modal-title" class="text-xl font-bold mb-4">상점 물품 관리</h3>
+            <form id="shop-item-form" class="text-left space-y-3">
+                <input type="hidden" id="shop-item-id">
+                <div>
+                    <label for="shop-item-name" class="block text-sm font-medium">물품 이름</label>
+                    <input type="text" id="shop-item-name" required class="w-full p-2 border rounded-md form-input">
+                </div>
+                <div>
+                    <label for="shop-item-price" class="block text-sm font-medium">가격 (원)</label>
+                    <input type="number" id="shop-item-price" required min="0" class="w-full p-2 border rounded-md form-input">
+                </div>
+                <div>
+                    <label for="shop-item-desc" class="block text-sm font-medium">설명</label>
+                    <textarea id="shop-item-desc" rows="3" class="w-full p-2 border rounded-md form-input"></textarea>
+                </div>
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="management-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-management-modal-btn">&times;</span>
+            <h3 id="management-modal-title" class="text-xl font-bold mb-4">관리 대상 학생 선택</h3>
+            <div id="management-student-list" class="space-y-2 max-h-96 overflow-y-auto"></div>
+        </div>
+    </div>
+    <div id="problem-creation-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-problem-creation-modal-btn">&times;</span>
+            <h3 id="problem-creation-modal-title" class="text-xl font-bold mb-4">🤖 AI 수학 문제 만들기</h3>
+            <div id="problem-creation-form-container" class="text-left space-y-4">
+                <input type="hidden" id="problem-set-id">
+                <div>
+                    <label for="problem-set-title" class="block text-sm font-medium">학습지 제목</label>
+                    <input type="text" id="problem-set-title" required class="w-full p-2 border rounded-md form-input" placeholder="예: 덧셈과 뺄셈 연습">
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="problem-count" class="block text-sm font-medium">문제 수</label>
+                        <input type="number" id="problem-count" required min="1" max="20" class="w-full p-2 border rounded-md form-input" placeholder="1~20">
+                    </div>
+                    <div>
+                        <label for="problem-topic" class="block text-sm font-medium">주제</label>
+                        <input type="text" id="problem-topic" required class="w-full p-2 border rounded-md form-input" placeholder="예: 두 자리 수 덧셈">
+                    </div>
+                    <div>
+                        <label for="problem-reward" class="block text-sm font-medium">완료 시 획득 금액 (원)</label>
+                        <input type="number" id="problem-reward" required min="0" class="w-full p-2 border rounded-md form-input" placeholder="예: 500">
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="is-word-problem" class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                    <label for="is-word-problem" class="ml-2 block text-sm text-gray-900">문장형 문제로 만들기</label>
+                </div>
+                 <button id="generate-ai-problems-btn" class="w-full btn bg-purple-500 hover:bg-purple-600 text-white">AI로 문제 생성하기</button>
+            </div>
+            <div id="problem-display-area" class="mt-6 text-left max-h-[50vh] overflow-y-auto">
+                <!-- AI-generated problems will be displayed here -->
+            </div>
+            <div id="problem-creation-footer" class="mt-6 text-right hidden">
+                <button id="save-problem-set-btn" class="btn btn-primary">학습 문제 저장하기</button>
+            </div>
+        </div>
+    </div>
+    <div id="assignment-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-assignment-modal-btn">&times;</span>
+            <h3 id="assignment-modal-title" class="text-xl font-bold mb-4">학습 문제 배부</h3>
+            <p id="assignment-problem-title" class="mb-4 text-gray-600"></p>
+            <div id="assignment-student-list" class="space-y-2 max-h-60 overflow-y-auto text-left border p-2 rounded-md">
+                <!-- Student list for assignment will be here -->
+            </div>
+            <div class="mt-6 text-right">
+                <button id="assign-homework-btn" class="btn btn-primary">선택한 학생에게 배부</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script type="module">
+        /*
+         * =================================================================================================
+         * 중요: Firestore 보안 규칙 안내 (Important: Firestore Security Rules Guide)
+         * =================================================================================================
+         *
+         * 학생 로그인이 "Missing or insufficient permissions" 오류와 함께 실패하는 경우,
+         * 이는 Firebase의 보안 규칙이 데이터 조회를 차단하고 있기 때문입니다.
+         * 아래 규칙을 복사하여 Firebase 프로젝트의 [Firestore Database > 규칙] 탭에 붙여넣어 주세요.
+         * 이 규칙은 학생 로그인을 허용하고 기본적인 데이터 접근을 제어합니다.
+         *
+         * If student login fails with a "Missing or insufficient permissions" error,
+         * it's because Firebase security rules are blocking the data query.
+         * Please copy the rules below and paste them into the [Firestore Database > Rules] tab
+         * in your Firebase project. These rules allow student login and control basic data access.
+         *
+         * --- COPY FROM HERE ---
+         
+            rules_version = '2';
+            service cloud.firestore {
+              match /databases/{database}/documents {
+
+                function isTeacher() {
+                  return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher';
+                }
+
+                match /users/{userId} {
+                  allow get: if request.auth.uid == userId || isTeacher();
+                  allow update: if request.auth.uid == userId || isTeacher();
+                  allow delete: if isTeacher();
+                  
+                  // Allow user creation (registration)
+                  allow create: if true; 
+                  
+                  // Allow LIST operations ONLY for teachers. Student login is now handled by direct auth, not queries.
+                  allow list: if isTeacher();
+                  
+                  match /assignedHomework/{homeworkId} {
+                    allow read, write: if request.auth.uid == userId || isTeacher();
+                  }
+                }
+
+                match /stocks/{stockId} {
+                    allow read: if true;
+                    allow write: if isTeacher();
+                }
+
+                match /shopItems/{itemId} {
+                    allow read: if true;
+                    allow write: if isTeacher();
+                }
+                
+                match /learningProblems/{problemId} {
+                    allow read: if true;
+                    allow write: if isTeacher();
+                }
+
+                match /metadata/{docId} {
+                   // Allow anyone to read/write the counters doc for registration.
+                   // Only teachers can access other metadata docs.
+                   allow read, write: if docId == 'counters' || isTeacher();
+                }
+              }
+            }
+         
+         * --- END COPY ---
+         */
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, runTransaction, updateDoc, increment, deleteField, serverTimestamp, Timestamp, orderBy, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // IMPORTANT: Replace with your actual Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDCeJPDQUNi-KmJ9DhkTRIu-9t2PGZCpt0",
+            authDomain: "mansungcoin-c6e06.firebaseapp.com",
+            projectId: "mansungcoin-c6e06",
+            storageBucket: "mansungcoin-c6e06.appspot.com",
+            messagingSenderId: "704809284946",
+            appId: "1:704809284946:web:3e71d98f38810577e1768b"
+        };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- Global State ---
+        let currentAuthUser = null;
+        let currentUserData = null;
+        let stockDataCache = {};
+        let stockUpdateInterval = null;
+        let assetChartInstance = null;
+        const stockChartInstances = {};
+        const MAX_HISTORY_LENGTH = 200;
+        let currentProblemSet = null; // For AI problem creation
+        let currentAssignmentId = null; // For student homework completion
+        let currentLearningProblemId = null; // For teacher assignment
+
+        // --- DOM Elements ---
+        const views = {
+            login: document.getElementById('login-view'),
+            studentRegister: document.getElementById('student-register-view'),
+            dashboard: document.getElementById('dashboard-container'),
+            admin: document.getElementById('admin-view'),
+        };
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+        const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+        const aiContentModal = document.getElementById('aiContentModal');
+        const aiModalTitle = document.getElementById('aiModalTitle');
+        const aiModalMessage = document.getElementById('aiModalMessage');
+        const aiLoadingSpinner = document.getElementById('aiLoadingSpinner');
+        const closeAiModalBtn = document.getElementById('closeAiModalBtn');
+        const adjustStudentModal = document.getElementById('adjust-student-modal');
+        const shopItemModal = document.getElementById('shop-item-modal');
+        const homeworkModal = document.getElementById('homework-modal');
+        const managementModal = document.getElementById('management-modal');
+        const problemCreationModal = document.getElementById('problem-creation-modal');
+        const assignmentModal = document.getElementById('assignment-modal');
+        const assignCodeModal = document.getElementById('assign-code-modal');
+        let studentToAdjustId = null;
+
+
+        // --- Utility & Modal Functions ---
+        const formatCurrency = (amount) => new Intl.NumberFormat('ko-KR').format(amount) + ' 원';
+        
+        function showModal(title, message) {
+            modalTitle.textContent = title;
+            modalMessage.innerHTML = message;
+            modal.style.display = 'flex';
+        }
+        modalCloseBtn.addEventListener('click', () => modal.style.display = 'none');
+        modalConfirmBtn.addEventListener('click', () => modal.style.display = 'none');
+        
+        function showAiModal(title) {
+            aiModalTitle.textContent = title;
+            aiModalMessage.textContent = '';
+            aiLoadingSpinner.classList.remove('hidden');
+            aiContentModal.style.display = 'flex';
+        }
+        function updateAiModalContent(content) {
+            aiModalMessage.textContent = content;
+            aiLoadingSpinner.classList.add('hidden');
+        }
+        closeAiModalBtn.addEventListener('click', () => aiContentModal.style.display = 'none');
+
+
+        function switchView(viewName) {
+            Object.values(views).forEach(view => view.classList.remove('active'));
+            if (views[viewName]) {
+                views[viewName].classList.add('active');
+            }
+        }
+        
+        function switchLoginTab(tabName) {
+            document.querySelectorAll('.login-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('#login-view .tab-content').forEach(content => content.classList.remove('active'));
+            
+            document.getElementById(`${tabName}-login-tab`).classList.add('active');
+            document.getElementById(`${tabName}-login-content`).classList.add('active');
+        }
+        
+        document.getElementById('student-login-tab').addEventListener('click', () => switchLoginTab('student'));
+        document.getElementById('teacher-login-tab').addEventListener('click', () => switchLoginTab('teacher'));
+
+
+        function switchTab(tabGroup, selectedTab) {
+            document.querySelectorAll(`.${tabGroup}-tab`).forEach(tab => {
+                tab.classList.remove('active');
+                const content = document.getElementById(`${tab.dataset.tab}-tab-content`);
+                if(content) content.classList.remove('active');
+            });
+            const selectedTabEl = document.querySelector(`.${tabGroup}-tab[data-tab="${selectedTab}"]`);
+            if(selectedTabEl) selectedTabEl.classList.add('active');
+            const selectedContent = document.getElementById(`${selectedTab}-tab-content`);
+            if(selectedContent) selectedContent.classList.add('active');
+        }
+
+        document.querySelectorAll('.dashboard-tab').forEach(tab => {
+            tab.addEventListener('click', () => switchTab('dashboard', tab.dataset.tab));
+        });
+        document.querySelectorAll('.admin-tab').forEach(tab => {
+            tab.addEventListener('click', () => switchTab('admin', tab.dataset.tab));
+        });
+
+
+        // --- Authentication Logic ---
+        onAuthStateChanged(auth, async (user) => {
+            currentAuthUser = user;
+            if (user && !user.isAnonymous) { // Teacher or converted student with email login
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                if (userDoc.exists()) {
+                    currentUserData = { id: user.uid, ...userDoc.data() };
+                    if (currentUserData.role === 'teacher') {
+                        showDashboard('teacher');
+                    } else {
+                        // This handles converted students who log in with their old email
+                        showDashboard('student');
+                    }
+                } else {
+                    // No user document found for this auth user, send to login
+                    currentUserData = null;
+                    switchView('login');
+                }
+            } else { // No user, anonymous user, or student login
+                // This part is tricky. Student login is not a "real" auth state change.
+                // We prevent this from overriding a successful student login.
+                if (!currentUserData) {
+                    switchView('login');
+                    switchLoginTab('student'); // Default to student tab
+                }
+            }
+            document.getElementById('loading-overlay').style.display = 'none';
+        });
+
+        async function initializeAuthentication() {
+            // This function is kept for potential future use with custom tokens
+            // but onAuthStateChanged is now the primary driver.
+        }
+
+        // --- Dashboard Logic ---
+        function showDashboard(role) {
+            const titleEl = document.getElementById('dashboard-title');
+            const codeEl = document.getElementById('dashboard-code');
+            const studentPanel = document.getElementById('student-info-panel');
+            const teacherPanel = document.getElementById('teacher-admin-panel');
+            
+            document.getElementById('homework-dashboard-tab').style.display = role === 'student' ? 'inline-block' : 'none';
+            document.getElementById('learning-problems-dashboard-tab').style.display = role === 'teacher' ? 'inline-block' : 'none';
+            document.getElementById('task-management-dashboard-tab').style.display = role === 'teacher' ? 'inline-block' : 'none';
+
+            if (role === 'teacher') {
+                titleEl.textContent = `${currentUserData.name || '교사'} 대시보드`;
+                studentPanel.classList.add('hidden');
+                teacherPanel.classList.remove('hidden');
+            } else { // Student
+                titleEl.textContent = `${currentUserData.name} 학생`;
+                codeEl.textContent = currentUserData.userCode || 'N/A';
+                studentPanel.classList.remove('hidden');
+                teacherPanel.classList.add('hidden');
+            }
+            switchView('dashboard');
+            switchTab('dashboard', 'main');
+            updateDashboardDisplay();
+            loadAndRenderMarketTabs();
+            loadAndRenderShopItems();
+            renderDashboardMainContent(role);
+            if (role === 'student') renderHomework();
+            if (role === 'teacher') loadLearningProblems();
+            startStockUpdates();
+            document.getElementById('teacher-add-shop-item-btn').classList.toggle('hidden', role !== 'teacher');
+        }
+        
+        function updateDashboardDisplay() {
+            if (!currentUserData) return;
+            const balance = currentUserData.balance || currentUserData.coins || 0;
+            document.getElementById('currentBalance').textContent = formatCurrency(balance);
+            let stockValue = 0;
+            if (currentUserData.portfolio) {
+                for (const stockId in currentUserData.portfolio) {
+                    const portfolioItem = currentUserData.portfolio[stockId];
+                    const quantity = portfolioItem?.quantity || 0;
+                    const stockPrice = stockDataCache[stockId]?.price || 0;
+                    stockValue += quantity * stockPrice;
+                }
+            }
+            document.getElementById('totalAssetValue').textContent = formatCurrency(balance + stockValue);
+            renderAssetAllocationChart();
+        }
+
+        function renderAssetAllocationChart() {
+            if (!currentUserData || !stockDataCache) return;
+            const ctx = document.getElementById('assetAllocationChart').getContext('2d');
+            const balance = currentUserData.balance || currentUserData.coins || 0;
+            const labels = ['현금'];
+            const data = [balance];
+            const backgroundColors = ['rgba(54, 162, 235, 0.7)'];
+
+            if (currentUserData.portfolio) {
+                for (const stockId in currentUserData.portfolio) {
+                    const portfolioItem = currentUserData.portfolio[stockId];
+                    const quantity = portfolioItem?.quantity || 0;
+                    if (quantity > 0 && stockDataCache[stockId]) {
+                        labels.push(stockDataCache[stockId].name);
+                        data.push(quantity * stockDataCache[stockId].price);
+                        backgroundColors.push(stockDataCache[stockId].color || '#CCCCCC');
+                    }
+                }
+            }
+
+            if (assetChartInstance) assetChartInstance.destroy();
+            
+            if (data.every(val => val === 0)) {
+                 assetChartInstance = new Chart(ctx, {type: 'doughnut', data: {labels: ['자산 없음'], datasets: [{ data: [1], backgroundColor: ['#E5E7EB'] }]}, options: {responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, tooltip: { enabled: false }}}});
+            } else {
+                assetChartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: { labels, datasets: [{ label: '자산 구성', data, backgroundColor: backgroundColors }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (c) => `${c.label}: ${formatCurrency(c.parsed)}` } } } }
+                });
+            }
+        }
+
+
+        // --- Stock Market Logic ---
+        async function initializeStockData() {
+            const initialStocks = {
+                'hanul': { name: '한울반 주식', price: 1000, history: [1000], color: 'rgba(59, 130, 246, 0.7)', minFluctuation: -50, maxFluctuation: 100, type: 'normal' },
+                'usan': { name: '우산 주식', price: 1000, history: [1000], color: 'rgba(16, 185, 129, 0.7)', minFluctuation: -50, maxFluctuation: 100, type: 'normal' },
+                'haetsal': { name: '햇살 주식', price: 1000, history: [1000], color: 'rgba(245, 158, 11, 0.7)', minFluctuation: -50, maxFluctuation: 100, type: 'normal' },
+                'edu': { name: '에이두 스쿨 주식', price: 1000, history: [1000], color: 'rgba(139, 92, 246, 0.7)', minFluctuation: -50, maxFluctuation: 100, type: 'normal' }
+            };
+            for (const stockId in initialStocks) {
+                const stockDocRef = doc(db, "stocks", stockId);
+                const docSnap = await getDoc(stockDocRef);
+                if (!docSnap.exists()) {
+                    await setDoc(stockDocRef, initialStocks[stockId]);
+                }
+            }
+        }
+
+        async function updateNormalStockPrices() {
+            for (const stockId in stockDataCache) {
+                const stock = stockDataCache[stockId];
+                if (stock.type === 'normal') {
+                    const minFluctuation = stock.minFluctuation || -50;
+                    const maxFluctuation = stock.maxFluctuation || 100;
+                    const change = Math.floor(Math.random() * (maxFluctuation - minFluctuation + 1)) + minFluctuation;
+                    let newPrice = stock.price + change;
+                    if (newPrice < 100) newPrice = 100;
+                    const newHistory = [...(stock.history || [])];
+                    newHistory.push(newPrice);
+                    if (newHistory.length > MAX_HISTORY_LENGTH) newHistory.shift();
+                    try {
+                        await updateDoc(doc(db, "stocks", stockId), { price: newPrice, history: newHistory });
+                    } catch (error) { console.error(`Error updating ${stock.name}:`, error); }
+                }
+            }
+        }
+        
+        function startStockUpdates() {
+            initializeStockData().then(() => {
+                if (stockUpdateInterval) clearInterval(stockUpdateInterval);
+                updateNormalStockPrices();
+                stockUpdateInterval = setInterval(updateNormalStockPrices, 60000);
+            });
+        }
+
+        async function loadAndRenderMarketTabs() {
+            const container = document.getElementById('marketTabsContainer');
+            container.innerHTML = '<p class="text-sm text-stone-500">주식 정보 로딩 중...</p>';
+            
+            try {
+                const querySnapshot = await getDocs(query(collection(db, "stocks"), orderBy("name")));
+                stockDataCache = {}; // Clear cache before loading
+                querySnapshot.forEach((docSnap) => {
+                    stockDataCache[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
+                });
+            } catch (error) {
+                container.innerHTML = '<p class="text-sm text-red-500">주식 정보를 불러오는데 실패했습니다.</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+            const stockIds = Object.keys(stockDataCache);
+            if (stockIds.length === 0) {
+                container.innerHTML = '<p class="text-sm text-stone-500">거래 가능한 주식이 없습니다.</p>';
+                document.getElementById('marketContent').innerHTML = '';
+                return;
+            }
+
+            stockIds.forEach((stockId, index) => {
+                const stock = stockDataCache[stockId];
+                const tabButton = document.createElement('button');
+                tabButton.className = `tab-button py-3 px-4 border-b-2 border-transparent text-stone-500 hover:text-amber-600 hover:border-amber-600 whitespace-nowrap text-sm font-medium`;
+                tabButton.textContent = stock.name;
+                tabButton.onclick = () => {
+                    document.querySelectorAll('#market .tab-button').forEach(btn => btn.classList.remove('active'));
+                    tabButton.classList.add('active');
+                    renderStockDetails(stockId);
+                };
+                container.appendChild(tabButton);
+                if (index === 0) {
+                    tabButton.classList.add('active');
+                    renderStockDetails(stockId);
+                }
+            });
+        }
+        
+        function renderStockDetails(stockId, filterType = 'day') {
+             if (!currentUserData || !stockDataCache[stockId]) {
+                document.getElementById('marketContent').innerHTML = '<p class="text-center text-stone-500">주식 정보를 불러올 수 없습니다.</p>';
+                return;
+            }
+            const stock = stockDataCache[stockId];
+            const portfolioItem = currentUserData.portfolio?.[stockId];
+            const userHoldings = portfolioItem?.quantity || 0;
+            const avgBuyPrice = portfolioItem?.avgBuyPrice || 0;
+            const holdingValue = userHoldings * stock.price;
+            let roiDisplay = 'N/A';
+            if (userHoldings > 0 && avgBuyPrice > 0) {
+                const roi = ((stock.price - avgBuyPrice) / avgBuyPrice) * 100;
+                roiDisplay = `${roi.toFixed(2)}%`;
+            }
+
+            document.getElementById('marketContent').innerHTML = `
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+                    <div>
+                        <h3 class="text-2xl font-bold" style="color: ${stock.color || '#000'}">${stock.name}</h3>
+                        <p class="text-4xl font-bold">${formatCurrency(stock.price)}</p>
+                    </div>
+                    <div class="text-right mt-2 md:mt-0 text-sm">
+                        <p>나의 보유량: <span class="font-semibold">${userHoldings} 주</span></p>
+                        <p>평가액: <span class="font-semibold">${formatCurrency(holdingValue)}</span></p>
+                        <p>평균 매수가: <span class="font-semibold">${userHoldings > 0 ? formatCurrency(avgBuyPrice) : 'N/A'}</span></p>
+                        <p>수익률: <span class="font-semibold ${roiDisplay.startsWith('-') ? 'text-red-600' : 'text-green-600'}">${roiDisplay}</span></p>
+                        <button id="aiStockAnalysisBtn-${stockId}" data-stock-id="${stockId}" class="mt-2 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-1 px-2 rounded-lg text-xs">✨ AI 종목 분석</button>
+                    </div>
+                </div>
+                <div class="chart-container h-64 md:h-80 mb-6"><canvas id="stockChart-${stockId}"></canvas></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="text-lg font-semibold text-emerald-600 mb-2">매수 (사기)</h4>
+                        <form id="buyForm-${stockId}" class="space-y-3"><input type="hidden" name="stockId" value="${stockId}">
+                            <input type="number" name="quantity" min="1" required placeholder="수량" class="w-full p-2 border rounded">
+                            <p class="text-sm">예상 금액: <span id="buyEstimate-${stockId}">0 원</span></p>
+                            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-3 rounded-lg">매수</button>
+                        </form>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-semibold text-red-600 mb-2">매도 (팔기)</h4>
+                        <form id="sellForm-${stockId}" class="space-y-3"><input type="hidden" name="stockId" value="${stockId}">
+                            <input type="number" name="quantity" min="1" max="${userHoldings}" ${userHoldings === 0 ? 'disabled' : ''} required placeholder="수량" class="w-full p-2 border rounded">
+                            <p class="text-sm">예상 금액: <span id="sellEstimate-${stockId}">0 원</span></p>
+                            <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-3 rounded-lg" ${userHoldings === 0 ? 'disabled' : ''}>매도</button>
+                        </form>
+                    </div>
+                </div>
+            `;
+            renderStockChart(stockId, stock.history || [], stock.color || '#CCCCCC');
+            
+            const buyForm = document.getElementById(`buyForm-${stockId}`);
+            buyForm.quantity.addEventListener('input', () => {
+                document.getElementById(`buyEstimate-${stockId}`).textContent = formatCurrency((buyForm.quantity.value || 0) * stock.price);
+            });
+            buyForm.addEventListener('submit', handleBuySellStock);
+
+            const sellForm = document.getElementById(`sellForm-${stockId}`);
+            if(sellForm.quantity) {
+                sellForm.quantity.addEventListener('input', () => {
+                    document.getElementById(`sellEstimate-${stockId}`).textContent = formatCurrency((sellForm.quantity.value || 0) * stock.price);
+                });
+                sellForm.addEventListener('submit', handleBuySellStock);
+            }
+            
+            document.getElementById(`aiStockAnalysisBtn-${stockId}`).addEventListener('click', handleAiStockAnalysis);
+        }
+        
+        function renderStockChart(stockId, historyData, color) {
+            const ctx = document.getElementById(`stockChart-${stockId}`).getContext('2d');
+            if (stockChartInstances[stockId]) stockChartInstances[stockId].destroy();
+            stockChartInstances[stockId] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: historyData.map((_, i) => i + 1),
+                    datasets: [{
+                        label: `${stockDataCache[stockId].name} 가격`,
+                        data: historyData,
+                        borderColor: color.replace('0.7', '1'),
+                        backgroundColor: color,
+                        tension: 0.1,
+                        fill: true,
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { callback: (v) => formatCurrency(v) } } }, plugins: { legend: { display: false } } }
+            });
+        }
+
+        async function handleBuySellStock(e) {
+            e.preventDefault();
+            const form = e.target;
+            const isBuy = form.id.startsWith('buy');
+            const stockId = form.stockId.value;
+            const quantity = parseInt(form.quantity.value);
+            const stock = stockDataCache[stockId];
+            const cost = quantity * stock.price;
+            
+            const userRef = doc(db, "users", currentUserData.id);
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const userSnap = await transaction.get(userRef);
+                    if (!userSnap.exists()) throw new Error("사용자 정보를 찾을 수 없습니다.");
+                    
+                    const userData = userSnap.data();
+                    const balance = userData.balance || userData.coins || 0;
+                    const currentPortfolio = userData.portfolio || {};
+                    const currentStockInfo = currentPortfolio[stockId] || { quantity: 0, avgBuyPrice: 0, totalInvested: 0, totalShares: 0 };
+                    
+                    if (isBuy) {
+                        if (balance < cost) throw new Error("잔액이 부족합니다.");
+                        const newTotalShares = (currentStockInfo.totalShares || 0) + quantity;
+                        const newTotalInvested = (currentStockInfo.totalInvested || 0) + cost;
+                        const newAvgBuyPrice = newTotalShares > 0 ? parseFloat((newTotalInvested / newTotalShares).toFixed(2)) : 0;
+                        const updatedStockData = {
+                            quantity: (currentStockInfo.quantity || 0) + quantity,
+                            avgBuyPrice: newAvgBuyPrice,
+                            totalInvested: newTotalInvested,
+                            totalShares: newTotalShares
+                        };
+                        transaction.update(userRef, { balance: increment(-cost), [`portfolio.${stockId}`]: updatedStockData });
+                    } else { // isSell
+                        if (currentStockInfo.quantity < quantity) throw new Error("보유 수량이 부족합니다.");
+                        const newQuantity = currentStockInfo.quantity - quantity;
+                        const updates = { balance: increment(cost) };
+                        if (newQuantity === 0) {
+                            updates[`portfolio.${stockId}`] = deleteField();
+                        } else {
+                            updates[`portfolio.${stockId}`] = { ...currentStockInfo, quantity: newQuantity };
+                        }
+                        transaction.update(userRef, updates);
+                    }
+                });
+                showModal('성공', `${stock.name} ${quantity}주를 ${isBuy ? '매수' : '매도'}했습니다.`);
+                form.reset();
+                const userDoc = await getDoc(userRef);
+                currentUserData = { id: userDoc.id, ...userDoc.data() };
+                updateDashboardDisplay();
+                renderStockDetails(stockId);
+            } catch (error) {
+                showModal('오류', `거래 중 오류 발생: ${error.message}`);
+            }
+        }
+        
+        async function handleAiStockAnalysis(e) {
+            const stockId = e.target.dataset.stockId;
+            const stockName = stockDataCache[stockId].name;
+            const prompt = `초등학생을 위한 ${stockName}에 대한 짧고 재미있는 이야기를 만들어줘. 예를 들어, ${stockName}이 왜 오르거나 내릴 수 있는지, 또는 ${stockName}과 관련된 재미있는 상상을 덧붙여서 이야기해줘. 긍정적이고 희망찬 내용으로 작성해줘. 100자 이내로 짧게 부탁해.`;
+            showAiModal("✨ AI가 열심히 생각하고 있어요...");
+            const apiKey = "AIzaSyC7_Gq4LIVVMv0hMD6qSwcTlGJcDSt-KgI";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+            try {
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API 요청 실패 (상태 코드: ${response.status})`);
+                const result = await response.json();
+                updateAiModalContent(result.candidates?.[0]?.content?.parts?.[0]?.text || 'AI 응답 생성 실패');
+            } catch (error) {
+                updateAiModalContent(`AI 연결 오류: ${error.message}`);
+            }
+        }
+
+
+        // --- Event Listeners ---
+        document.getElementById('show-student-register-btn').addEventListener('click', () => switchView('studentRegister'));
+        document.getElementById('back-to-login-btn').addEventListener('click', () => switchView('login'));
+        document.getElementById('admin-page-btn').addEventListener('click', () => {
+            switchView('admin');
+            loadAdminData();
+        });
+        document.getElementById('back-to-dashboard-btn').addEventListener('click', () => showDashboard(currentUserData.role));
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            if (auth.currentUser && !auth.currentUser.isAnonymous) {
+                signOut(auth);
+            }
+            currentUserData = null;
+            currentAuthUser = null;
+            switchView('login');
+            if (stockUpdateInterval) clearInterval(stockUpdateInterval);
+        });
+
+        // Student Registration
+        document.getElementById('student-register-btn').addEventListener('click', async () => {
+            const name = document.getElementById('student-name').value.trim();
+            if (!name) { showModal('오류', '이름을 입력해주세요.'); return; }
+
+            try {
+                const counterRef = doc(db, "metadata", "counters");
+                const newCode = await runTransaction(db, async (transaction) => {
+                    const counterDoc = await transaction.get(counterRef);
+                    let nextCode = 1;
+                    if (counterDoc.exists() && counterDoc.data().lastUserCode) {
+                        nextCode = counterDoc.data().lastUserCode + 1;
+                    }
+                    transaction.set(counterRef, { lastUserCode: nextCode }, { merge: true });
+                    return nextCode;
+                });
+
+                const email = `${newCode}@abc.com`;
+                const password = `${newCode}qwerty`;
+
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                
+                await setDoc(doc(db, "users", userCredential.user.uid), {
+                    uid: userCredential.user.uid,
+                    name: name,
+                    email: email,
+                    userCode: newCode,
+                    role: 'student',
+                    coins: 0,
+                    balance: 0,
+                    portfolio: {},
+                    createdAt: serverTimestamp()
+                });
+
+                showModal('등록 완료!', `환영합니다, ${name} 학생!<br>당신의 고유 코드는 <strong class="text-2xl text-amber-600">${newCode}</strong> 입니다.<br>이 코드를 꼭 기억하고 로그인해주세요.`);
+                switchView('login');
+            } catch (e) {
+                console.error("Error adding document: ", e);
+                if (e.code === 'auth/email-already-in-use') {
+                    showModal('오류', '이미 사용 중인 계정 정보입니다. 다른 코드를 시도해주세요.');
+                } else {
+                    showModal('오류', '학생 등록 중 문제가 발생했습니다.');
+                }
+            }
+        });
+        
+        // Student Login
+        document.getElementById('student-login-btn').addEventListener('click', async () => {
+            const codeInput = document.getElementById('student-code').value.trim();
+            
+            const normalizedCode = codeInput.replace(/[\uFF10-\uFF19]/g, (m) => String.fromCharCode(m.charCodeAt(0) - 0xFEE0));
+
+            if (!normalizedCode || !/^\d+$/.test(normalizedCode)) {
+                showModal('오류', '유효한 숫자 코드를 입력해주세요.');
+                return;
+            }
+            
+            const codeAsInt = parseInt(normalizedCode, 10);
+            const email = `${codeAsInt}@abc.com`;
+            const password = `${codeAsInt}qwerty`;
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                // onAuthStateChanged will handle successful login
+            } catch (error) {
+                 console.error("Student login error:", error);
+                 if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                     showModal('로그인 실패', '고유 코드가 올바르지 않거나 해당 학생을 찾을 수 없습니다.');
+                 } else if (error.code === 'permission-denied') {
+                     showModal('로그인 오류', '데이터베이스 접근 권한이 없습니다. 관리자에게 문의하여 Firestore 보안 규칙을 확인해주세요.');
+                 } else {
+                     showModal('로그인 오류', `알 수 없는 오류가 발생했습니다: ${error.message}`);
+                 }
+            }
+        });
+
+        // Teacher Login
+        document.getElementById('teacher-login-btn').addEventListener('click', async () => {
+            const email = document.getElementById('teacher-email').value;
+            const password = document.getElementById('teacher-password').value;
+            if (!email || !password) { showModal('오류', '이메일과 비밀번호를 모두 입력해주세요.'); return; }
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                showModal('로그인 실패', '이메일 또는 비밀번호가 올바르지 않습니다.');
+            }
+        });
+        
+        // Teacher Registration (REMOVED)
+        // document.getElementById('teacher-register-btn').addEventListener('click', ...);
+        
+        // Admin page logic
+        document.getElementById('randomizePricesBtn').addEventListener('click', async () => {
+            showModal("진행 중", "주가 변경 중...");
+            await updateNormalStockPrices();
+            showModal('알림', '주식 가격이 임의로 변경되었습니다.');
+        });
+        
+        async function loadAdminData() {
+            const listEl = document.getElementById('adminUserList');
+            listEl.innerHTML = '<li>사용자 정보 로딩 중...</li>';
+            try {
+                const usersSnapshot = await getDocs(collection(db, "users"));
+
+                listEl.innerHTML = '';
+                
+                const users = usersSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                const teachers = users.filter(u => u.role === 'teacher');
+                const students = users.filter(u => u.role === 'student');
+
+                if (teachers.length > 0) {
+                    const teacherHeader = document.createElement('h4');
+                    teacherHeader.className = "text-lg font-semibold text-gray-700 mt-4 mb-2 border-b pb-1";
+                    teacherHeader.textContent = "교사 목록";
+                    listEl.appendChild(teacherHeader);
+
+                    teachers.forEach(teacher => {
+                        const li = document.createElement('li');
+                        li.className = "flex justify-between items-center py-2 border-b";
+                        li.innerHTML = `
+                            <div>
+                                <span class="font-medium">${teacher.name}</span> <span class="text-xs text-gray-500">(${teacher.email || '이메일 없음'})</span>
+                                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">교사</span>
+                            </div>
+                            <button data-userid="${teacher.id}" data-username="${teacher.name}" class="convert-to-student-btn btn bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 text-xs">학생으로 전환</button>
+                        `;
+                        listEl.appendChild(li);
+                    });
+                }
+
+                if (students.length > 0) {
+                    const studentHeader = document.createElement('h4');
+                    studentHeader.className = "text-lg font-semibold text-gray-700 mt-6 mb-2 border-b pb-1";
+                    studentHeader.textContent = "학생 목록";
+                    listEl.appendChild(studentHeader);
+                    
+                    students.sort((a,b) => (a.userCode || 0) - (b.userCode || 0));
+
+                    students.forEach(student => {
+                        const li = document.createElement('li');
+                        li.className = "flex justify-between items-center py-2 border-b";
+                        li.innerHTML = `
+                            <div>
+                                <span class="font-medium">${student.name}</span> <span class="text-xs text-gray-500">(코드: ${student.userCode || '없음'})</span>
+                                 <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">학생</span>
+                            </div>
+                            <div class="space-x-2">
+                                <button data-userid="${student.id}" data-username="${student.name}" class="convert-to-teacher-btn btn bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 text-xs">교사로 전환</button>
+                                <button data-userid="${student.id}" data-username="${student.name}" class="assign-code-btn btn bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 text-xs">코드 부여/수정</button>
+                                <button data-studentid="${student.id}" class="adjust-student-btn btn btn-secondary px-2 py-1 text-xs">조정</button>
+                            </div>
+                        `;
+                        listEl.appendChild(li);
+                    });
+                }
+
+                document.querySelectorAll('.adjust-student-btn').forEach(btn => btn.addEventListener('click', (e) => openAdjustModal(e.target.dataset.studentid)));
+                document.querySelectorAll('.convert-to-student-btn').forEach(btn => btn.addEventListener('click', (e) => handleRoleSwitch(e.target.dataset.userid, e.target.dataset.username, 'student')));
+                document.querySelectorAll('.convert-to-teacher-btn').forEach(btn => btn.addEventListener('click', (e) => handleRoleSwitch(e.target.dataset.userid, e.target.dataset.username, 'teacher')));
+                document.querySelectorAll('.assign-code-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignCodeModal(e.target.dataset.userid, e.target.dataset.username)));
+
+            } catch (error) {
+                console.error("Error loading admin data:", error);
+                listEl.innerHTML = `<li>사용자 정보 로드 실패: ${error.message}</li>`;
+            }
+        }
+        
+        async function handleRoleSwitch(userId, userName, toRole) {
+            showModal(`${toRole === 'student' ? '학생' : '교사'}으로 전환 확인`, `정말로 '${userName}'님을 ${toRole === 'student' ? '학생' : '교사'}으로 전환하시겠습니까?`);
+            
+            modalConfirmBtn.onclick = async () => {
+                modal.style.display = 'none';
+                
+                try {
+                    const userRef = doc(db, "users", userId);
+                    const updates = { role: toRole };
+                    
+                    await updateDoc(userRef, updates);
+                    showModal('전환 완료', `'${userName}'님의 역할이 성공적으로 변경되었습니다.`);
+                    loadAdminData();
+
+                } catch (e) {
+                    console.error("Error switching role: ", e);
+                    showModal('오류', '역할 전환 중 문제가 발생했습니다.');
+                } finally {
+                    modalConfirmBtn.onclick = () => modal.style.display = 'none';
+                }
+            };
+        }
+
+        function openAssignCodeModal(userId, userName) {
+            assignCodeModal.style.display = 'flex';
+            document.getElementById('assign-code-modal-title').textContent = `'${userName}' 학생 코드 부여/수정`;
+            document.getElementById('assign-code-userid').value = userId;
+            document.getElementById('new-user-code').value = '';
+        }
+
+        document.getElementById('close-assign-code-modal-btn').addEventListener('click', () => assignCodeModal.style.display = 'none');
+        document.getElementById('save-new-code-btn').addEventListener('click', async () => {
+            const userId = document.getElementById('assign-code-userid').value;
+            const newCode = document.getElementById('new-user-code').value;
+
+            if (!newCode || !/^\d+$/.test(newCode)) {
+                showModal('오류', '유효한 숫자 코드를 입력해주세요.');
+                return;
+            }
+
+            const newCodeInt = parseInt(newCode, 10);
+
+            try {
+                const userRef = doc(db, "users", userId);
+                await updateDoc(userRef, {
+                    userCode: newCodeInt,
+                    email: `${newCodeInt}@abc.com`
+                });
+                
+                assignCodeModal.style.display = 'none';
+                showModal('코드 변경 완료', `고유 코드가 ${newCodeInt}(으)로 변경되었습니다.<br><strong class="text-red-500">매우 중요: Firebase Console의 Authentication 탭에서 해당 학생의 이메일을 '${newCodeInt}@abc.com'으로, 비밀번호를 '${newCodeInt}qwerty'(으)로 직접 변경해야만 새 코드로 로그인이 가능합니다.</strong>`);
+                loadAdminData();
+            } catch (error) {
+                console.error("Error assigning new code:", error);
+                showModal('오류', '코드 변경 중 오류가 발생했습니다.');
+            }
+        });
+        
+        // --- Shop Logic ---
+        async function loadAndRenderShopItems() {
+            const container = document.getElementById('shop-item-list');
+            container.innerHTML = `<p class="col-span-full text-center text-gray-500">상점 물품을 불러오는 중입니다...</p>`;
+            try {
+                const querySnapshot = await getDocs(query(collection(db, "shopItems"), orderBy("name")));
+                container.innerHTML = '';
+                if(querySnapshot.empty) {
+                    container.innerHTML = `<p class="col-span-full text-center text-gray-500">판매중인 물품이 없습니다.</p>`;
+                    return;
+                }
+                querySnapshot.forEach(docSnap => {
+                    const item = { id: docSnap.id, ...docSnap.data() };
+                    const card = document.createElement('div');
+                    card.className = "bg-white p-4 rounded-lg shadow flex flex-col";
+                    card.innerHTML = `
+                        <h3 class="text-lg font-bold">${item.name}</h3>
+                        <p class="text-sm text-gray-500 flex-grow my-2">${item.description || ''}</p>
+                        <div class="flex justify-between items-center mt-4">
+                            <span class="font-bold text-amber-600">${formatCurrency(item.price)}</span>
+                            <button data-itemid="${item.id}" class="buy-item-btn btn btn-primary px-3 py-1 text-sm">구매</button>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+                document.querySelectorAll('.buy-item-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => handleBuyItem(e.target.dataset.itemid));
+                });
+            } catch (error) {
+                console.error("Error loading shop items: ", error);
+                container.innerHTML = `<p class="col-span-full text-center text-red-500">상점 물품 로드 실패</p>`;
+            }
+        }
+
+        async function handleBuyItem(itemId) {
+            const itemDoc = await getDoc(doc(db, "shopItems", itemId));
+            if (!itemDoc.exists()) {
+                showModal('오류', '존재하지 않는 물품입니다.');
+                return;
+            }
+            const item = itemDoc.data();
+            
+            showModal('구매 확인', `'${item.name}'을(를) ${formatCurrency(item.price)}에 구매하시겠습니까?`);
+            modalConfirmBtn.onclick = async () => {
+                modal.style.display = 'none';
+                const userRef = doc(db, "users", currentUserData.id);
+                try {
+                    await runTransaction(db, async (transaction) => {
+                        const userSnap = await transaction.get(userRef);
+                        const userData = userSnap.data();
+                        const balance = userData.balance || userData.coins || 0;
+                        if (balance < item.price) {
+                            throw new Error('잔액이 부족합니다.');
+                        }
+                        transaction.update(userRef, { balance: increment(-item.price) });
+                    });
+                    showModal('구매 완료', `${item.name} 구매가 완료되었습니다.`);
+                    const userDoc = await getDoc(userRef);
+                    currentUserData = { id: userDoc.id, ...userDoc.data() };
+                    updateDashboardDisplay();
+                } catch (error) {
+                    showModal('구매 실패', error.message);
+                }
+                modalConfirmBtn.onclick = () => modal.style.display = 'none';
+            };
+        }
+
+        // --- Admin Shop Management ---
+        document.getElementById('teacher-add-shop-item-btn').addEventListener('click', () => openShopItemModal());
+
+        async function openShopItemModal(itemId = null) {
+            const form = document.getElementById('shop-item-form');
+            form.reset();
+            document.getElementById('shop-item-id').value = '';
+            if (itemId) {
+                const itemDoc = await getDoc(doc(db, "shopItems", itemId));
+                if (itemDoc.exists()) {
+                    const item = itemDoc.data();
+                    document.getElementById('shop-item-id').value = itemId;
+                    document.getElementById('shop-item-name').value = item.name;
+                    document.getElementById('shop-item-price').value = item.price;
+                    document.getElementById('shop-item-desc').value = item.description;
+                }
+            }
+            shopItemModal.style.display = 'flex';
+        }
+        document.getElementById('close-shop-item-modal-btn').addEventListener('click', () => shopItemModal.style.display = 'none');
+        document.getElementById('shop-item-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const itemId = document.getElementById('shop-item-id').value;
+            const data = {
+                name: document.getElementById('shop-item-name').value,
+                price: Number(document.getElementById('shop-item-price').value),
+                description: document.getElementById('shop-item-desc').value
+            };
+            if (itemId) {
+                await updateDoc(doc(db, "shopItems", itemId), data);
+            } else {
+                await addDoc(collection(db, "shopItems"), data);
+            }
+            shopItemModal.style.display = 'none';
+            loadAndRenderShopItems();
+        });
+        
+        // --- Admin Student Adjustment ---
+        async function openAdjustModal(studentId) {
+            studentToAdjustId = studentId;
+            const studentDoc = await getDoc(doc(db, "users", studentId));
+            if (!studentDoc.exists()) {
+                showModal('오류', '학생 정보를 찾을 수 없습니다.');
+                return;
+            }
+            const student = studentDoc.data();
+            document.getElementById('adjust-modal-title').textContent = `${student.name} 학생 자산 조정`;
+            
+            const portfolioList = document.getElementById('student-portfolio-list');
+            portfolioList.innerHTML = '';
+            if (student.portfolio && Object.keys(student.portfolio).length > 0) {
+                 for (const stockId in student.portfolio) {
+                    const stockInfo = student.portfolio[stockId];
+                    const stockName = stockDataCache[stockId]?.name || '알 수 없는 주식';
+                    const div = document.createElement('div');
+                    div.className = 'flex justify-between items-center text-sm';
+                    div.innerHTML = `
+                        <span>${stockName}: ${stockInfo.quantity}주</span>
+                        <button data-stockid="${stockId}" class="reset-stock-btn text-xs bg-red-500 text-white px-2 py-1 rounded">초기화</button>
+                    `;
+                    portfolioList.appendChild(div);
+                }
+                document.querySelectorAll('.reset-stock-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const stockIdToReset = e.target.dataset.stockid;
+                        showModal('확인', `${stockDataCache[stockIdToReset].name} 주식을 초기화하시겠습니까?`);
+                        modalConfirmBtn.onclick = async () => {
+                            await updateDoc(doc(db, "users", studentToAdjustId), {
+                                [`portfolio.${stockIdToReset}`]: deleteField()
+                            });
+                            modal.style.display = 'none';
+                            openAdjustModal(studentToAdjustId); // Refresh modal
+                        }
+                    });
+                });
+            } else {
+                portfolioList.innerHTML = '<p class="text-xs text-gray-500">보유 주식이 없습니다.</p>';
+            }
+
+            adjustStudentModal.style.display = 'flex';
+        }
+        document.getElementById('close-adjust-modal-btn').addEventListener('click', () => adjustStudentModal.style.display = 'none');
+        document.getElementById('adjust-won-btn').addEventListener('click', async () => {
+            const amount = Number(document.getElementById('won-adjustment-amount').value);
+            if (isNaN(amount) || amount === 0) {
+                showModal('오류', '정확한 금액을 입력하세요.');
+                return;
+            }
+            await updateDoc(doc(db, "users", studentToAdjustId), {
+                balance: increment(amount),
+                coins: increment(amount) // Keep 'coins' field for backend consistency if needed
+            });
+            showModal('성공', '금액 조정이 완료되었습니다.');
+            document.getElementById('won-adjustment-amount').value = '';
+        });
+
+        // --- Life Rules & Teacher Management Logic ---
+        const isSameDay = (d1, d2) => {
+            if (!d1 || !d2) return false;
+            return d1.getFullYear() === d2.getFullYear() &&
+                   d1.getMonth() === d2.getMonth() &&
+                   d1.getDate() === d2.getDate();
+        };
+
+        function renderDashboardMainContent(role) {
+            const container = document.getElementById('main-dashboard-bottom-content');
+            container.innerHTML = '';
+            if (role === 'student') {
+                container.innerHTML = `<h3 class="text-lg font-bold mb-3">📜 오늘의 생활 규칙</h3><div id="life-rules-container" class="space-y-2"></div>`;
+                renderLifeRulesForStudent();
+            } else if (role === 'teacher') {
+                container.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button id="manage-rules-btn" class="btn btn-primary py-3">생활규칙 관리하기</button>
+                         <p class="text-center text-gray-500 p-3">숙제 관리는 '학습 문제' 탭에서 할 수 있습니다.</p>
+                    </div>
+                `;
+                document.getElementById('manage-rules-btn').addEventListener('click', () => openManageModal('rules'));
+            }
+        }
+
+        function renderLifeRulesForStudent() {
+            const container = document.getElementById('life-rules-container');
+            if (!container) return;
+            container.innerHTML = '';
+            const rules = [
+                { id: 'rule1', text: '일찍 일어나기', reward: 300 },
+                { id: 'rule2', text: '숙제 먼저 하기', reward: 300 },
+                { id: 'rule3', text: '30분 이상 책 읽기', reward: 300 },
+            ];
+            const today = new Date();
+            rules.forEach(rule => {
+                const completedRules = currentUserData.completedRules || {};
+                const lastCompleted = completedRules[rule.id];
+                const isCompletedToday = lastCompleted && isSameDay(lastCompleted.toDate(), today);
+
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center bg-gray-50 p-3 rounded-md';
+                div.innerHTML = `
+                    <span>${rule.text}</span>
+                    <button data-ruleid="${rule.id}" data-reward="${rule.reward}" class="complete-rule-btn ${isCompletedToday ? 'bg-gray-300' : 'bg-green-500 hover:bg-green-600'} text-white text-xs font-bold py-1 px-3 rounded-full" ${isCompletedToday ? 'disabled' : ''}>
+                        ${isCompletedToday ? '완료됨' : '지켰어요'}
+                    </button>
+                `;
+                container.appendChild(div);
+            });
+
+            document.querySelectorAll('.complete-rule-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const ruleId = e.target.dataset.ruleid;
+                    const reward = Number(e.target.dataset.reward);
+                    const userRef = doc(db, "users", currentUserData.id);
+                    await updateDoc(userRef, {
+                        balance: increment(reward),
+                        coins: increment(reward),
+                        [`completedRules.${ruleId}`]: serverTimestamp()
+                    });
+                    const userDoc = await getDoc(userRef);
+                    currentUserData = { id: userDoc.id, ...userDoc.data() };
+                    showModal('참 잘했어요!', `${formatCurrency(reward)}을(를) 획득했습니다!`);
+                    updateDashboardDisplay();
+                    renderLifeRulesForStudent();
+                });
+            });
+        }
+        
+        async function openManageModal(type) {
+            const title = type === 'rules' ? '생활규칙 관리' : '오늘의 숙제 관리';
+            document.getElementById('management-modal-title').textContent = title;
+            const listEl = document.getElementById('management-student-list');
+            listEl.innerHTML = '<p>학생 목록을 불러오는 중...</p>';
+            managementModal.style.display = 'flex';
+
+            const usersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
+            listEl.innerHTML = '';
+            usersSnapshot.forEach(docSnap => {
+                const student = {id: docSnap.id, ...docSnap.data()};
+                const div = document.createElement('div');
+                div.className = 'p-2 hover:bg-gray-100 cursor-pointer rounded';
+                div.textContent = `${student.name} (코드: ${student.userCode})`;
+                div.addEventListener('click', () => {
+                    showModal('알림', `${student.name} 학생의 ${title} 기능은 현재 개발 중입니다.`);
+                    managementModal.style.display = 'none';
+                });
+                listEl.appendChild(div);
+            });
+        }
+        document.getElementById('close-management-modal-btn').addEventListener('click', () => managementModal.style.display = 'none');
+
+        // --- TTS ---
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'ko-KR';
+                utterance.rate = 0.9;
+                window.speechSynthesis.cancel(); // Cancel any previous speech
+                window.speechSynthesis.speak(utterance);
+            } else {
+                showModal('오류', '사용하시는 브라우저는 음성 읽어주기를 지원하지 않습니다.');
+            }
+        }
+
+        // --- Learning Problems & Homework (NEW & UPDATED) ---
+
+        // Teacher: Open AI Math Problem Creator
+        document.getElementById('add-ai-math-problem-btn').addEventListener('click', () => openProblemCreationModal());
+
+        // Teacher: Open Modal (new or for editing)
+        function openProblemCreationModal(problemSet = null) {
+            problemCreationModal.style.display = 'flex';
+            document.getElementById('problem-creation-form-container').style.display = 'block';
+            document.getElementById('problem-display-area').innerHTML = '';
+            document.getElementById('problem-creation-footer').classList.add('hidden');
+            
+            const form = document.getElementById('problem-creation-form-container');
+            form.querySelector('#problem-set-id').value = problemSet?.id || '';
+            form.querySelector('#problem-set-title').value = problemSet?.title || '';
+            form.querySelector('#problem-count').value = problemSet?.problems?.length || '';
+            form.querySelector('#problem-topic').value = problemSet?.topic || '';
+            form.querySelector('#problem-reward').value = problemSet?.reward || '';
+            form.querySelector('#is-word-problem').checked = problemSet?.isWordProblem || false;
+
+            if (problemSet && problemSet.problems) {
+                currentProblemSet = problemSet;
+                renderProblemDisplay(problemSet.problems);
+                document.getElementById('problem-creation-footer').classList.remove('hidden');
+            }
+        }
+
+        // Teacher: Generate problems with AI
+        document.getElementById('generate-ai-problems-btn').addEventListener('click', async () => {
+            const count = document.getElementById('problem-count').value;
+            const topic = document.getElementById('problem-topic').value;
+            const title = document.getElementById('problem-set-title').value;
+            const reward = document.getElementById('problem-reward').value;
+            const isWordProblem = document.getElementById('is-word-problem').checked;
+
+            if (!count || !topic || !title || !reward) {
+                showModal('입력 오류', '모든 필드를 채워주세요.');
+                return;
+            }
+
+            const wordProblemText = isWordProblem ? '문장형' : '';
+            const prompt = `초등학생을 위한 ${topic} 주제의 ${wordProblemText} 수학 문제 ${count}개를 만들어줘. 각 문제에는 질문과 정답이 모두 포함되어야 해. 응답은 반드시 JSON 형식으로 "problems"라는 키 아래에 배열로 제공해줘. 각 배열 요소는 "question"과 "answer" 키를 가진 객체여야 해. 예를 들어: {"problems": [{"question": "사과 3개와 바나나 2개를 합치면 총 몇 개일까요?", "answer": "5"}]}`;
+            
+            const displayArea = document.getElementById('problem-display-area');
+            displayArea.innerHTML = `<div class="flex items-center justify-center p-4"><div class="loading-spinner"></div><p class="ml-2">AI가 문제를 만들고 있습니다...</p></div>`;
+
+            const apiKey = "AIzaSyC7_Gq4LIVVMv0hMD6qSwcTlGJcDSt-KgI";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: { responseMimeType: "application/json" }
+            };
+            
+            try {
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API 요청 실패 (상태 코드: ${response.status})`);
+                const result = await response.json();
+                const jsonString = result.candidates[0].content.parts[0].text;
+                const generatedData = JSON.parse(jsonString);
+                
+                if (!generatedData.problems || !Array.isArray(generatedData.problems)) {
+                    throw new Error("AI가 유효한 형식의 문제를 생성하지 못했습니다.");
+                }
+
+                currentProblemSet = {
+                    title,
+                    topic,
+                    reward: Number(reward),
+                    isWordProblem,
+                    problems: generatedData.problems.map(p => ({
+                        question: p.question,
+                        answer: String(p.answer) // Ensure answer is a string for comparison
+                    }))
+                };
+
+                renderProblemDisplay(currentProblemSet.problems);
+                document.getElementById('problem-creation-footer').classList.remove('hidden');
+
+            } catch (error) {
+                displayArea.innerHTML = `<p class="text-red-500 text-center">문제 생성 실패: ${error.message}</p>`;
+                console.error(error);
+            }
+        });
+
+        // Teacher: Render generated problems for review
+        function renderProblemDisplay(problems) {
+            const displayArea = document.getElementById('problem-display-area');
+            displayArea.innerHTML = problems.map((p, index) => `
+                <div class="problem-item border-b py-3">
+                    <div class="flex items-center">
+                        <span class="problem-number font-bold mr-2">${index + 1}.</span>
+                        <p class="problem-text flex-grow">${p.question}</p>
+                    </div>
+                    <div class="flex items-center mt-2">
+                        <span class="text-sm font-bold text-green-600 mr-2">정답:</span>
+                        <p class="text-sm text-gray-700">${p.answer}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Teacher: Save the created problem set to Firestore
+        document.getElementById('save-problem-set-btn').addEventListener('click', async () => {
+            if (!currentProblemSet) {
+                showModal('오류', '저장할 문제가 없습니다.');
+                return;
+            }
+            
+            const problemSetId = document.getElementById('problem-set-id').value;
+            const dataToSave = {
+                ...currentProblemSet,
+                teacherId: currentAuthUser.uid,
+                createdAt: serverTimestamp()
+            };
+
+            try {
+                if (problemSetId) { // Editing existing
+                    await setDoc(doc(db, "learningProblems", problemSetId), dataToSave, { merge: true });
+                    showModal('성공', '학습 문제가 성공적으로 수정되었습니다.');
+                } else { // Creating new
+                    await addDoc(collection(db, "learningProblems"), dataToSave);
+                    showModal('성공', '학습 문제가 성공적으로 저장되었습니다.');
+                }
+                problemCreationModal.style.display = 'none';
+                loadLearningProblems(); // Refresh the list
+            } catch (error) {
+                showModal('저장 실패', `오류가 발생했습니다: ${error.message}`);
+                console.error(error);
+            }
+        });
+
+        // Teacher: Load all created learning problems
+        async function loadLearningProblems() {
+            const container = document.getElementById('learning-problem-list');
+            container.innerHTML = `<p class="text-center text-gray-500">학습 문제 목록을 불러오는 중입니다...</p>`;
+            try {
+                const q = query(collection(db, "learningProblems"), where("teacherId", "==", currentAuthUser.uid));
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    container.innerHTML = `<p class="text-center text-gray-500">생성된 학습 문제가 없습니다.</p>`;
+                    return;
+                }
+                
+                const problemSets = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                problemSets.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
+
+
+                container.innerHTML = `
+                    <div class="divide-y divide-gray-200">
+                        ${problemSets.map(problemSet => {
+                            return `
+                                <div class="p-3 flex justify-between items-center">
+                                    <div>
+                                        <p class="font-bold">${problemSet.title}</p>
+                                        <p class="text-sm text-gray-500">${problemSet.topic} (${problemSet.problems.length}문제, ${formatCurrency(problemSet.reward)})</p>
+                                    </div>
+                                    <div class="space-x-2">
+                                        <button data-id="${problemSet.id}" class="assign-problem-btn btn bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-1">배부</button>
+                                        <button data-id="${problemSet.id}" class="edit-problem-btn btn bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1">수정</button>
+                                        <button data-id="${problemSet.id}" class="delete-problem-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+
+                container.querySelectorAll('.assign-problem-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignmentModal(e.target.dataset.id)));
+                container.querySelectorAll('.edit-problem-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                    const problemDoc = await getDoc(doc(db, "learningProblems", e.target.dataset.id));
+                    openProblemCreationModal({id: problemDoc.id, ...problemDoc.data()});
+                }));
+                container.querySelectorAll('.delete-problem-btn').forEach(btn => btn.addEventListener('click', (e) => deleteLearningProblem(e.target.dataset.id)));
+
+            } catch (error) {
+                console.error("Error loading learning problems:", error);
+                container.innerHTML = `<p class="text-center text-red-500">학습 문제 로드 실패. 콘솔을 확인해주세요.</p>`;
+            }
+        }
+
+        // Teacher: Delete a learning problem
+        async function deleteLearningProblem(problemId) {
+            showModal('삭제 확인', '정말로 이 학습 문제를 삭제하시겠습니까? 배부된 숙제에는 영향을 주지 않습니다.');
+            modalConfirmBtn.onclick = async () => {
+                try {
+                    await deleteDoc(doc(db, "learningProblems", problemId));
+                    modal.style.display = 'none';
+                    showModal('성공', '학습 문제가 삭제되었습니다.');
+                    loadLearningProblems();
+                } catch (error) {
+                    showModal('삭제 실패', `오류: ${error.message}`);
+                }
+                modalConfirmBtn.onclick = () => modal.style.display = 'none';
+            }
+        }
+
+        // Teacher: Open assignment modal
+        async function openAssignmentModal(problemId) {
+            currentLearningProblemId = problemId;
+            const problemDoc = await getDoc(doc(db, "learningProblems", problemId));
+            if (!problemDoc.exists()) {
+                showModal('오류', '존재하지 않는 학습 문제입니다.');
+                return;
+            }
+            const problemSet = problemDoc.data();
+            
+            document.getElementById('assignment-problem-title').textContent = `"${problemSet.title}" 배부하기`;
+            const studentListEl = document.getElementById('assignment-student-list');
+            studentListEl.innerHTML = '학생 목록 로딩 중...';
+            assignmentModal.style.display = 'flex';
+
+            const usersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
+            if (usersSnapshot.empty) {
+                studentListEl.innerHTML = '배부할 학생이 없습니다.';
+                return;
+            }
+            studentListEl.innerHTML = usersSnapshot.docs.map(docSnap => {
+                const student = {id: docSnap.id, ...docSnap.data()};
+                return `
+                    <label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100">
+                        <input type="checkbox" data-studentid="${student.id}" class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                        <span>${student.name} (코드: ${student.userCode})</span>
+                    </label>
+                `;
+            }).join('');
+        }
+
+        // Teacher: Assign homework to selected students
+        document.getElementById('assign-homework-btn').addEventListener('click', async () => {
+            const selectedStudentIds = Array.from(document.querySelectorAll('#assignment-student-list input:checked'))
+                .map(input => input.dataset.studentid);
+            
+            if (selectedStudentIds.length === 0) {
+                showModal('오류', '한 명 이상의 학생을 선택해주세요.');
+                return;
+            }
+
+            const problemDoc = await getDoc(doc(db, "learningProblems", currentLearningProblemId));
+            const problemSet = problemDoc.data();
+
+            try {
+                for (const studentId of selectedStudentIds) {
+                    const assignmentData = {
+                        problemId: currentLearningProblemId,
+                        title: problemSet.title,
+                        reward: problemSet.reward,
+                        status: 'assigned',
+                        assignedAt: serverTimestamp()
+                    };
+                    await addDoc(collection(db, `users/${studentId}/assignedHomework`), assignmentData);
+                }
+                assignmentModal.style.display = 'none';
+                showModal('성공', `${selectedStudentIds.length}명의 학생에게 숙제를 배부했습니다.`);
+            } catch (error) {
+                showModal('배부 실패', `오류: ${error.message}`);
+                console.error(error);
+            }
+        });
+
+        // Student: Render homework list
+        async function renderHomework() {
+            const tableBody = document.getElementById('homework-table-body');
+            tableBody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-gray-500">숙제를 불러오는 중...</td></tr>`;
+            
+            try {
+                const q = query(collection(db, `users/${currentUserData.id}/assignedHomework`), orderBy("assignedAt", "desc"));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    tableBody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-gray-500">새로운 숙제가 없습니다.</td></tr>`;
+                    return;
+                }
+
+                tableBody.innerHTML = '';
+                querySnapshot.forEach(docSnap => {
+                    const hw = { id: docSnap.id, ...docSnap.data() };
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${hw.title}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${hw.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                                ${hw.status === 'completed' ? '완료' : '미완료'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button data-hwid="${hw.id}" data-problemid="${hw.problemId}" class="view-homework-btn text-amber-600 hover:text-amber-900" ${hw.status === 'completed' ? 'disabled' : ''}>
+                                ${hw.status === 'completed' ? '완료됨' : '숙제로 이동하기'}
+                            </button>
+                        </td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+
+                tableBody.querySelectorAll('.view-homework-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => openHomeworkModal(e.target.dataset.hwid, e.target.dataset.problemid));
+                });
+
+            } catch (error) {
+                console.error("Error fetching homework:", error);
+                tableBody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-red-500">숙제 로드 실패</td></tr>`;
+            }
+        }
+        
+        // Student: Open and do homework
+        async function openHomeworkModal(assignmentId, problemId) {
+            currentAssignmentId = assignmentId;
+            const problemDoc = await getDoc(doc(db, "learningProblems", problemId));
+            if (!problemDoc.exists()) {
+                showModal('오류', '숙제 문제를 불러올 수 없습니다.');
+                return;
+            }
+            const problemSet = problemDoc.data();
+            
+            document.getElementById('homework-modal-title').textContent = problemSet.title;
+            const contentArea = document.getElementById('homework-modal-content');
+            
+            contentArea.innerHTML = problemSet.problems.map((p, index) => `
+                 <div class="problem-item border-b py-4" data-answer="${p.answer}">
+                    <div class="flex items-center mb-2">
+                        <span class="problem-status-icon text-lg mr-2"></span>
+                        <span class="problem-number font-bold mr-2">${index + 1}.</span>
+                        <button class="speak-btn text-blue-500 hover:text-blue-700 mr-3" data-text="${p.question}"><i class="fas fa-play-circle"></i></button>
+                        <p class="problem-text flex-grow">${p.question}</p>
+                    </div>
+                    <div class="flex items-center ml-10">
+                        <input type="text" class="student-answer-input w-full p-2 border rounded-md form-input" placeholder="정답을 입력하세요">
+                        <button class="grade-one-btn btn btn-secondary text-xs px-3 py-2 ml-2 whitespace-nowrap">채점</button>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('homework-score-display').textContent = '';
+            const completeBtn = document.getElementById('complete-homework-btn');
+            completeBtn.classList.add('btn-disabled');
+            completeBtn.disabled = true;
+
+            contentArea.querySelectorAll('.speak-btn').forEach(btn => btn.addEventListener('click', (e) => speak(e.currentTarget.dataset.text)));
+            contentArea.querySelectorAll('.grade-one-btn').forEach((btn, index) => {
+                btn.addEventListener('click', () => gradeOneProblem(index));
+            });
+
+            homeworkModal.style.display = 'flex';
+        }
+
+        // Student: Grade a single problem
+        function gradeOneProblem(index) {
+            const problemItem = document.querySelectorAll('#homework-modal-content .problem-item')[index];
+            const correctAnswer = problemItem.dataset.answer.trim();
+            const studentAnswer = problemItem.querySelector('.student-answer-input').value.trim();
+            const iconEl = problemItem.querySelector('.problem-status-icon');
+            
+            if (studentAnswer === correctAnswer) {
+                iconEl.innerHTML = '⭕';
+                iconEl.classList.remove('text-yellow-400');
+                iconEl.classList.add('text-red-500');
+                return true;
+            } else {
+                iconEl.innerHTML = '⭐';
+                iconEl.classList.remove('text-red-500');
+                iconEl.classList.add('text-yellow-400');
+                return false;
+            }
+        }
+
+        // Student: Grade all problems
+        document.getElementById('grade-all-homework-btn').addEventListener('click', () => {
+            const problems = document.querySelectorAll('#homework-modal-content .problem-item');
+            let correctCount = 0;
+            problems.forEach((_, index) => {
+                if(gradeOneProblem(index)) {
+                    correctCount++;
+                }
+            });
+
+            const score = Math.round((correctCount / problems.length) * 100);
+            document.getElementById('homework-score-display').textContent = `점수: ${score} / 100`;
+
+            const completeBtn = document.getElementById('complete-homework-btn');
+            if (score === 100) {
+                completeBtn.classList.remove('btn-disabled');
+                completeBtn.disabled = false;
+            } else {
+                completeBtn.classList.add('btn-disabled');
+                completeBtn.disabled = true;
+            }
+        });
+
+        // Student: Complete the homework assignment
+        document.getElementById('complete-homework-btn').addEventListener('click', async () => {
+            if (!currentAssignmentId) return;
+
+            const userRef = doc(db, "users", currentUserData.id);
+            const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
+
+            try {
+                const assignmentDoc = await getDoc(assignmentRef);
+                const reward = assignmentDoc.data().reward || 0;
+
+                await updateDoc(assignmentRef, { status: 'completed' });
+                await updateDoc(userRef, { balance: increment(reward) });
+
+                const userDoc = await getDoc(userRef);
+                currentUserData = { id: userDoc.id, ...userDoc.data() };
+                
+                homeworkModal.style.display = 'none';
+                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을(를) 획득했습니다!`);
+                updateDashboardDisplay();
+                renderHomework();
+
+            } catch (error) {
+                showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
+                console.error(error);
+            }
+        });
+
+        // Close Modals
+        document.getElementById('close-homework-modal-btn').addEventListener('click', () => homeworkModal.style.display = 'none');
+        document.getElementById('close-problem-creation-modal-btn').addEventListener('click', () => problemCreationModal.style.display = 'none');
+        document.getElementById('close-assignment-modal-btn').addEventListener('click', () => assignmentModal.style.display = 'none');
+
+        // --- Initial Load ---
+        initializeAuthentication();
+
+    </script>
+</body>
+</html>
