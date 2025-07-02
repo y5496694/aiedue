@@ -108,7 +108,10 @@
         <div id="dashboard-container" class="view">
             <header class="flex justify-between items-center mb-8">
                 <h1 id="dashboard-title" class="text-3xl font-bold"></h1>
-                <button id="logout-btn" class="py-2 px-4 rounded-md btn btn-secondary">로그아웃</button>
+                <div class="flex items-center space-x-4">
+                    <button id="back-to-admin-btn" class="hidden py-2 px-4 rounded-md btn bg-red-500 hover:bg-red-600 text-white">관리자 페이지로 돌아가기</button>
+                    <button id="logout-btn" class="py-2 px-4 rounded-md btn btn-secondary">로그아웃</button>
+                </div>
             </header>
             
             <div class="border-b border-gray-200 mb-6">
@@ -199,6 +202,7 @@
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-bold">📝 학습 문제 관리</h2>
                     <div class="space-x-2">
+                        <button id="add-ai-dictation-problem-btn" class="btn bg-teal-500 hover:bg-teal-600 text-white">🎤 AI 받아쓰기 문제 만들기</button>
                         <button id="add-ai-math-problem-btn" class="btn bg-blue-500 hover:bg-blue-600 text-white">🤖 AI 수학 문제 만들기</button>
                     </div>
                 </div>
@@ -242,14 +246,12 @@
                             <h3 class="text-xl font-semibold text-red-600 mb-2">시장 관리</h3>
                             <button id="randomizePricesBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg text-sm">주가 임의 변경</button>
                         </div>
-                        <!--/** NEW FEATURE 2: Purchase Log Start */-->
                         <div class="bg-white p-6 rounded-xl shadow-lg">
                              <h3 class="text-xl font-semibold text-red-600 mb-2">최근 구매 기록</h3>
                              <ul id="admin-purchase-log" class="space-y-2 text-sm max-h-80 overflow-y-auto">
                                  <li>기록을 불러오는 중...</li>
                              </ul>
                         </div>
-                        <!--/** NEW FEATURE 2: Purchase Log End */-->
                     </div>
                 </div>
             </div>
@@ -288,7 +290,6 @@
             <p id="aiModalMessage" class="text-stone-700 whitespace-pre-wrap text-lg leading-relaxed"></p>
         </div>
     </div>
-    <!--/** NEW FEATURE 4: Enhanced Admin Controls Start */-->
     <div id="adjust-student-modal" class="modal-overlay hidden">
         <div class="modal-content modal-content-lg">
             <span class="close-button" id="close-adjust-modal-btn">&times;</span>
@@ -316,7 +317,6 @@
             </div>
         </div>
     </div>
-    <!--/** NEW FEATURE 4: Enhanced Admin Controls End */-->
     <div id="assign-code-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <span class="close-button" id="close-assign-code-modal-btn">&times;</span>
@@ -348,12 +348,10 @@
                     <label for="shop-item-price" class="block text-sm font-medium">가격 (원)</label>
                     <input type="number" id="shop-item-price" required min="0" class="w-full p-2 border rounded-md form-input">
                 </div>
-                 <!--/** NEW FEATURE 1: Shop Item Images Start */-->
                 <div>
                     <label for="shop-item-image-url" class="block text-sm font-medium">이미지 URL (선택 사항)</label>
                     <input type="url" id="shop-item-image-url" class="w-full p-2 border rounded-md form-input" placeholder="https://example.com/image.png">
                 </div>
-                 <!--/** NEW FEATURE 1: Shop Item Images End */-->
                 <div>
                     <label for="shop-item-desc" class="block text-sm font-medium">설명</label>
                     <textarea id="shop-item-desc" rows="3" class="w-full p-2 border rounded-md form-input"></textarea>
@@ -428,7 +426,6 @@
             <h3 id="assignment-modal-title" class="text-xl font-bold mb-4">배부하기</h3>
             <p id="assignment-item-title" class="mb-4 text-gray-600"></p>
             
-            <!--/** NEW FEATURE 3: Recurring Life Rules Start */-->
             <div id="assignment-options" class="hidden text-left mb-4 space-y-2">
                 <label class="block text-sm font-medium">반복 설정</label>
                 <div class="flex items-center space-x-4">
@@ -436,7 +433,6 @@
                      <label class="flex items-center"><input type="radio" name="repeatType" value="one-time" class="mr-1"> 한 번만</label>
                 </div>
             </div>
-            <!--/** NEW FEATURE 3: Recurring Life Rules End */-->
 
             <div class="mb-2 relative">
                 <input type="text" id="assignment-student-search" class="w-full p-2 pl-10 border border-gray-300 rounded-md form-input" placeholder="이름 또는 코드로 검색...">
@@ -452,6 +448,59 @@
             </div>
         </div>
     </div>
+    <div id="dictation-creation-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-dictation-creation-modal-btn">&times;</span>
+            <h3 class="text-xl font-bold mb-4">🎤 AI 받아쓰기 문제 만들기</h3>
+            <form id="dictation-creation-form" class="text-left space-y-4">
+                <input type="hidden" id="dictation-problem-id">
+                <div>
+                    <label for="dictation-title" class="block text-sm font-medium">제목</label>
+                    <input type="text" id="dictation-title" required class="w-full p-2 border rounded-md form-input" placeholder="예: 1단원 받아쓰기">
+                </div>
+                <div>
+                    <label for="dictation-type" class="block text-sm font-medium">받아쓰기 종류</label>
+                    <select id="dictation-type" class="w-full p-2 border rounded-md form-input">
+                        <option value="word">단어 받아쓰기</option>
+                        <option value="sentence">문장 받아쓰기</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="dictation-count" class="block text-sm font-medium">문제 수</label>
+                        <input type="number" id="dictation-count" required min="1" max="20" class="w-full p-2 border rounded-md form-input" placeholder="1~20">
+                    </div>
+                    <div>
+                        <label for="dictation-reward" class="block text-sm font-medium">완료 시 획득 금액 (원)</label>
+                        <input type="number" id="dictation-reward" required min="0" class="w-full p-2 border rounded-md form-input" placeholder="예: 500">
+                    </div>
+                </div>
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary">받아쓰기 문제 저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="dictation-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-dictation-modal-btn">&times;</span>
+            <h3 id="dictation-modal-title" class="text-xl font-bold mb-4"></h3>
+            <div id="dictation-initial-view">
+                <p class="mb-4">받아쓰기 주제를 입력하고 문제 생성 버튼을 눌러주세요.</p>
+                <input type="text" id="dictation-student-topic" class="w-full p-2 border rounded-md form-input mb-4" placeholder="예: 과일, 동물, 교실 물건">
+                <button id="generate-dictation-questions-btn" class="btn btn-primary">받아쓰기 문제 생성</button>
+            </div>
+            <div id="dictation-main-view" class="hidden">
+                <div id="dictation-content" class="text-left mb-6 max-h-[60vh] overflow-y-auto space-y-4">
+                    <!-- Dictation questions will be rendered here -->
+                </div>
+                <div id="dictation-footer" class="mt-6 flex justify-end items-center space-x-2">
+                    <button id="reveal-dictation-answers-btn" class="btn btn-secondary">정답 공개</button>
+                    <button id="complete-dictation-btn" class="btn btn-primary btn-disabled" disabled>숙제 완료하기</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
 
     <script type="module">
@@ -464,74 +513,68 @@
          * 이는 Firebase의 보안 규칙이 데이터 조회를 차단하고 있기 때문입니다.
          * 아래 규칙 전체를 복사하여 Firebase 프로젝트의 [Firestore Database > 규칙] 탭에 붙여넣어 주세요.
          *
-         * If app features fail with a "Missing or insufficient permissions" error,
-         * it's because Firebase security rules are blocking the data query.
-         * Please copy the entire ruleset below and paste it into the [Firestore Database > Rules] tab
-         * in your Firebase project.
-         *
          */
         // --- COPY FROM HERE ---
         
         // rules_version = '2';
         // service cloud.firestore {
-        //   match /databases/{database}/documents {
+        //  match /databases/{database}/documents {
         //
-        //     function isTeacher() {
-        //       return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher';
-        //     }
+        //    function isTeacher() {
+        //      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher';
+        //    }
         //
-        //     match /users/{userId} {
-        //       allow get: if request.auth.uid == userId || isTeacher();
-        //       allow update: if request.auth.uid == userId || isTeacher();
-        //       allow delete: if isTeacher();
-        //       
-        //       // Allow user creation (registration)
-        //       allow create: if true; 
-        //       
-        //       // Allow LIST operations ONLY for teachers.
-        //       allow list: if isTeacher();
-        //       
-        //       match /assignedHomework/{homeworkId} {
-        //         allow read, write: if request.auth.uid == userId || isTeacher();
-        //       }
-        //       
-        //       match /assignedLifeRules/{ruleId} {
-        //           allow read, write: if request.auth.uid == userId || isTeacher();
-        //       }
-        //     }
+        //    match /users/{userId} {
+        //      allow get: if request.auth.uid == userId || isTeacher();
+        //      allow update: if request.auth.uid == userId || isTeacher();
+        //      allow delete: if isTeacher();
+        //      
+        //      // Allow user creation (registration)
+        //      allow create: if true; 
+        //      
+        //      // Allow LIST operations ONLY for teachers.
+        //      allow list: if isTeacher();
+        //      
+        //      match /assignedHomework/{homeworkId} {
+        //        allow read, write: if request.auth.uid == userId || isTeacher();
+        //      }
+        //      
+        //      match /assignedLifeRules/{ruleId} {
+        //          allow read, write: if request.auth.uid == userId || isTeacher();
+        //      }
+        //    }
         //
-        //     match /stocks/{stockId} {
-        //         allow read: if true;
-        //         allow write: if isTeacher();
-        //     }
+        //    match /stocks/{stockId} {
+        //        allow read: if true;
+        //        allow write: if isTeacher();
+        //    }
         //
-        //     match /shopItems/{itemId} {
-        //         allow read: if true;
-        //         allow write: if isTeacher();
-        //     }
-        //     
-        //     match /learningProblems/{problemId} {
-        //         allow read: if true;
-        //         allow write: if isTeacher();
-        //     }
-        //     
-        //     match /lifeRules/{ruleId} {
-        //         allow read: if request.auth != null;
-        //         allow write: if isTeacher();
-        //     }
+        //    match /shopItems/{itemId} {
+        //        allow read: if true;
+        //        allow write: if isTeacher();
+        //    }
+        //    
+        //    match /learningProblems/{problemId} {
+        //        allow read: if true;
+        //        allow write: if isTeacher();
+        //    }
+        //    
+        //    match /lifeRules/{ruleId} {
+        //        allow read: if request.auth != null;
+        //        allow write: if isTeacher();
+        //    }
         //
-        //     match /metadata/{docId} {
-        //       // Allow anyone to read/write the counters doc for registration.
-        //       // Only teachers can access other metadata docs.
-        //       allow read, write: if docId == 'counters' || isTeacher();
-        //     }
+        //    match /metadata/{docId} {
+        //      // Allow anyone to read/write the counters doc for registration.
+        //      // Only teachers can access other metadata docs.
+        //      allow read, write: if docId == 'counters' || isTeacher();
+        //    }
         //
-        //     // /** NEW FEATURE 2: Purchase Log Security Rule */
-        //     match /purchaseLog/{logId} {
-        //         allow create: if request.auth != null; // Allow any authenticated user to create a log (i.e., make a purchase)
-        //         allow read, list: if isTeacher(); // Only teachers can read the logs
-        //     }
-        //   }
+        //    match /purchaseLog/{logId} {
+        //        allow create: if request.auth != null; // Allow any authenticated user to create a log (i.e., make a purchase)
+        //        allow read, list: if isTeacher(); // Only teachers can read the logs
+        //    }
+        //  }
         // }
         
         // --- END COPY ---
@@ -555,7 +598,9 @@
 
         // --- Global State ---
         let currentAuthUser = null;
-        let currentUserData = null;
+        let currentUserData = null; // Currently logged-in user
+        let viewedUserData = null; // For admin viewing a student's dashboard
+        let isAdminViewing = false; // Flag for admin view mode
         let stockDataCache = {};
         let stockUpdateInterval = null;
         let assetChartInstance = null;
@@ -564,7 +609,8 @@
         let currentProblemSet = null; // For AI problem creation
         let currentAssignmentId = null; // For student homework completion
         let currentAssignmentItemId = null; // For teacher assignment (homework or life rule)
-        let currentAssignmentType = null; // 'homework' or 'lifeRule'
+        let currentAssignmentType = null; // 'math', 'dictation', or 'lifeRule'
+        let currentDictationTemplate = null; // For student dictation homework
 
         // --- DOM Elements ---
         const views = {
@@ -573,11 +619,11 @@
             dashboard: document.getElementById('dashboard-container'),
             admin: document.getElementById('admin-view'),
         };
-        const modal = document.getElementById('modal');
-        const modalTitle = document.getElementById('modal-title');
-        const modalMessage = document.getElementById('modal-message');
-        const modalCloseBtn = document.getElementById('modal-close-btn');
-        const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+        let modal = document.getElementById('modal');
+        let modalTitle = document.getElementById('modal-title');
+        let modalMessage = document.getElementById('modal-message');
+        let modalCloseBtn = document.getElementById('modal-close-btn');
+        let modalConfirmBtn = document.getElementById('modal-confirm-btn');
         const aiContentModal = document.getElementById('aiContentModal');
         const aiModalTitle = document.getElementById('aiModalTitle');
         const aiModalMessage = document.getElementById('aiModalMessage');
@@ -590,19 +636,35 @@
         const problemCreationModal = document.getElementById('problem-creation-modal');
         const assignmentModal = document.getElementById('assignment-modal');
         const assignCodeModal = document.getElementById('assign-code-modal');
+        const dictationCreationModal = document.getElementById('dictation-creation-modal');
+        const dictationModal = document.getElementById('dictation-modal');
         let studentToAdjustId = null;
 
 
         // --- Utility & Modal Functions ---
         const formatCurrency = (amount) => new Intl.NumberFormat('ko-KR').format(amount) + ' 원';
         
-        function showModal(title, message) {
+        function showModal(title, message, onConfirm = null) {
             modalTitle.textContent = title;
             modalMessage.innerHTML = message;
+            
+            // Clone and replace the button to remove old event listeners
+            const newConfirmBtn = modalConfirmBtn.cloneNode(true);
+            modalConfirmBtn.parentNode.replaceChild(newConfirmBtn, modalConfirmBtn);
+            modalConfirmBtn = document.getElementById('modal-confirm-btn'); // Re-assign the global variable
+
+            if (onConfirm && typeof onConfirm === 'function') {
+                modalConfirmBtn.style.display = 'inline-block';
+                modalConfirmBtn.onclick = () => {
+                    onConfirm();
+                };
+            } else {
+                modalConfirmBtn.onclick = () => modal.style.display = 'none';
+            }
             modal.style.display = 'flex';
         }
+
         modalCloseBtn.addEventListener('click', () => modal.style.display = 'none');
-        modalConfirmBtn.addEventListener('click', () => modal.style.display = 'none');
         
         function showAiModal(title) {
             aiModalTitle.textContent = title;
@@ -659,55 +721,66 @@
         // --- Authentication Logic ---
         onAuthStateChanged(auth, async (user) => {
             currentAuthUser = user;
-            if (user && !user.isAnonymous) { // Teacher or converted student with email login
+            isAdminViewing = false; // Reset admin view on auth change
+            document.getElementById('back-to-admin-btn').classList.add('hidden');
+
+            if (user && !user.isAnonymous) {
                 const userDoc = await getDoc(doc(db, "users", user.uid));
                 if (userDoc.exists()) {
                     currentUserData = { id: user.uid, ...userDoc.data() };
-                    if (currentUserData.role === 'teacher') {
-                        showDashboard('teacher');
-                    } else {
-                        // This handles converted students who log in with their old email
-                        showDashboard('student');
-                    }
+                    viewedUserData = currentUserData; // By default, you view your own data
+                    showDashboard(currentUserData.role);
                 } else {
-                    // No user document found for this auth user, send to login
                     currentUserData = null;
+                    viewedUserData = null;
                     switchView('login');
                 }
-            } else { // No user, anonymous user, or student login
-                // This part is tricky. Student login is not a "real" auth state change.
-                // We prevent this from overriding a successful student login.
-                if (!currentUserData) {
+            } else { 
+                if (!isAdminViewing) {
+                    currentUserData = null;
+                    viewedUserData = null;
                     switchView('login');
-                    switchLoginTab('student'); // Default to student tab
+                    switchLoginTab('student');
                 }
             }
             document.getElementById('loading-overlay').style.display = 'none';
         });
 
         async function initializeAuthentication() {
-            // This function is kept for potential future use with custom tokens
-            // but onAuthStateChanged is now the primary driver.
+            // Kept for potential future use
         }
 
         // --- Dashboard Logic ---
         function showDashboard(role) {
+            const dataToShow = viewedUserData; // Use the currently viewed user's data
+            if (!dataToShow) return;
+
             const titleEl = document.getElementById('dashboard-title');
             const codeEl = document.getElementById('dashboard-code');
             const studentPanel = document.getElementById('student-info-panel');
             const teacherPanel = document.getElementById('teacher-admin-panel');
             
-            document.getElementById('homework-dashboard-tab').style.display = role === 'student' ? 'inline-block' : 'none';
-            document.getElementById('learning-problems-dashboard-tab').style.display = role === 'teacher' ? 'inline-block' : 'none';
-            document.getElementById('life-rules-management-dashboard-tab').style.display = role === 'teacher' ? 'inline-block' : 'none';
+            // Show/hide tabs based on the *actual logged-in user's role*
+            document.getElementById('homework-dashboard-tab').style.display = dataToShow.role === 'student' ? 'inline-block' : 'none';
+            document.getElementById('learning-problems-dashboard-tab').style.display = currentUserData.role === 'teacher' ? 'inline-block' : 'none';
+            document.getElementById('life-rules-management-dashboard-tab').style.display = currentUserData.role === 'teacher' ? 'inline-block' : 'none';
+            document.getElementById('teacher-admin-panel').style.display = currentUserData.role === 'teacher' ? 'block' : 'none';
+            
+            // Disable interactive elements if admin is viewing
+            const isReadOnly = isAdminViewing;
+            document.querySelectorAll('.buy-item-btn, #main-dashboard-bottom-content button').forEach(el => el.disabled = isReadOnly);
+
 
             if (role === 'teacher') {
-                titleEl.textContent = `${currentUserData.name || '교사'} 대시보드`;
+                titleEl.textContent = `${dataToShow.name || '교사'} 대시보드`;
                 studentPanel.classList.add('hidden');
                 teacherPanel.classList.remove('hidden');
             } else { // Student
-                titleEl.textContent = `${currentUserData.name} 학생`;
-                codeEl.textContent = currentUserData.userCode || 'N/A';
+                titleEl.textContent = `${dataToShow.name} 학생`;
+                if(isAdminViewing) {
+                    titleEl.textContent += ` (관리자 조회 모드)`;
+                }
+                codeEl.textContent = dataToShow.userCode || 'N/A';
                 studentPanel.classList.remove('hidden');
                 teacherPanel.classList.add('hidden');
             }
@@ -721,22 +794,23 @@
                 renderHomework();
                 renderLifeRulesForStudent();
             }
-            if (role === 'teacher') {
+            if (currentUserData.role === 'teacher') {
                 loadLearningProblems();
                 loadLifeRules();
             }
             startStockUpdates();
-            document.getElementById('teacher-add-shop-item-btn').classList.toggle('hidden', role !== 'teacher');
+            document.getElementById('teacher-add-shop-item-btn').classList.toggle('hidden', currentUserData.role !== 'teacher');
         }
         
         function updateDashboardDisplay() {
-            if (!currentUserData) return;
-            const balance = currentUserData.balance || currentUserData.coins || 0;
+            const dataToShow = viewedUserData;
+            if (!dataToShow) return;
+            const balance = dataToShow.balance || dataToShow.coins || 0;
             document.getElementById('currentBalance').textContent = formatCurrency(balance);
             let stockValue = 0;
-            if (currentUserData.portfolio) {
-                for (const stockId in currentUserData.portfolio) {
-                    const portfolioItem = currentUserData.portfolio[stockId];
+            if (dataToShow.portfolio) {
+                for (const stockId in dataToShow.portfolio) {
+                    const portfolioItem = dataToShow.portfolio[stockId];
                     const quantity = portfolioItem?.quantity || 0;
                     const stockPrice = stockDataCache[stockId]?.price || 0;
                     stockValue += quantity * stockPrice;
@@ -747,16 +821,17 @@
         }
 
         function renderAssetAllocationChart() {
-            if (!currentUserData || !stockDataCache) return;
+            const dataToShow = viewedUserData;
+            if (!dataToShow || !stockDataCache) return;
             const ctx = document.getElementById('assetAllocationChart').getContext('2d');
-            const balance = currentUserData.balance || currentUserData.coins || 0;
+            const balance = dataToShow.balance || dataToShow.coins || 0;
             const labels = ['현금'];
             const data = [balance];
             const backgroundColors = ['rgba(54, 162, 235, 0.7)'];
 
-            if (currentUserData.portfolio) {
-                for (const stockId in currentUserData.portfolio) {
-                    const portfolioItem = currentUserData.portfolio[stockId];
+            if (dataToShow.portfolio) {
+                for (const stockId in dataToShow.portfolio) {
+                    const portfolioItem = dataToShow.portfolio[stockId];
                     const quantity = portfolioItem?.quantity || 0;
                     if (quantity > 0 && stockDataCache[stockId]) {
                         labels.push(stockDataCache[stockId].name);
@@ -798,6 +873,7 @@
         }
 
         async function updateNormalStockPrices() {
+            if (isAdminViewing) return; // Don't update prices when an admin is just viewing
             for (const stockId in stockDataCache) {
                 const stock = stockDataCache[stockId];
                 if (stock.type === 'normal') {
@@ -865,13 +941,14 @@
             });
         }
         
-        function renderStockDetails(stockId, filterType = 'day') {
-             if (!currentUserData || !stockDataCache[stockId]) {
+        function renderStockDetails(stockId) {
+            const dataToShow = viewedUserData;
+             if (!dataToShow || !stockDataCache[stockId]) {
                 document.getElementById('marketContent').innerHTML = '<p class="text-center text-stone-500">주식 정보를 불러올 수 없습니다.</p>';
                 return;
             }
             const stock = stockDataCache[stockId];
-            const portfolioItem = currentUserData.portfolio?.[stockId];
+            const portfolioItem = dataToShow.portfolio?.[stockId];
             const userHoldings = portfolioItem?.quantity || 0;
             const avgBuyPrice = portfolioItem?.avgBuyPrice || 0;
             const holdingValue = userHoldings * stock.price;
@@ -881,6 +958,8 @@
                 roiDisplay = `${roi.toFixed(2)}%`;
             }
 
+            const isReadOnly = isAdminViewing;
+
             document.getElementById('marketContent').innerHTML = `
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
                     <div>
@@ -888,11 +967,11 @@
                         <p class="text-4xl font-bold">${formatCurrency(stock.price)}</p>
                     </div>
                     <div class="text-right mt-2 md:mt-0 text-sm">
-                        <p>나의 보유량: <span class="font-semibold">${userHoldings} 주</span></p>
+                        <p>보유량: <span class="font-semibold">${userHoldings} 주</span></p>
                         <p>평가액: <span class="font-semibold">${formatCurrency(holdingValue)}</span></p>
                         <p>평균 매수가: <span class="font-semibold">${userHoldings > 0 ? formatCurrency(avgBuyPrice) : 'N/A'}</span></p>
                         <p>수익률: <span class="font-semibold ${roiDisplay.startsWith('-') ? 'text-red-600' : 'text-green-600'}">${roiDisplay}</span></p>
-                        <button id="aiStockAnalysisBtn-${stockId}" data-stock-id="${stockId}" class="mt-2 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-1 px-2 rounded-lg text-xs">✨ AI 종목 분석</button>
+                        <button id="aiStockAnalysisBtn-${stockId}" data-stock-id="${stockId}" class="mt-2 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-1 px-2 rounded-lg text-xs" ${isReadOnly ? 'disabled' : ''}>✨ AI 종목 분석</button>
                     </div>
                 </div>
                 <div class="chart-container h-64 md:h-80 mb-6"><canvas id="stockChart-${stockId}"></canvas></div>
@@ -900,17 +979,17 @@
                     <div>
                         <h4 class="text-lg font-semibold text-emerald-600 mb-2">매수 (사기)</h4>
                         <form id="buyForm-${stockId}" class="space-y-3"><input type="hidden" name="stockId" value="${stockId}">
-                            <input type="number" name="quantity" min="1" required placeholder="수량" class="w-full p-2 border rounded">
+                            <input type="number" name="quantity" min="1" required placeholder="수량" class="w-full p-2 border rounded" ${isReadOnly ? 'disabled' : ''}>
                             <p class="text-sm">예상 금액: <span id="buyEstimate-${stockId}">0 원</span></p>
-                            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-3 rounded-lg">매수</button>
+                            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-3 rounded-lg" ${isReadOnly ? 'disabled' : ''}>매수</button>
                         </form>
                     </div>
                     <div>
                         <h4 class="text-lg font-semibold text-red-600 mb-2">매도 (팔기)</h4>
                         <form id="sellForm-${stockId}" class="space-y-3"><input type="hidden" name="stockId" value="${stockId}">
-                            <input type="number" name="quantity" min="1" max="${userHoldings}" ${userHoldings === 0 ? 'disabled' : ''} required placeholder="수량" class="w-full p-2 border rounded">
+                            <input type="number" name="quantity" min="1" max="${userHoldings}" ${userHoldings === 0 || isReadOnly ? 'disabled' : ''} required placeholder="수량" class="w-full p-2 border rounded">
                             <p class="text-sm">예상 금액: <span id="sellEstimate-${stockId}">0 원</span></p>
-                            <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-3 rounded-lg" ${userHoldings === 0 ? 'disabled' : ''}>매도</button>
+                            <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-3 rounded-lg" ${userHoldings === 0 || isReadOnly ? 'disabled' : ''}>매도</button>
                         </form>
                     </div>
                 </div>
@@ -956,6 +1035,7 @@
 
         async function handleBuySellStock(e) {
             e.preventDefault();
+            if (isAdminViewing) return;
             const form = e.target;
             const isBuy = form.id.startsWith('buy');
             const stockId = form.stockId.value;
@@ -1003,6 +1083,7 @@
                 form.reset();
                 const userDoc = await getDoc(userRef);
                 currentUserData = { id: userDoc.id, ...userDoc.data() };
+                viewedUserData = currentUserData;
                 updateDashboardDisplay();
                 renderStockDetails(stockId);
             } catch (error) {
@@ -1036,13 +1117,19 @@
             switchView('admin');
             loadAdminData();
         });
-        document.getElementById('back-to-dashboard-btn').addEventListener('click', () => showDashboard(currentUserData.role));
+        document.getElementById('back-to-dashboard-btn').addEventListener('click', () => {
+            isAdminViewing = false;
+            viewedUserData = currentUserData;
+            document.getElementById('back-to-admin-btn').classList.add('hidden');
+            showDashboard(currentUserData.role);
+        });
         document.getElementById('logout-btn').addEventListener('click', () => {
             if (auth.currentUser && !auth.currentUser.isAnonymous) {
                 signOut(auth);
             }
             currentUserData = null;
-            currentAuthUser = null;
+            viewedUserData = null;
+            isAdminViewing = false;
             switchView('login');
             if (stockUpdateInterval) clearInterval(stockUpdateInterval);
         });
@@ -1190,9 +1277,10 @@
                                 <span class="font-medium">${student.name}</span> <span class="text-xs text-gray-500">(코드: ${student.userCode || '없음'})</span>
                                 <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">학생</span>
                             </div>
-                            <div class="space-x-2">
-                                <button data-userid="${student.id}" data-username="${student.name}" class="convert-to-teacher-btn btn bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 text-xs">교사로 전환</button>
-                                <button data-userid="${student.id}" data-username="${student.name}" class="assign-code-btn btn bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 text-xs">코드 부여/수정</button>
+                            <div class="space-x-1">
+                                <button data-userid="${student.id}" class="view-student-dashboard-btn btn bg-sky-500 hover:bg-sky-600 text-white px-2 py-1 text-xs">조회</button>
+                                <button data-userid="${student.id}" data-username="${student.name}" class="convert-to-teacher-btn btn bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 text-xs">교사로</button>
+                                <button data-userid="${student.id}" data-username="${student.name}" class="assign-code-btn btn bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 text-xs">코드</button>
                                 <button data-studentid="${student.id}" class="adjust-student-btn btn btn-secondary px-2 py-1 text-xs">조정</button>
                             </div>
                         `;
@@ -1200,12 +1288,12 @@
                     });
                 }
 
+                document.querySelectorAll('.view-student-dashboard-btn').forEach(btn => btn.addEventListener('click', (e) => viewStudentDashboard(e.target.dataset.userid)));
                 document.querySelectorAll('.adjust-student-btn').forEach(btn => btn.addEventListener('click', (e) => openAdjustModal(e.target.dataset.studentid)));
                 document.querySelectorAll('.convert-to-student-btn').forEach(btn => btn.addEventListener('click', (e) => handleRoleSwitch(e.target.dataset.userid, e.target.dataset.username, 'student')));
                 document.querySelectorAll('.convert-to-teacher-btn').forEach(btn => btn.addEventListener('click', (e) => handleRoleSwitch(e.target.dataset.userid, e.target.dataset.username, 'teacher')));
                 document.querySelectorAll('.assign-code-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignCodeModal(e.target.dataset.userid, e.target.dataset.username)));
 
-                // Add search listener
                 document.getElementById('admin-user-search').addEventListener('input', (e) => {
                     const searchTerm = e.target.value.toLowerCase();
                     const userItems = document.querySelectorAll('#adminUserList > li');
@@ -1223,31 +1311,23 @@
                 console.error("Error loading admin data:", error);
                 listEl.innerHTML = `<li>사용자 정보 로드 실패: ${error.message}</li>`;
             }
-            // /** NEW FEATURE 2: Load purchase log */
             loadPurchaseLog();
         }
         
         async function handleRoleSwitch(userId, userName, toRole) {
-            showModal(`${toRole === 'student' ? '학생' : '교사'}으로 전환 확인`, `정말로 '${userName}'님을 ${toRole === 'student' ? '학생' : '교사'}으로 전환하시겠습니까?`);
-            
-            modalConfirmBtn.onclick = async () => {
+            showModal(`${toRole === 'student' ? '학생' : '교사'}으로 전환 확인`, `정말로 '${userName}'님을 ${toRole === 'student' ? '학생' : '교사'}으로 전환하시겠습니까?`, async () => {
                 modal.style.display = 'none';
-                
                 try {
                     const userRef = doc(db, "users", userId);
                     const updates = { role: toRole };
-                    
                     await updateDoc(userRef, updates);
                     showModal('전환 완료', `'${userName}'님의 역할이 성공적으로 변경되었습니다.`);
                     loadAdminData();
-
                 } catch (e) {
                     console.error("Error switching role: ", e);
                     showModal('오류', '역할 전환 중 문제가 발생했습니다.');
-                } finally {
-                    modalConfirmBtn.onclick = () => modal.style.display = 'none';
                 }
-            };
+            });
         }
 
         function openAssignCodeModal(userId, userName) {
@@ -1301,7 +1381,6 @@
                     const card = document.createElement('div');
                     card.className = "bg-white p-4 rounded-lg shadow flex flex-col";
                     
-                    // /** NEW FEATURE 1: Shop Item Images */
                     const imageHtml = item.imageUrl 
                         ? `<img src="${item.imageUrl}" alt="${item.name}" class="w-full h-32 object-cover rounded-md mb-3" onerror="this.onerror=null;this.src='https://placehold.co/400x300/F59E0B/FFFFFF?text=Image';">`
                         : `<div class="w-full h-32 bg-gray-200 rounded-md mb-3 flex items-center justify-center"><span class="text-gray-500 text-sm">No Image</span></div>`;
@@ -1313,7 +1392,7 @@
                             <p class="text-sm text-gray-500 flex-grow my-2">${item.description || ''}</p>
                             <div class="flex justify-between items-center mt-4">
                                 <span class="font-bold text-amber-600">${formatCurrency(item.price)}</span>
-                                <button data-itemid="${item.id}" data-itemname="${item.name}" data-itemprice="${item.price}" class="buy-item-btn btn btn-primary px-3 py-1 text-sm">구매</button>
+                                <button data-itemid="${item.id}" data-itemname="${item.name}" data-itemprice="${item.price}" class="buy-item-btn btn btn-primary px-3 py-1 text-sm" ${isAdminViewing ? 'disabled' : ''}>구매</button>
                             </div>
                         </div>
                     `;
@@ -1329,10 +1408,9 @@
         }
 
         async function handleBuyItem(itemId, itemName, itemPrice) {
+            if (isAdminViewing) return;
             const price = Number(itemPrice);
-            showModal('구매 확인', `'${itemName}'을(를) ${formatCurrency(price)}에 구매하시겠습니까?`);
-            
-            modalConfirmBtn.onclick = async () => {
+            showModal('구매 확인', `'${itemName}'을(를) ${formatCurrency(price)}에 구매하시겠습니까?`, async () => {
                 modal.style.display = 'none';
                 const userRef = doc(db, "users", currentUserData.id);
                 try {
@@ -1346,7 +1424,6 @@
                         transaction.update(userRef, { balance: increment(-price) });
                     });
 
-                    // /** NEW FEATURE 2: Log the purchase */
                     await addDoc(collection(db, 'purchaseLog'), {
                         studentId: currentUserData.id,
                         studentName: currentUserData.name,
@@ -1359,12 +1436,12 @@
                     showModal('구매 완료', `${itemName} 구매가 완료되었습니다.`);
                     const userDoc = await getDoc(userRef);
                     currentUserData = { id: userDoc.id, ...userDoc.data() };
+                    viewedUserData = currentUserData;
                     updateDashboardDisplay();
                 } catch (error) {
                     showModal('구매 실패', error.message);
                 }
-                modalConfirmBtn.onclick = () => modal.style.display = 'none';
-            };
+            });
         }
 
         // --- Admin Shop Management ---
@@ -1382,7 +1459,6 @@
                     document.getElementById('shop-item-name').value = item.name;
                     document.getElementById('shop-item-price').value = item.price;
                     document.getElementById('shop-item-desc').value = item.description;
-                    // /** NEW FEATURE 1: Populate image URL */
                     document.getElementById('shop-item-image-url').value = item.imageUrl || '';
                 }
             }
@@ -1396,7 +1472,6 @@
                 name: document.getElementById('shop-item-name').value,
                 price: Number(document.getElementById('shop-item-price').value),
                 description: document.getElementById('shop-item-desc').value,
-                // /** NEW FEATURE 1: Save image URL */
                 imageUrl: document.getElementById('shop-item-image-url').value
             };
             if (itemId) {
@@ -1408,8 +1483,19 @@
             loadAndRenderShopItems();
         });
         
-        // --- Admin Student Adjustment ---
-        /** NEW FEATURE 4: Enhanced Admin Controls */
+        // --- Admin Student Adjustment & Viewing ---
+        async function viewStudentDashboard(studentId) {
+            const studentDoc = await getDoc(doc(db, "users", studentId));
+            if (!studentDoc.exists()) {
+                showModal('오류', '학생 정보를 찾을 수 없습니다.');
+                return;
+            }
+            isAdminViewing = true;
+            viewedUserData = { id: studentDoc.id, ...studentDoc.data() };
+            document.getElementById('back-to-admin-btn').classList.remove('hidden');
+            showDashboard('student');
+        }
+
         async function openAdjustModal(studentId) {
             studentToAdjustId = studentId;
             const studentDoc = await getDoc(doc(db, "users", studentId));
@@ -1454,8 +1540,8 @@
                            <p class="text-xs ${hw.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}">${hw.status}</p>
                         </div>
                         <div class="space-x-2">
-                           ${hw.status !== 'completed' ? `<button data-hwid="${hw.id}" data-reward="${hw.reward}" class="force-complete-hw-btn text-xs bg-blue-500 text-white px-2 py-1 rounded">강제 완료</button>` : ''}
-                           <button data-hwid="${hw.id}" class="delete-hw-btn text-xs bg-red-500 text-white px-2 py-1 rounded">삭제</button>
+                            ${hw.status !== 'completed' ? `<button data-hwid="${hw.id}" data-reward="${hw.reward}" class="force-complete-hw-btn text-xs bg-blue-500 text-white px-2 py-1 rounded">강제 완료</button>` : ''}
+                            <button data-hwid="${hw.id}" class="delete-hw-btn text-xs bg-red-500 text-white px-2 py-1 rounded">삭제</button>
                         </div>
                     `;
                     homeworkList.appendChild(div);
@@ -1491,7 +1577,7 @@
             // Remove previous listeners to avoid duplicates
             const newModal = adjustStudentModal.cloneNode(true);
             adjustStudentModal.parentNode.replaceChild(newModal, adjustStudentModal);
-            adjustStudentModal = newModal;
+            adjustStudentModal = document.getElementById('adjust-student-modal');
 
             document.getElementById('close-adjust-modal-btn').addEventListener('click', () => adjustStudentModal.style.display = 'none');
             
@@ -1552,11 +1638,12 @@
         }
 
         async function renderLifeRulesForStudent() {
+            const dataToShow = viewedUserData;
             const container = document.getElementById('life-rules-container');
             if (!container) return;
             container.innerHTML = '<p class="text-sm text-gray-500">규칙을 불러오는 중...</p>';
 
-            const q = query(collection(db, `users/${currentUserData.id}/assignedLifeRules`));
+            const q = query(collection(db, `users/${dataToShow.id}/assignedLifeRules`));
             const querySnapshot = await getDocs(q);
             
             if (querySnapshot.empty) {
@@ -1571,7 +1658,6 @@
                 const rule = { id: docSnap.id, ...docSnap.data() };
                 const lastCompleted = rule.lastCompletedAt?.toDate();
                 
-                // /** NEW FEATURE 3: Recurring Life Rules Logic */
                 const isCompletedToday = lastCompleted && isSameDay(lastCompleted, today);
                 let shouldShow = true;
                 if (rule.repeatType === 'one-time' && lastCompleted) {
@@ -1583,10 +1669,15 @@
                     const div = document.createElement('div');
                     div.className = 'flex justify-between items-center bg-gray-50 p-3 rounded-md';
                     div.innerHTML = `
-                        <span>${rule.text}</span>
-                        <button data-ruleid="${rule.id}" data-reward="${rule.reward}" data-repeat="${rule.repeatType}" class="complete-rule-btn ${isCompletedToday ? 'bg-gray-300' : 'bg-green-500 hover:bg-green-600'} text-white text-xs font-bold py-1 px-3 rounded-full" ${isCompletedToday ? 'disabled' : ''}>
-                            ${isCompletedToday ? '완료됨' : '지켰어요'}
-                        </button>
+                        <div class="flex-grow">
+                            <span>${rule.text}</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button data-ruleid="${rule.id}" data-reward="${rule.reward}" data-repeat="${rule.repeatType}" class="complete-rule-btn ${isCompletedToday ? 'bg-gray-300' : 'bg-green-500 hover:bg-green-600'} text-white text-xs font-bold py-1 px-3 rounded-full" ${isCompletedToday || isAdminViewing ? 'disabled' : ''}>
+                                ${isCompletedToday ? '완료됨' : '지켰어요'}
+                            </button>
+                            ${isAdminViewing ? `<button data-ruleid="${rule.id}" class="delete-assigned-rule-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>` : ''}
+                        </div>
                     `;
                     container.appendChild(div);
                 }
@@ -1598,6 +1689,7 @@
 
             document.querySelectorAll('.complete-rule-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
+                    if (isAdminViewing) return;
                     const ruleId = e.target.dataset.ruleid;
                     const reward = Number(e.target.dataset.reward);
                     const userRef = doc(db, "users", currentUserData.id);
@@ -1608,10 +1700,15 @@
 
                     const userDoc = await getDoc(userRef);
                     currentUserData = { id: userDoc.id, ...userDoc.data() };
+                    viewedUserData = currentUserData;
                     showModal('참 잘했어요!', `${formatCurrency(reward)}을(를) 획득했습니다!`);
                     updateDashboardDisplay();
                     renderLifeRulesForStudent();
                 });
+            });
+
+            document.querySelectorAll('.delete-assigned-rule-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => deleteAssignedLifeRule(e.target.dataset.ruleid));
             });
         }
         
@@ -1632,8 +1729,10 @@
 
         // Teacher: Open AI Math Problem Creator
         document.getElementById('add-ai-math-problem-btn').addEventListener('click', () => openProblemCreationModal());
+        // Teacher: Open AI Dictation Problem Creator
+        document.getElementById('add-ai-dictation-problem-btn').addEventListener('click', () => openDictationCreationModal());
 
-        // Teacher: Open Modal (new or for editing)
+        // Teacher: Open Math Problem Modal (new or for editing)
         function openProblemCreationModal(problemSet = null) {
             problemCreationModal.style.display = 'flex';
             document.getElementById('problem-creation-form-container').style.display = 'block';
@@ -1655,7 +1754,7 @@
             }
         }
 
-        // Teacher: Generate problems with AI
+        // Teacher: Generate Math problems with AI
         document.getElementById('generate-ai-problems-btn').addEventListener('click', async () => {
             const count = document.getElementById('problem-count').value;
             const topic = document.getElementById('problem-topic').value;
@@ -1693,6 +1792,7 @@
                 }
 
                 currentProblemSet = {
+                    type: 'math', // Add type for math problems
                     title,
                     topic,
                     reward: Number(reward),
@@ -1712,7 +1812,7 @@
             }
         });
 
-        // Teacher: Render generated problems for review
+        // Teacher: Render generated math problems for review
         function renderProblemDisplay(problems) {
             const displayArea = document.getElementById('problem-display-area');
             displayArea.innerHTML = problems.map((p, index) => `
@@ -1729,7 +1829,7 @@
             `).join('');
         }
 
-        // Teacher: Save the created problem set to Firestore
+        // Teacher: Save the created math problem set to Firestore
         document.getElementById('save-problem-set-btn').addEventListener('click', async () => {
             if (!currentProblemSet) {
                 showModal('오류', '저장할 문제가 없습니다.');
@@ -1759,12 +1859,12 @@
             }
         });
 
-        // Teacher: Load all created learning problems
+        // Teacher: Load all created learning problems (math and dictation)
         async function loadLearningProblems() {
             const container = document.getElementById('learning-problem-list');
             container.innerHTML = `<p class="text-center text-gray-500">학습 문제 목록을 불러오는 중입니다...</p>`;
             try {
-                const q = query(collection(db, "learningProblems"), where("teacherId", "==", currentAuthUser.uid));
+                const q = query(collection(db, "learningProblems"), where("teacherId", "==", currentUserData.id));
                 const querySnapshot = await getDocs(q);
                 
                 if (querySnapshot.empty) {
@@ -1779,15 +1879,21 @@
                 container.innerHTML = `
                     <div class="divide-y divide-gray-200">
                         ${problemSets.map(problemSet => {
+                            const isDictation = problemSet.type === 'dictation';
+                            const icon = isDictation ? '🎤' : '🤖';
+                            const topicText = isDictation ? 
+                                `${problemSet.dictationType === 'word' ? '단어' : '문장'} ${problemSet.count}개` :
+                                `${problemSet.topic} (${problemSet.problems?.length || 0}문제)`;
+
                             return `
                                 <div class="p-3 flex justify-between items-center">
                                     <div>
-                                        <p class="font-bold">${problemSet.title}</p>
-                                        <p class="text-sm text-gray-500">${problemSet.topic} (${problemSet.problems.length}문제, ${formatCurrency(problemSet.reward)})</p>
+                                        <p class="font-bold">${icon} ${problemSet.title}</p>
+                                        <p class="text-sm text-gray-500">${topicText}, ${formatCurrency(problemSet.reward)}</p>
                                     </div>
                                     <div class="space-x-2">
                                         <button data-id="${problemSet.id}" data-title="${problemSet.title}" class="assign-homework-btn btn bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-1">배부</button>
-                                        <button data-id="${problemSet.id}" class="edit-problem-btn btn bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1">수정</button>
+                                        <button data-id="${problemSet.id}" data-type="${problemSet.type}" class="edit-problem-btn btn bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1">수정</button>
                                         <button data-id="${problemSet.id}" class="delete-problem-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>
                                     </div>
                                 </div>
@@ -1798,8 +1904,14 @@
 
                 container.querySelectorAll('.assign-homework-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignmentModal('homework', e.target.dataset.id, e.target.dataset.title)));
                 container.querySelectorAll('.edit-problem-btn').forEach(btn => btn.addEventListener('click', async (e) => {
-                    const problemDoc = await getDoc(doc(db, "learningProblems", e.target.dataset.id));
-                    openProblemCreationModal({id: problemDoc.id, ...problemDoc.data()});
+                    const problemId = e.target.dataset.id;
+                    const problemType = e.target.dataset.type;
+                    const problemDoc = await getDoc(doc(db, "learningProblems", problemId));
+                    if(problemType === 'dictation') {
+                        openDictationCreationModal({id: problemDoc.id, ...problemDoc.data()});
+                    } else {
+                        openProblemCreationModal({id: problemDoc.id, ...problemDoc.data()});
+                    }
                 }));
                 container.querySelectorAll('.delete-problem-btn').forEach(btn => btn.addEventListener('click', (e) => deleteLearningProblem(e.target.dataset.id)));
 
@@ -1811,8 +1923,7 @@
 
         // Teacher: Delete a learning problem
         async function deleteLearningProblem(problemId) {
-            showModal('삭제 확인', '정말로 이 학습 문제를 삭제하시겠습니까? 배부된 숙제에는 영향을 주지 않습니다.');
-            modalConfirmBtn.onclick = async () => {
+            showModal('삭제 확인', '정말로 이 학습 문제를 삭제하시겠습니까? 배부된 숙제에는 영향을 주지 않습니다.', async () => {
                 try {
                     await deleteDoc(doc(db, "learningProblems", problemId));
                     modal.style.display = 'none';
@@ -1821,8 +1932,7 @@
                 } catch (error) {
                     showModal('삭제 실패', `오류: ${error.message}`);
                 }
-                modalConfirmBtn.onclick = () => modal.style.display = 'none';
-            }
+            });
         }
 
         // Teacher: Open assignment modal (for both homework and life rules)
@@ -1833,7 +1943,6 @@
             document.getElementById('assignment-modal-title').textContent = `${type === 'homework' ? '숙제' : '생활 규칙'} 배부하기`;
             document.getElementById('assignment-item-title').textContent = `"${itemTitle}"`;
             
-            // /** NEW FEATURE 3: Show/hide recurring options */
             const assignmentOptions = document.getElementById('assignment-options');
             if (type === 'lifeRule') {
                 assignmentOptions.classList.remove('hidden');
@@ -1860,7 +1969,6 @@
                 `;
             }).join('');
             
-            // Add search listener for assignment modal
             document.getElementById('assignment-student-search').addEventListener('input', (e) => {
                 const searchTerm = e.target.value.toLowerCase();
                 const studentLabels = document.querySelectorAll('#assignment-student-list label');
@@ -1891,7 +1999,8 @@
                     const problemSet = problemDoc.data();
                     for (const studentId of selectedStudentIds) {
                         const assignmentData = {
-                            problemId: currentAssignmentItemId,
+                            problemId: currentAssignmentItemId, 
+                            type: problemSet.type, 
                             title: problemSet.title,
                             reward: problemSet.reward,
                             status: 'assigned',
@@ -1900,7 +2009,6 @@
                         await addDoc(collection(db, `users/${studentId}/assignedHomework`), assignmentData);
                     }
                 } else if (currentAssignmentType === 'lifeRule') {
-                    // /** NEW FEATURE 3: Get repeat type */
                     const repeatType = document.querySelector('input[name="repeatType"]:checked').value;
                     const ruleDoc = await getDoc(doc(db, "lifeRules", currentAssignmentItemId));
                     const rule = ruleDoc.data();
@@ -1909,11 +2017,10 @@
                             ruleId: currentAssignmentItemId,
                             text: rule.text,
                             reward: rule.reward,
-                            repeatType: repeatType, // Save repeat type
+                            repeatType: repeatType, 
                             assignedAt: serverTimestamp(),
                             lastCompletedAt: null
                         };
-                        // Use setDoc with ruleId to prevent duplicate assignments
                         await setDoc(doc(db, `users/${studentId}/assignedLifeRules`, currentAssignmentItemId), assignmentData);
                     }
                 }
@@ -1927,11 +2034,12 @@
 
         // Student: Render homework list
         async function renderHomework() {
+            const dataToShow = viewedUserData;
             const tableBody = document.getElementById('homework-table-body');
             tableBody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-gray-500">숙제를 불러오는 중...</td></tr>`;
             
             try {
-                const q = query(collection(db, `users/${currentUserData.id}/assignedHomework`), orderBy("assignedAt", "desc"));
+                const q = query(collection(db, `users/${dataToShow.id}/assignedHomework`), orderBy("assignedAt", "desc"));
                 const querySnapshot = await getDocs(q);
 
                 if (querySnapshot.empty) {
@@ -1942,25 +2050,43 @@
                 tableBody.innerHTML = '';
                 querySnapshot.forEach(docSnap => {
                     const hw = { id: docSnap.id, ...docSnap.data() };
+                    const icon = hw.type === 'dictation' ? '🎤' : '🤖';
+                    const isCompleted = hw.status === 'completed';
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${hw.title}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${icon} ${hw.title}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${hw.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
-                                ${hw.status === 'completed' ? '완료' : '미완료'}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${isCompleted ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                                ${isCompleted ? '완료' : '미완료'}
                             </span>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button data-hwid="${hw.id}" data-problemid="${hw.problemId}" class="view-homework-btn text-amber-600 hover:text-amber-900" ${hw.status === 'completed' ? 'disabled' : ''}>
-                                ${hw.status === 'completed' ? '완료됨' : '숙제로 이동하기'}
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                            <button data-hwid="${hw.id}" data-problemid="${hw.problemId}" data-type="${hw.type}" class="view-homework-btn text-amber-600 hover:text-amber-900">
+                                ${isCompleted ? '결과 보기' : '숙제로 이동하기'}
                             </button>
+                            ${isAdminViewing ? `<button data-hwid="${hw.id}" class="delete-assigned-hw-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>` : ''}
                         </td>
                     `;
                     tableBody.appendChild(tr);
                 });
 
                 tableBody.querySelectorAll('.view-homework-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => openHomeworkModal(e.target.dataset.hwid, e.target.dataset.problemid));
+                    btn.addEventListener('click', (e) => {
+                        if (isAdminViewing && e.target.textContent.trim() === '숙제로 이동하기') {
+                            showModal('알림', '관리자 조회 모드에서는 숙제를 풀 수 없습니다. 완료된 숙제의 결과만 볼 수 있습니다.');
+                            return;
+                        }
+                        const hwType = e.target.dataset.type;
+                        if (hwType === 'dictation') {
+                            openDictationModal(e.target.dataset.hwid, e.target.dataset.problemid);
+                        } else {
+                            openHomeworkModal(e.target.dataset.hwid, e.target.dataset.problemid);
+                        }
+                    });
+                });
+
+                tableBody.querySelectorAll('.delete-assigned-hw-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => deleteAssignedHomework(e.target.dataset.hwid));
                 });
 
             } catch (error) {
@@ -1969,34 +2095,44 @@
             }
         }
         
-        // Student: Open and do homework
+        // Student: Open and do Math homework
         async function openHomeworkModal(assignmentId, problemId) {
             currentAssignmentId = assignmentId;
+            const dataToShow = viewedUserData;
+            const assignmentDoc = await getDoc(doc(db, `users/${dataToShow.id}/assignedHomework`, assignmentId));
             const problemDoc = await getDoc(doc(db, "learningProblems", problemId));
-            if (!problemDoc.exists()) {
+            
+            if (!problemDoc.exists() || !assignmentDoc.exists()) {
                 showModal('오류', '숙제 문제를 불러올 수 없습니다.');
                 return;
             }
             const problemSet = problemDoc.data();
-            
+            const assignmentData = assignmentDoc.data();
+            const isCompleted = assignmentData.status === 'completed';
+
             document.getElementById('homework-modal-title').textContent = problemSet.title;
             const contentArea = document.getElementById('homework-modal-content');
             
-            contentArea.innerHTML = problemSet.problems.map((p, index) => `
+            contentArea.innerHTML = problemSet.problems.map((p, index) => {
+                const studentAnswer = assignmentData.studentAnswers?.[index] || '';
+                const isCorrect = studentAnswer.trim() === p.answer.trim();
+                return `
                 <div class="problem-item border-b py-4" data-answer="${p.answer}">
                     <div class="flex items-center mb-2">
-                        <span class="problem-status-icon text-lg mr-2"></span>
+                        <span class="problem-status-icon text-lg mr-2">${isCompleted ? (isCorrect ? '⭕' : '⭐') : ''}</span>
                         <span class="problem-number font-bold mr-2">${index + 1}.</span>
                         <button class="speak-btn text-blue-500 hover:text-blue-700 mr-3" data-text="${p.question}"><i class="fas fa-play-circle"></i></button>
                         <p class="problem-text flex-grow">${p.question}</p>
                     </div>
                     <div class="flex items-center ml-10">
-                        <input type="text" class="student-answer-input w-full p-2 border rounded-md form-input" placeholder="정답을 입력하세요">
-                        <button class="grade-one-btn btn btn-secondary text-xs px-3 py-2 ml-2 whitespace-nowrap">채점</button>
+                        <input type="text" class="student-answer-input w-full p-2 border rounded-md form-input" placeholder="정답을 입력하세요" value="${studentAnswer}" ${isCompleted ? 'disabled' : ''}>
+                        ${!isCompleted ? '<button class="grade-one-btn btn btn-secondary text-xs px-3 py-2 ml-2 whitespace-nowrap">채점</button>' : ''}
                     </div>
+                    ${isCompleted ? `<p class="ml-10 mt-1 text-sm ${isCorrect ? 'text-green-600' : 'text-red-500'}">정답: ${p.answer}</p>` : ''}
                 </div>
-            `).join('');
+            `}).join('');
 
+            document.getElementById('homework-modal-footer').style.display = isCompleted ? 'none' : 'flex';
             document.getElementById('homework-score-display').textContent = '';
             const completeBtn = document.getElementById('complete-homework-btn');
             completeBtn.classList.add('btn-disabled');
@@ -2010,7 +2146,7 @@
             homeworkModal.style.display = 'flex';
         }
 
-        // Student: Grade a single problem
+        // Student: Grade a single math problem
         function gradeOneProblem(index) {
             const problemItem = document.querySelectorAll('#homework-modal-content .problem-item')[index];
             const correctAnswer = problemItem.dataset.answer.trim();
@@ -2030,7 +2166,7 @@
             }
         }
 
-        // Student: Grade all problems
+        // Student: Grade all math problems
         document.getElementById('grade-all-homework-btn').addEventListener('click', () => {
             const problems = document.querySelectorAll('#homework-modal-content .problem-item');
             let correctCount = 0;
@@ -2053,22 +2189,29 @@
             }
         });
 
-        // Student: Complete the homework assignment
+        // Student: Complete the math homework assignment
         document.getElementById('complete-homework-btn').addEventListener('click', async () => {
-            if (!currentAssignmentId) return;
+            if (!currentAssignmentId || isAdminViewing) return;
 
             const userRef = doc(db, "users", currentUserData.id);
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
+            
+            const studentAnswers = Array.from(document.querySelectorAll('#homework-modal-content .student-answer-input')).map(input => input.value);
 
             try {
                 const assignmentDoc = await getDoc(assignmentRef);
                 const reward = assignmentDoc.data().reward || 0;
 
-                await updateDoc(assignmentRef, { status: 'completed' });
+                await updateDoc(assignmentRef, { 
+                    status: 'completed',
+                    studentAnswers: studentAnswers,
+                    completedAt: serverTimestamp()
+                });
                 await updateDoc(userRef, { balance: increment(reward) });
 
                 const userDoc = await getDoc(userRef);
                 currentUserData = { id: userDoc.id, ...userDoc.data() };
+                viewedUserData = currentUserData;
                 
                 homeworkModal.style.display = 'none';
                 showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을(를) 획득했습니다!`);
@@ -2088,7 +2231,7 @@
             const container = document.getElementById('life-rule-list');
             container.innerHTML = `<p class="text-center text-gray-500">생활 규칙 목록을 불러오는 중입니다...</p>`;
             try {
-                const q = query(collection(db, "lifeRules"), where("teacherId", "==", currentAuthUser.uid));
+                const q = query(collection(db, "lifeRules"), where("teacherId", "==", currentUserData.id));
                 const querySnapshot = await getDocs(q);
                 
                 if (querySnapshot.empty) {
@@ -2163,8 +2306,7 @@
         });
 
         async function deleteLifeRule(ruleId) {
-            showModal('삭제 확인', '정말로 이 생활 규칙을 삭제하시겠습니까? 학생에게 이미 배부된 규칙에는 영향을 주지 않습니다.');
-            modalConfirmBtn.onclick = async () => {
+            showModal('삭제 확인', '정말로 이 생활 규칙을 삭제하시겠습니까? 학생에게 이미 배부된 규칙에는 영향을 주지 않습니다.', async () => {
                 try {
                     await deleteDoc(doc(db, "lifeRules", ruleId));
                     modal.style.display = 'none';
@@ -2173,11 +2315,227 @@
                 } catch (error) {
                     showModal('삭제 실패', `오류: ${error.message}`);
                 }
-                modalConfirmBtn.onclick = () => modal.style.display = 'none';
+            });
+        }
+        
+        // --- AI Dictation Feature ---
+
+        function openDictationCreationModal(problemSet = null) {
+            dictationCreationModal.style.display = 'flex';
+            const form = document.getElementById('dictation-creation-form');
+            form.reset();
+            document.getElementById('dictation-problem-id').value = problemSet?.id || '';
+            if (problemSet) {
+                document.getElementById('dictation-title').value = problemSet.title;
+                document.getElementById('dictation-type').value = problemSet.dictationType;
+                document.getElementById('dictation-count').value = problemSet.count;
+                document.getElementById('dictation-reward').value = problemSet.reward;
             }
         }
 
-        // /** NEW FEATURE 2: Load Purchase Log for Admin */
+        document.getElementById('dictation-creation-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const problemId = document.getElementById('dictation-problem-id').value;
+            const data = {
+                type: 'dictation',
+                title: document.getElementById('dictation-title').value,
+                dictationType: document.getElementById('dictation-type').value,
+                count: Number(document.getElementById('dictation-count').value),
+                reward: Number(document.getElementById('dictation-reward').value),
+                teacherId: currentAuthUser.uid,
+                createdAt: serverTimestamp()
+            };
+
+            if (!data.title || !data.count || !data.reward) {
+                showModal('오류', '모든 필드를 입력해주세요.');
+                return;
+            }
+
+            try {
+                if (problemId) {
+                    await setDoc(doc(db, "learningProblems", problemId), data, { merge: true });
+                } else {
+                    await addDoc(collection(db, "learningProblems"), data);
+                }
+                dictationCreationModal.style.display = 'none';
+                loadLearningProblems();
+            } catch (error) {
+                showModal('저장 실패', `오류: ${error.message}`);
+            }
+        });
+        
+        async function openDictationModal(assignmentId, problemId) {
+            currentAssignmentId = assignmentId;
+            const dataToShow = viewedUserData;
+
+            const assignmentDoc = await getDoc(doc(db, `users/${dataToShow.id}/assignedHomework`, assignmentId));
+            if (!assignmentDoc.exists()) {
+                showModal('오류', '숙제 정보를 찾을 수 없습니다.');
+                return;
+            }
+            const assignmentData = assignmentDoc.data();
+            const isCompleted = assignmentData.status === 'completed';
+
+            document.getElementById('dictation-modal-title').textContent = assignmentData.title;
+
+            if (isCompleted) {
+                // Review mode
+                document.getElementById('dictation-initial-view').style.display = 'none';
+                document.getElementById('dictation-main-view').style.display = 'block';
+                document.getElementById('dictation-footer').style.display = 'none'; // Hide footer in review mode
+                if (!assignmentData.problems) {
+                    showModal('오류', '저장된 문제 내용을 찾을 수 없어 결과를 표시할 수 없습니다.');
+                    dictationModal.style.display = 'none';
+                    return;
+                }
+                renderDictationQuestions(assignmentData.problems, assignmentData.studentAnswers, true);
+            } else {
+                // Taking the test mode
+                if (assignmentData.problems && Array.isArray(assignmentData.problems)) {
+                    // Resume in-progress dictation
+                    document.getElementById('dictation-initial-view').style.display = 'none';
+                    document.getElementById('dictation-main-view').style.display = 'block';
+                    document.getElementById('dictation-footer').style.display = 'flex';
+                    const problemDoc = await getDoc(doc(db, "learningProblems", problemId));
+                    if (problemDoc.exists()) {
+                         currentDictationTemplate = problemDoc.data();
+                    }
+                    renderDictationQuestions(assignmentData.problems, [], false);
+                } else {
+                    // First time opening this assignment. Show topic input.
+                    const problemDoc = await getDoc(doc(db, "learningProblems", problemId));
+                    if (!problemDoc.exists()) {
+                        showModal('오류', '받아쓰기 문제를 불러올 수 없습니다.');
+                        return;
+                    }
+                    currentDictationTemplate = problemDoc.data();
+                    
+                    document.getElementById('dictation-initial-view').style.display = 'block';
+                    document.getElementById('dictation-main-view').style.display = 'none';
+                    document.getElementById('dictation-student-topic').value = '';
+                    document.getElementById('dictation-content').innerHTML = '';
+                }
+            }
+            
+            dictationModal.style.display = 'flex';
+        }
+
+        document.getElementById('generate-dictation-questions-btn').addEventListener('click', async () => {
+            const topic = document.getElementById('dictation-student-topic').value.trim();
+            if (!topic) {
+                showModal('오류', '주제를 입력해주세요.');
+                return;
+            }
+
+            const { count, dictationType } = currentDictationTemplate;
+            const typeText = dictationType === 'word' ? '단어' : '문장';
+            const prompt = `초등학생을 위한 받아쓰기 연습. '${topic}'와(과) 관련된 ${typeText} ${count}개를 만들어줘. 응답은 반드시 JSON 형식으로 "items"라는 키 아래에 철자가 정확한 ${typeText} 배열로 제공해줘. 예: {"items": ["사과", "바나나", "딸기"]}`;
+            
+            const contentArea = document.getElementById('dictation-content');
+            contentArea.innerHTML = `<div class="flex items-center justify-center p-4"><div class="loading-spinner"></div><p class="ml-2">AI가 문제를 만들고 있습니다...</p></div>`;
+            document.getElementById('dictation-initial-view').style.display = 'none';
+            document.getElementById('dictation-main-view').style.display = 'block';
+            document.getElementById('dictation-footer').style.display = 'flex';
+
+
+            const apiKey = "AIzaSyC7_Gq4LIVVMv0hMD6qSwcTlGJcDSt-KgI";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: { responseMimeType: "application/json" }
+            };
+
+            try {
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API 요청 실패 (상태 코드: ${response.status})`);
+                const result = await response.json();
+                const jsonString = result.candidates[0].content.parts[0].text;
+                const generatedData = JSON.parse(jsonString);
+
+                if (!generatedData.items || !Array.isArray(generatedData.items)) {
+                    throw new Error("AI가 유효한 형식의 문제를 생성하지 못했습니다.");
+                }
+                
+                // Save generated questions to the assignment document immediately
+                const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
+                await updateDoc(assignmentRef, {
+                    problems: generatedData.items 
+                });
+
+                renderDictationQuestions(generatedData.items, [], false);
+
+            } catch (error) {
+                contentArea.innerHTML = `<p class="text-red-500 text-center">문제 생성 실패: ${error.message}</p>`;
+                console.error(error);
+            }
+        });
+
+        function renderDictationQuestions(items, studentAnswers = [], isReview = false) {
+            const contentArea = document.getElementById('dictation-content');
+            contentArea.innerHTML = items.map((item, index) => {
+                const studentAnswer = studentAnswers[index] || '';
+                const isCorrect = studentAnswer.trim() === item.trim();
+                return `
+                <div class="dictation-item border-b py-3" data-answer="${item}">
+                    <div class="flex items-center">
+                        <span class="font-bold mr-3">${index + 1}.</span>
+                        <button class="speak-btn text-blue-500 hover:text-blue-700 mr-4 text-xl" data-text="${item}"><i class="fas fa-volume-up"></i></button>
+                        <input type="text" class="student-answer-input w-full p-2 border rounded-md form-input" placeholder="받아쓰기" value="${studentAnswer}" ${isReview ? 'disabled' : ''}>
+                    </div>
+                    <div class="correct-answer-display ml-12 mt-1 ${isReview ? '' : 'hidden'}">
+                        ${isReview ? `<p class="text-sm ${isCorrect ? 'text-green-600' : 'text-red-500'}">정답: ${item}</p>` : ''}
+                    </div>
+                </div>
+            `}).join('');
+
+            contentArea.querySelectorAll('.speak-btn').forEach(btn => btn.addEventListener('click', (e) => speak(e.currentTarget.dataset.text)));
+        }
+        
+        document.getElementById('reveal-dictation-answers-btn').addEventListener('click', () => {
+            document.querySelectorAll('.dictation-item').forEach(item => {
+                const correctAnswer = item.dataset.answer;
+                const studentAnswer = item.querySelector('.student-answer-input').value.trim();
+                const isCorrect = studentAnswer === correctAnswer.trim();
+                const displayEl = item.querySelector('.correct-answer-display');
+                displayEl.innerHTML = `<p class="text-sm ${isCorrect ? 'text-green-600' : 'text-red-500'}">정답: ${correctAnswer}</p>`;
+                displayEl.classList.remove('hidden');
+            });
+            const completeBtn = document.getElementById('complete-dictation-btn');
+            completeBtn.classList.remove('btn-disabled');
+            completeBtn.disabled = false;
+        });
+
+        document.getElementById('complete-dictation-btn').addEventListener('click', async () => {
+            if (!currentAssignmentId || isAdminViewing) return;
+
+            const userRef = doc(db, "users", currentUserData.id);
+            const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
+            
+            const studentAnswers = Array.from(document.querySelectorAll('#dictation-content .student-answer-input')).map(input => input.value);
+            
+            try {
+                const reward = currentDictationTemplate.reward || 0;
+                await updateDoc(assignmentRef, { 
+                    status: 'completed',
+                    studentAnswers: studentAnswers,
+                    completedAt: serverTimestamp()
+                });
+                await updateDoc(userRef, { balance: increment(reward) });
+
+                const userDoc = await getDoc(userRef);
+                currentUserData = { id: userDoc.id, ...userDoc.data() };
+                viewedUserData = currentUserData;
+
+                dictationModal.style.display = 'none';
+                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을(를) 획득했습니다!`);
+                updateDashboardDisplay();
+                renderHomework();
+            } catch (error) {
+                showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
+            }
+        });
+
+
         async function loadPurchaseLog() {
             const logEl = document.getElementById('admin-purchase-log');
             logEl.innerHTML = '<li>기록을 불러오는 중...</li>';
@@ -2201,8 +2559,47 @@
                 });
             } catch(error) {
                 console.error("Error loading purchase log:", error);
-                logEl.innerHTML = '<li>기록 로드 실패</li>';
+                logEl.innerHTML = `
+                    <li class="text-red-500">기록 로드 실패</li>
+                    <li class="text-xs text-gray-600 mt-2">
+                        <b>원인:</b> Firestore 색인이 필요할 수 있습니다.<br>
+                        <b>해결 방법:</b>
+                        <ol class="list-decimal list-inside">
+                            <li>브라우저의 개발자 도구(F12)를 열고 Console 탭을 확인하세요.</li>
+                            <li>'FAILED_PRECONDITION' 또는 'The query requires an index'와 유사한 오류 메시지를 찾으세요.</li>
+                            <li>오류 메시지 안에 있는 링크를 클릭하여 Firebase 콘솔에서 필요한 색인을 생성하세요. 색인이 생성되기까지 몇 분 정도 걸릴 수 있습니다.</li>
+                        </ol>
+                    </li>
+                `;
             }
+        }
+
+        async function deleteAssignedHomework(assignmentId) {
+            if (!isAdminViewing || !viewedUserData) return;
+            showModal('숙제 삭제 확인', '정말로 이 학생의 숙제를 삭제하시겠습니까?', async () => {
+                try {
+                    await deleteDoc(doc(db, `users/${viewedUserData.id}/assignedHomework`, assignmentId));
+                    modal.style.display = 'none';
+                    showModal('성공', '숙제가 삭제되었습니다.');
+                    renderHomework(); // Refresh the list
+                } catch (error) {
+                    showModal('오류', `삭제 중 오류가 발생했습니다: ${error.message}`);
+                }
+            });
+        }
+
+        async function deleteAssignedLifeRule(ruleId) {
+            if (!isAdminViewing || !viewedUserData) return;
+            showModal('생활 규칙 삭제 확인', '정말로 이 학생의 생활 규칙을 삭제하시겠습니까?', async () => {
+                try {
+                    await deleteDoc(doc(db, `users/${viewedUserData.id}/assignedLifeRules`, ruleId));
+                    modal.style.display = 'none';
+                    showModal('성공', '생활 규칙이 삭제되었습니다.');
+                    renderLifeRulesForStudent(); // Refresh the list
+                } catch (error) {
+                    showModal('오류', `삭제 중 오류가 발생했습니다: ${error.message}`);
+                }
+            });
         }
 
         // Close Modals
@@ -2210,6 +2607,8 @@
         document.getElementById('close-problem-creation-modal-btn').addEventListener('click', () => problemCreationModal.style.display = 'none');
         document.getElementById('close-assignment-modal-btn').addEventListener('click', () => assignmentModal.style.display = 'none');
         document.getElementById('close-life-rule-modal-btn').addEventListener('click', () => lifeRuleModal.style.display = 'none');
+        document.getElementById('close-dictation-creation-modal-btn').addEventListener('click', () => dictationCreationModal.style.display = 'none');
+        document.getElementById('close-dictation-modal-btn').addEventListener('click', () => dictationModal.style.display = 'none');
 
 
         // --- Initial Load ---
