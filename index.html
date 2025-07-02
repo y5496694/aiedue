@@ -229,6 +229,12 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-white p-6 rounded-xl shadow-lg">
                         <h3 class="text-xl font-semibold text-red-600 mb-2">사용자 관리</h3>
+                        <div class="mb-4 relative">
+                            <input type="text" id="admin-user-search" class="w-full p-2 pl-10 border border-gray-300 rounded-md form-input" placeholder="이름 또는 코드로 검색...">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-search text-gray-400"></i>
+                            </div>
+                        </div>
                         <ul id="adminUserList" class="space-y-2 text-sm max-h-96 overflow-y-auto"><li>불러오는 중...</li></ul>
                     </div>
                     <div class="bg-white p-6 rounded-xl shadow-lg">
@@ -395,6 +401,12 @@
             <span class="close-button" id="close-assignment-modal-btn">&times;</span>
             <h3 id="assignment-modal-title" class="text-xl font-bold mb-4">배부하기</h3>
             <p id="assignment-item-title" class="mb-4 text-gray-600"></p>
+            <div class="mb-2 relative">
+                <input type="text" id="assignment-student-search" class="w-full p-2 pl-10 border border-gray-300 rounded-md form-input" placeholder="이름 또는 코드로 검색...">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-gray-400"></i>
+                </div>
+            </div>
             <div id="assignment-student-list" class="space-y-2 max-h-60 overflow-y-auto text-left border p-2 rounded-md">
                 <!-- Student list for assignment will be here -->
             </div>
@@ -1150,6 +1162,20 @@
                 document.querySelectorAll('.convert-to-teacher-btn').forEach(btn => btn.addEventListener('click', (e) => handleRoleSwitch(e.target.dataset.userid, e.target.dataset.username, 'teacher')));
                 document.querySelectorAll('.assign-code-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignCodeModal(e.target.dataset.userid, e.target.dataset.username)));
 
+                // Add search listener
+                document.getElementById('admin-user-search').addEventListener('input', (e) => {
+                    const searchTerm = e.target.value.toLowerCase();
+                    const userItems = document.querySelectorAll('#adminUserList > li');
+                    userItems.forEach(item => {
+                        const itemText = item.textContent.toLowerCase();
+                        if (itemText.includes(searchTerm)) {
+                            item.style.display = 'flex';
+                        } else {
+                            item.style.display = 'none';
+                        }
+                    });
+                });
+
             } catch (error) {
                 console.error("Error loading admin data:", error);
                 listEl.innerHTML = `<li>사용자 정보 로드 실패: ${error.message}</li>`;
@@ -1686,6 +1712,20 @@
                     </label>
                 `;
             }).join('');
+            
+            // Add search listener for assignment modal
+            document.getElementById('assignment-student-search').addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                const studentLabels = document.querySelectorAll('#assignment-student-list label');
+                studentLabels.forEach(label => {
+                    const labelText = label.textContent.toLowerCase();
+                    if (labelText.includes(searchTerm)) {
+                        label.style.display = 'flex';
+                    } else {
+                        label.style.display = 'none';
+                    }
+                });
+            });
         }
 
         // Teacher: Assign item to selected students
