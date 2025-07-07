@@ -209,6 +209,10 @@
                         <button id="add-ai-math-problem-btn" class="btn bg-blue-500 hover:bg-blue-600 text-white">🤖 AI 수학 문제 만들기</button>
                     </div>
                 </div>
+                <div class="flex items-center space-x-2 mb-2">
+                    <div id="learning-problem-folder-list" class="flex space-x-2"></div>
+                    <button id="add-learning-problem-folder-btn" class="btn btn-secondary">+ 폴더</button>
+                </div>
                 <div id="learning-problem-list" class="bg-white p-4 rounded-lg shadow">
                     <!-- Learning problems will be rendered here -->
                 </div>
@@ -220,6 +224,10 @@
                         <button id="add-life-rule-btn" class="btn bg-green-500 hover:bg-green-600 text-white">+ 새 규칙 만들기</button>
                     </div>
                 </div>
+                <div class="flex items-center space-x-2 mb-2">
+                    <div id="life-rule-folder-list" class="flex space-x-2"></div>
+                    <button id="add-life-rule-folder-btn" class="btn btn-secondary">+ 폴더</button>
+                </div>
                 <div id="life-rule-list" class="bg-white p-4 rounded-lg shadow">
                     <!-- Life rules will be rendered here -->
                 </div>
@@ -228,6 +236,10 @@
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-bold">📂 업무 관리</h2>
                     <button id="open-draft-modal-btn" class="btn btn-primary">AI 기안 만들기</button>
+                </div>
+                <div class="flex items-center space-x-2 mb-2">
+                    <div id="work-doc-folder-list" class="flex space-x-2"></div>
+                    <button id="add-work-doc-folder-btn" class="btn btn-secondary">+ 폴더</button>
                 </div>
                 <div id="work-doc-list" class="bg-white p-4 rounded-lg shadow">
                     <p class="text-center text-gray-500">작성된 문서가 없습니다.</p>
@@ -747,6 +759,14 @@
         let currentAssignmentType = null; // 'math', 'dictation', or 'lifeRule'
         let currentDictationTemplate = null; // For student dictation homework
 
+        // Folder management state
+        let lifeRuleFolders = [];
+        let learningProblemFolders = [];
+        let workDocFolders = [];
+        let currentLifeRuleFolder = 'all';
+        let currentLearningProblemFolder = 'all';
+        let currentWorkDocFolder = 'all';
+
         // --- DOM Elements ---
         const views = {
             login: document.getElementById('login-view'),
@@ -950,6 +970,9 @@
                 loadLearningProblems();
                 loadLifeRules();
                 loadWorkDocs();
+                loadLearningProblemFolders();
+                loadLifeRuleFolders();
+                loadWorkDocFolders();
             }
             startStockUpdates();
             document.getElementById('teacher-add-shop-item-btn').classList.toggle('hidden', currentUserData.role !== 'teacher');
@@ -1922,6 +1945,7 @@
         document.getElementById('add-ai-dictation-problem-btn').addEventListener('click', () => openDictationCreationModal());
         // Teacher: Open Manual Problem Creator
         document.getElementById('add-manual-problem-btn').addEventListener('click', () => openManualProblemCreationModal());
+        document.getElementById('add-learning-problem-folder-btn').addEventListener('click', () => createLearningProblemFolder());
 
         // Teacher: Open Math Problem Modal (new or for editing)
         function openProblemCreationModal(problemSet = null) {
@@ -2065,11 +2089,11 @@
                 
                 const problemSets = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 problemSets.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
-
+                const filtered = currentLearningProblemFolder === 'all' ? problemSets : problemSets.filter(p => p.folderId === currentLearningProblemFolder);
 
                 container.innerHTML = `
                     <div class="divide-y divide-gray-200">
-                        ${problemSets.map(problemSet => {
+                        ${filtered.map(problemSet => {
                             const isDictation = problemSet.type === 'dictation';
                             const isManual = problemSet.type === 'manual';
                             const icon = isDictation ? '🎤' : (isManual ? '📝' : '🤖');
@@ -2078,7 +2102,7 @@
                                 isManual ? '직접 문제' : `${problemSet.topic} (${problemSet.problems?.length || 0}문제)`;
 
                             return `
-                                <div class="p-3 flex justify-between items-center">
+                                <div class="p-3 flex justify-between items-center learning-problem-item" draggable="true" data-id="${problemSet.id}">
                                     <div>
                                         <p class="font-bold">${icon} ${problemSet.title}</p>
                                         <p class="text-sm text-gray-500">${topicText}, ${formatCurrency(problemSet.reward)}</p>
@@ -2093,6 +2117,12 @@
                         }).join('')}
                     </div>
                 `;
+
+                container.querySelectorAll('.learning-problem-item').forEach(item => {
+                    item.addEventListener('dragstart', e => {
+                        e.dataTransfer.setData('text/plain', item.dataset.id);
+                    });
+                });
 
                 container.querySelectorAll('.assign-homework-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignmentModal('homework', e.target.dataset.id, e.target.dataset.title)));
                 container.querySelectorAll('.edit-problem-btn').forEach(btn => btn.addEventListener('click', async (e) => {
@@ -2424,6 +2454,7 @@
 
         // --- Teacher: Life Rule Management ---
         document.getElementById('add-life-rule-btn').addEventListener('click', () => openLifeRuleModal());
+        document.getElementById('add-life-rule-folder-btn').addEventListener('click', () => createLifeRuleFolder());
 
         async function loadLifeRules() {
             const container = document.getElementById('life-rule-list');
@@ -2439,11 +2470,12 @@
                 
                 const rules = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 rules.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
+                const filtered = currentLifeRuleFolder === 'all' ? rules : rules.filter(r => r.folderId === currentLifeRuleFolder);
 
                 container.innerHTML = `
                     <div class="divide-y divide-gray-200">
-                        ${rules.map(rule => `
-                            <div class="p-3 flex justify-between items-center">
+                        ${filtered.map(rule => `
+                            <div class="p-3 flex justify-between items-center life-rule-item" draggable="true" data-id="${rule.id}">
                                 <div>
                                     <p class="font-bold">${rule.text}</p>
                                     <p class="text-sm text-gray-500">보상: ${formatCurrency(rule.reward)}</p>
@@ -2457,6 +2489,12 @@
                         `).join('')}
                     </div>
                 `;
+
+                container.querySelectorAll('.life-rule-item').forEach(item => {
+                    item.addEventListener('dragstart', e => {
+                        e.dataTransfer.setData('text/plain', item.dataset.id);
+                    });
+                });
 
                 container.querySelectorAll('.assign-rule-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignmentModal('lifeRule', e.target.dataset.id, e.target.dataset.title)));
                 container.querySelectorAll('.edit-rule-btn').forEach(btn => btn.addEventListener('click', async (e) => {
@@ -2519,6 +2557,13 @@
         // --- Work Management ---
         let currentDraftIndex = null;
         document.getElementById('open-draft-modal-btn').addEventListener('click', () => openDraftModal());
+        document.getElementById('add-work-doc-folder-btn').addEventListener('click', () => {
+            const name = prompt('폴더 이름');
+            if(!name) return;
+            workDocFolders.push(name);
+            saveWorkDocFolders();
+            loadWorkDocFolders();
+        });
 
         function openDraftModal(index = null) {
             currentDraftIndex = index;
@@ -2722,13 +2767,132 @@
                 container.innerHTML = '<p class="text-center text-gray-500">작성된 문서가 없습니다.</p>';
                 return;
             }
+            const filtered = currentWorkDocFolder === 'all' ? docs : docs.filter(d => d.folder === currentWorkDocFolder);
             container.innerHTML = '<div class="divide-y divide-gray-200">' +
-                docs.map((d,i)=>`<div class="p-3 flex justify-between items-center"><span>${d.title}</span><button class="edit-draft-btn btn btn-secondary btn-xs" data-index="${i}">편집</button></div>`).join('') +
+                filtered.map((d,i)=>`<div class="p-3 flex justify-between items-center work-doc-item" draggable="true" data-index="${i}"><span>${d.title}</span><button class="edit-draft-btn btn btn-secondary btn-xs" data-index="${i}">편집</button></div>`).join('') +
                 '</div>';
+            container.querySelectorAll('.work-doc-item').forEach(item => {
+                item.addEventListener('dragstart', e => {
+                    e.dataTransfer.setData('text/plain', item.dataset.index);
+                });
+            });
             container.querySelectorAll('.edit-draft-btn').forEach(btn => btn.addEventListener('click', e => {
                 const idx = Number(e.target.dataset.index);
                 openDraftModal(idx);
             }));
+        }
+
+        function loadWorkDocFolders() {
+            workDocFolders = JSON.parse(localStorage.getItem('workDocFolders') || '[]');
+            const list = document.getElementById('work-doc-folder-list');
+            if(!list) return;
+            list.innerHTML = `<div class="folder cursor-pointer px-2 py-1 border rounded" data-id="all">전체</div>` +
+                workDocFolders.map(f => `<div class="folder cursor-pointer px-2 py-1 border rounded" data-id="${f}">${f}</div>`).join('');
+            list.querySelectorAll('.folder').forEach(el => {
+                el.addEventListener('dragover', e => e.preventDefault());
+                el.addEventListener('drop', e => {
+                    const idx = e.dataTransfer.getData('text/plain');
+                    moveWorkDocToFolder(Number(idx), el.dataset.id === 'all' ? null : el.dataset.id);
+                });
+                el.addEventListener('click', () => {
+                    currentWorkDocFolder = el.dataset.id;
+                    loadWorkDocs();
+                });
+            });
+        }
+
+        function saveWorkDocFolders() {
+            localStorage.setItem('workDocFolders', JSON.stringify(workDocFolders));
+        }
+
+        function moveWorkDocToFolder(index, folder) {
+            const docs = JSON.parse(localStorage.getItem('workDocs') || '[]');
+            if(!docs[index]) return;
+            if(folder) {
+                docs[index].folder = folder;
+            } else {
+                delete docs[index].folder;
+            }
+            localStorage.setItem('workDocs', JSON.stringify(docs));
+            loadWorkDocs();
+        }
+
+        async function loadFoldersByType(type) {
+            const q = query(collection(db, 'folders'), where('teacherId', '==', currentUserData.id), where('type', '==', type));
+            const snap = await getDocs(q);
+            return snap.docs.map(d => ({ id: d.id, name: d.data().name }));
+        }
+
+        async function loadLifeRuleFolders() {
+            lifeRuleFolders = await loadFoldersByType('lifeRule');
+            const list = document.getElementById('life-rule-folder-list');
+            if(!list) return;
+            list.innerHTML = `<div class="folder cursor-pointer px-2 py-1 border rounded" data-id="all">전체</div>` +
+                lifeRuleFolders.map(f => `<div class="folder cursor-pointer px-2 py-1 border rounded" data-id="${f.id}">${f.name}</div>`).join('');
+            list.querySelectorAll('.folder').forEach(el => {
+                el.addEventListener('dragover', e => e.preventDefault());
+                el.addEventListener('drop', e => {
+                    const ruleId = e.dataTransfer.getData('text/plain');
+                    moveLifeRuleToFolder(ruleId, el.dataset.id === 'all' ? null : el.dataset.id);
+                });
+                el.addEventListener('click', () => {
+                    currentLifeRuleFolder = el.dataset.id;
+                    loadLifeRules();
+                });
+            });
+        }
+
+        async function createLifeRuleFolder() {
+            const name = prompt('폴더 이름');
+            if(!name) return;
+            await addDoc(collection(db,'folders'), {teacherId: currentUserData.id, type:'lifeRule', name});
+            loadLifeRuleFolders();
+        }
+
+        async function moveLifeRuleToFolder(ruleId, folderId) {
+            const ref = doc(db,'lifeRules', ruleId);
+            if(folderId) {
+                await updateDoc(ref, { folderId });
+            } else {
+                await updateDoc(ref, { folderId: deleteField() });
+            }
+            loadLifeRules();
+        }
+
+        async function loadLearningProblemFolders() {
+            learningProblemFolders = await loadFoldersByType('learningProblem');
+            const list = document.getElementById('learning-problem-folder-list');
+            if(!list) return;
+            list.innerHTML = `<div class="folder cursor-pointer px-2 py-1 border rounded" data-id="all">전체</div>` +
+                learningProblemFolders.map(f => `<div class="folder cursor-pointer px-2 py-1 border rounded" data-id="${f.id}">${f.name}</div>`).join('');
+            list.querySelectorAll('.folder').forEach(el => {
+                el.addEventListener('dragover', e => e.preventDefault());
+                el.addEventListener('drop', e => {
+                    const pid = e.dataTransfer.getData('text/plain');
+                    moveLearningProblemToFolder(pid, el.dataset.id === 'all' ? null : el.dataset.id);
+                });
+                el.addEventListener('click', () => {
+                    currentLearningProblemFolder = el.dataset.id;
+                    loadLearningProblems();
+                });
+            });
+        }
+
+        async function createLearningProblemFolder() {
+            const name = prompt('폴더 이름');
+            if(!name) return;
+            await addDoc(collection(db,'folders'), {teacherId: currentUserData.id, type:'learningProblem', name});
+            loadLearningProblemFolders();
+        }
+
+        async function moveLearningProblemToFolder(problemId, folderId) {
+            const ref = doc(db,'learningProblems', problemId);
+            if(folderId) {
+                await updateDoc(ref, { folderId });
+            } else {
+                await updateDoc(ref, { folderId: deleteField() });
+            }
+            loadLearningProblems();
         }
         
         // --- AI Dictation Feature ---
