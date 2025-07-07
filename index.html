@@ -225,9 +225,11 @@
                     </div>
                 </div>
                 <div class="flex items-center space-x-2 mb-2">
-                    <div id="life-rule-folder-list" class="flex space-x-2"></div>
-                    <button id="add-life-rule-folder-btn" class="btn btn-secondary">+ 폴더</button>
+                    <button id="life-rule-view-list-btn" class="px-2" title="일자형 보기"><i class="fas fa-bars"></i></button>
+                    <button id="life-rule-view-album-btn" class="px-2" title="앨범 보기"><i class="fas fa-th-large"></i></button>
+                    <button id="add-life-rule-folder-btn" class="btn btn-secondary ml-auto">+ 폴더</button>
                 </div>
+                <div id="life-rule-folder-list" class="hidden"></div>
                 <div id="life-rule-list" class="bg-white p-4 rounded-lg shadow">
                     <!-- Life rules will be rendered here -->
                 </div>
@@ -766,6 +768,8 @@
         let currentLifeRuleFolder = 'all';
         let currentLearningProblemFolder = 'all';
         let currentWorkDocFolder = 'all';
+        let lifeRuleViewMode = 'list';
+        let lifeRuleListData = [];
 
         // --- DOM Elements ---
         const views = {
@@ -2455,58 +2459,118 @@
         // --- Teacher: Life Rule Management ---
         document.getElementById('add-life-rule-btn').addEventListener('click', () => openLifeRuleModal());
         document.getElementById('add-life-rule-folder-btn').addEventListener('click', () => createLifeRuleFolder());
+        document.getElementById('life-rule-view-list-btn').addEventListener('click', () => { lifeRuleViewMode = 'list'; loadLifeRules(); });
+        document.getElementById('life-rule-view-album-btn').addEventListener('click', () => { lifeRuleViewMode = 'album'; loadLifeRules(); });
 
         async function loadLifeRules() {
             const container = document.getElementById('life-rule-list');
             container.innerHTML = `<p class="text-center text-gray-500">생활 규칙 목록을 불러오는 중입니다...</p>`;
+            await loadLifeRuleFolders();
             try {
                 const q = query(collection(db, "lifeRules"), where("teacherId", "==", currentUserData.id));
                 const querySnapshot = await getDocs(q);
-                
-                if (querySnapshot.empty) {
-                    container.innerHTML = `<p class="text-center text-gray-500">생성된 생활 규칙이 없습니다.</p>`;
-                    return;
-                }
-                
-                const rules = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                rules.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
-                const filtered = currentLifeRuleFolder === 'all' ? rules : rules.filter(r => r.folderId === currentLifeRuleFolder);
 
-                container.innerHTML = `
-                    <div class="divide-y divide-gray-200">
-                        ${filtered.map(rule => `
-                            <div class="p-3 flex justify-between items-center life-rule-item" draggable="true" data-id="${rule.id}">
+                lifeRuleListData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                lifeRuleListData.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+                const items = [];
+                if (currentLifeRuleFolder !== 'all') {
+                    items.push({ type: 'back' });
+                } else {
+                    lifeRuleFolders.forEach(f => items.push({ type: 'folder', id: f.id, name: f.name }));
+                }
+
+                const filteredRules = currentLifeRuleFolder === 'all'
+                    ? lifeRuleListData.filter(r => !r.folderId)
+                    : lifeRuleListData.filter(r => r.folderId === currentLifeRuleFolder);
+                filteredRules.forEach(r => items.push({ type: 'rule', data: r }));
+
+                const wrapperClass = lifeRuleViewMode === 'album' ? 'grid grid-cols-2 gap-2' : 'divide-y divide-gray-200';
+                container.innerHTML = `<div class="${wrapperClass}"></div>`;
+                const wrapper = container.firstElementChild;
+
+                items.forEach(item => {
+                    if (item.type === 'folder') {
+                        const el = document.createElement('div');
+                        el.className = 'p-3 folder-item border rounded bg-gray-50 cursor-pointer';
+                        el.dataset.id = item.id;
+                        el.textContent = `📁 ${item.name}`;
+                        el.addEventListener('click', () => {
+                            currentLifeRuleFolder = item.id;
+                            loadLifeRules();
+                        });
+                        el.addEventListener('dragover', e => e.preventDefault());
+                        el.addEventListener('drop', e => {
+                            const ruleId = e.dataTransfer.getData('text/plain');
+                            moveLifeRuleToFolder(ruleId, item.id);
+                        });
+                        wrapper.appendChild(el);
+                    } else if (item.type === 'back') {
+                        const el = document.createElement('div');
+                        el.className = 'p-3 folder-back-item border rounded bg-gray-50 cursor-pointer';
+                        el.textContent = '⬅ 뒤로가기';
+                        el.addEventListener('click', () => {
+                            currentLifeRuleFolder = 'all';
+                            loadLifeRules();
+                        });
+                        el.addEventListener('dragover', e => e.preventDefault());
+                        el.addEventListener('drop', e => {
+                            const ruleId = e.dataTransfer.getData('text/plain');
+                            moveLifeRuleToFolder(ruleId, null);
+                        });
+                        wrapper.appendChild(el);
+                    } else {
+                        const rule = item.data;
+                        const el = document.createElement('div');
+                        el.className = 'p-3 flex justify-between items-center life-rule-item border rounded';
+                        el.dataset.id = rule.id;
+                        el.innerHTML = `
+                            <div class="flex items-center space-x-2">
+                                <span class="drag-handle cursor-move" draggable="true"><i class="fas fa-bars"></i></span>
                                 <div>
                                     <p class="font-bold">${rule.text}</p>
                                     <p class="text-sm text-gray-500">보상: ${formatCurrency(rule.reward)}</p>
                                 </div>
-                                <div class="space-x-2">
-                                    <button data-id="${rule.id}" data-title="${rule.text}" class="assign-rule-btn btn bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-1">배부</button>
-                                    <button data-id="${rule.id}" class="edit-rule-btn btn bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1">수정</button>
-                                    <button data-id="${rule.id}" class="delete-rule-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>
-                                </div>
                             </div>
-                        `).join('')}
-                    </div>
-                `;
-
-                container.querySelectorAll('.life-rule-item').forEach(item => {
-                    item.addEventListener('dragstart', e => {
-                        e.dataTransfer.setData('text/plain', item.dataset.id);
-                    });
+                            <div class="space-x-2">
+                                <button data-id="${rule.id}" data-title="${rule.text}" class="assign-rule-btn btn bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-1">배부</button>
+                                <button data-id="${rule.id}" class="edit-rule-btn btn bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1">수정</button>
+                                <button data-id="${rule.id}" class="delete-rule-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>
+                            </div>`;
+                        el.querySelector('.drag-handle').addEventListener('dragstart', e => {
+                            e.dataTransfer.setData('text/plain', rule.id);
+                        });
+                        el.addEventListener('dragover', e => e.preventDefault());
+                        el.addEventListener('drop', e => {
+                            const draggedId = e.dataTransfer.getData('text/plain');
+                            if (draggedId !== rule.id) reorderLifeRules(draggedId, rule.id);
+                        });
+                        wrapper.appendChild(el);
+                    }
                 });
 
-                container.querySelectorAll('.assign-rule-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignmentModal('lifeRule', e.target.dataset.id, e.target.dataset.title)));
-                container.querySelectorAll('.edit-rule-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                wrapper.querySelectorAll('.assign-rule-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignmentModal('lifeRule', e.target.dataset.id, e.target.dataset.title)));
+                wrapper.querySelectorAll('.edit-rule-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                     const ruleDoc = await getDoc(doc(db, "lifeRules", e.target.dataset.id));
                     openLifeRuleModal({id: ruleDoc.id, ...ruleDoc.data()});
                 }));
-                container.querySelectorAll('.delete-rule-btn').forEach(btn => btn.addEventListener('click', (e) => deleteLifeRule(e.target.dataset.id)));
+                wrapper.querySelectorAll('.delete-rule-btn').forEach(btn => btn.addEventListener('click', (e) => deleteLifeRule(e.target.dataset.id)));
 
             } catch (error) {
                 console.error("Error loading life rules:", error);
                 container.innerHTML = `<p class="text-center text-red-500">생활 규칙 로드 실패.</p>`;
             }
+        }
+
+        async function reorderLifeRules(draggedId, targetId) {
+            const rules = lifeRuleListData.filter(r => (currentLifeRuleFolder === 'all' ? !r.folderId : r.folderId === currentLifeRuleFolder));
+            const draggedIndex = rules.findIndex(r => r.id === draggedId);
+            const targetIndex = rules.findIndex(r => r.id === targetId);
+            if(draggedIndex === -1 || targetIndex === -1) return;
+            const [dragged] = rules.splice(draggedIndex, 1);
+            rules.splice(targetIndex, 0, dragged);
+            await Promise.all(rules.map((r, i) => updateDoc(doc(db, 'lifeRules', r.id), { order: i })));
+            loadLifeRules();
         }
 
         function openLifeRuleModal(rule = null) {
@@ -2823,30 +2887,16 @@
             return snap.docs.map(d => ({ id: d.id, name: d.data().name }));
         }
 
-        async function loadLifeRuleFolders() {
+       async function loadLifeRuleFolders() {
             lifeRuleFolders = await loadFoldersByType('lifeRule');
-            const list = document.getElementById('life-rule-folder-list');
-            if(!list) return;
-            list.innerHTML = `<div class="folder cursor-pointer px-2 py-1 border rounded" data-id="all">전체</div>` +
-                lifeRuleFolders.map(f => `<div class="folder cursor-pointer px-2 py-1 border rounded" data-id="${f.id}">${f.name}</div>`).join('');
-            list.querySelectorAll('.folder').forEach(el => {
-                el.addEventListener('dragover', e => e.preventDefault());
-                el.addEventListener('drop', e => {
-                    const ruleId = e.dataTransfer.getData('text/plain');
-                    moveLifeRuleToFolder(ruleId, el.dataset.id === 'all' ? null : el.dataset.id);
-                });
-                el.addEventListener('click', () => {
-                    currentLifeRuleFolder = el.dataset.id;
-                    loadLifeRules();
-                });
-            });
         }
 
         async function createLifeRuleFolder() {
             const name = prompt('폴더 이름');
             if(!name) return;
             await addDoc(collection(db,'folders'), {teacherId: currentUserData.id, type:'lifeRule', name});
-            loadLifeRuleFolders();
+            await loadLifeRuleFolders();
+            loadLifeRules();
         }
 
         async function moveLifeRuleToFolder(ruleId, folderId) {
