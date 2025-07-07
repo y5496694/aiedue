@@ -127,7 +127,7 @@
             <div id="main-tab-content" class="tab-content">
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div class="lg:col-span-2 space-y-6">
-                        <div class="bg-white p-6 rounded-lg shadow-md">
+                        <div id="wallet-section" class="bg-white p-6 rounded-lg shadow-md">
                             <h2 class="text-xl font-bold mb-4">💰 내 지갑 현황</h2>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                                 <div>
@@ -156,7 +156,7 @@
                         </div>
                     </div>
                     <div class="space-y-6">
-                        <div class="bg-white p-6 rounded-lg shadow-md">
+                        <div id="asset-allocation-section" class="bg-white p-6 rounded-lg shadow-md">
                             <h2 class="text-xl font-bold mb-4">🎨 자산 구성</h2>
                             <div class="chart-container h-64"><canvas id="assetAllocationChart"></canvas></div>
                         </div>
@@ -262,6 +262,10 @@
                         </div>
                     </div>
                 </div>
+            </div>
+            <div id="admin-market-section" class="bg-white p-6 rounded-xl shadow-lg mt-6">
+                <h3 class="text-xl font-semibold text-red-600 mb-2">주식 시장</h3>
+                <div id="admin-market-list" class="space-y-2 text-sm"></div>
             </div>
         </div>
 
@@ -820,6 +824,19 @@
             const codeEl = document.getElementById('dashboard-code');
             const studentPanel = document.getElementById('student-info-panel');
             const teacherPanel = document.getElementById('teacher-admin-panel');
+            const walletSection = document.getElementById('wallet-section');
+            const marketSection = document.getElementById('market');
+            const assetSection = document.getElementById('asset-allocation-section');
+
+            if (role === 'teacher') {
+                walletSection.classList.add('hidden');
+                marketSection.classList.add('hidden');
+                assetSection.classList.add('hidden');
+            } else {
+                walletSection.classList.remove('hidden');
+                marketSection.classList.remove('hidden');
+                assetSection.classList.remove('hidden');
+            }
             
             // Show/hide tabs based on the *actual logged-in user's role*
             document.getElementById('homework-dashboard-tab').style.display = dataToShow.role === 'student' ? 'inline-block' : 'none';
@@ -1381,6 +1398,7 @@
             }
             loadPurchaseLog();
             loadSignupLog();
+            loadAdminMarket();
         }
         
         async function handleRoleSwitch(userId, userName, toRole) {
@@ -2814,6 +2832,41 @@
                         </ol>
                     </li>
                 `;
+            }
+        }
+
+        async function loadAdminMarket() {
+            const container = document.getElementById('admin-market-list');
+            if (!container) return;
+            container.innerHTML = '<p>주식 정보를 불러오는 중...</p>';
+            try {
+                const qSnap = await getDocs(query(collection(db, 'stocks'), orderBy('name')));
+                container.innerHTML = '';
+                qSnap.forEach(docSnap => {
+                    const stock = { id: docSnap.id, ...docSnap.data() };
+                    const row = document.createElement('div');
+                    row.className = 'flex flex-col sm:flex-row sm:items-center sm:justify-between border-b pb-2 mb-2';
+                    row.innerHTML = `
+                        <div class="font-semibold">${stock.name} <span class="ml-2 text-sm text-gray-600">${formatCurrency(stock.price)}</span></div>
+                        <div class="flex items-center space-x-2 mt-2 sm:mt-0">
+                            <input type="number" data-stockid="${stock.id}" data-field="min" class="w-20 p-1 border rounded" value="${stock.minFluctuation || 0}">
+                            <input type="number" data-stockid="${stock.id}" data-field="max" class="w-20 p-1 border rounded" value="${stock.maxFluctuation || 0}">
+                            <button class="update-fluct-btn bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs" data-stockid="${stock.id}">적용</button>
+                        </div>`;
+                    container.appendChild(row);
+                });
+                container.querySelectorAll('.update-fluct-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                    const id = e.target.dataset.stockid;
+                    const minInput = container.querySelector(`input[data-stockid="${id}"][data-field="min"]`);
+                    const maxInput = container.querySelector(`input[data-stockid="${id}"][data-field="max"]`);
+                    const min = Number(minInput.value);
+                    const max = Number(maxInput.value);
+                    await updateDoc(doc(db, 'stocks', id), { minFluctuation: min, maxFluctuation: max });
+                    showModal('완료', '등락폭이 수정되었습니다.');
+                }));
+            } catch (error) {
+                console.error('Error loading admin market:', error);
+                container.innerHTML = '<p class="text-red-500">주식 정보를 불러오지 못했습니다.</p>';
             }
         }
 
