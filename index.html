@@ -202,6 +202,7 @@
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-bold">📝 학습 문제 관리</h2>
                     <div class="space-x-2">
+                        <button id="add-manual-problem-btn" class="btn bg-gray-500 hover:bg-gray-600 text-white">+ 직접 문제 추가</button>
                         <button id="add-ai-dictation-problem-btn" class="btn bg-teal-500 hover:bg-teal-600 text-white">🎤 AI 받아쓰기 문제 만들기</button>
                         <button id="add-ai-math-problem-btn" class="btn bg-blue-500 hover:bg-blue-600 text-white">🤖 AI 수학 문제 만들기</button>
                     </div>
@@ -501,6 +502,52 @@
             </div>
         </div>
     </div>
+    <div id="manual-problem-creation-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-manual-problem-creation-modal-btn">&times;</span>
+            <h3 class="text-xl font-bold mb-4">직접 문제 추가</h3>
+            <form id="manual-problem-form" class="text-left space-y-4">
+                <input type="hidden" id="manual-problem-id">
+                <div>
+                    <label for="manual-problem-title" class="block text-sm font-medium">제목</label>
+                    <input type="text" id="manual-problem-title" required class="w-full p-2 border rounded-md form-input">
+                </div>
+                <div>
+                    <label for="manual-problem-content" class="block text-sm font-medium">내용</label>
+                    <textarea id="manual-problem-content" rows="3" class="w-full p-2 border rounded-md form-input"></textarea>
+                </div>
+                <div>
+                    <label for="manual-problem-link-input" class="block text-sm font-medium">링크 (선택)</label>
+                    <input type="url" id="manual-problem-link-input" class="w-full p-2 border rounded-md form-input" placeholder="https://">
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="manual-problem-password" class="block text-sm font-medium">암호</label>
+                        <input type="text" id="manual-problem-password" required class="w-full p-2 border rounded-md form-input">
+                    </div>
+                    <div>
+                        <label for="manual-problem-reward" class="block text-sm font-medium">완료 시 획득 금액 (원)</label>
+                        <input type="number" id="manual-problem-reward" required min="0" class="w-full p-2 border rounded-md form-input">
+                    </div>
+                </div>
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="manual-problem-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-manual-problem-modal-btn">&times;</span>
+            <h3 id="manual-problem-modal-title" class="text-xl font-bold mb-4"></h3>
+            <div id="manual-problem-modal-content" class="text-left mb-4 whitespace-pre-wrap"></div>
+            <div id="manual-problem-link" class="mb-4"></div>
+            <div class="flex items-center space-x-2" id="manual-problem-footer">
+                <input type="text" id="manual-problem-answer-input" class="w-full p-2 border rounded-md form-input" placeholder="암호 입력">
+                <button id="complete-manual-problem-btn" class="btn btn-primary">숙제 완료하기</button>
+            </div>
+        </div>
+    </div>
 
 
     <script type="module">
@@ -638,6 +685,8 @@
         const assignCodeModal = document.getElementById('assign-code-modal');
         const dictationCreationModal = document.getElementById('dictation-creation-modal');
         const dictationModal = document.getElementById('dictation-modal');
+        const manualProblemCreationModal = document.getElementById('manual-problem-creation-modal');
+        const manualProblemModal = document.getElementById('manual-problem-modal');
         let studentToAdjustId = null;
 
 
@@ -1731,6 +1780,8 @@
         document.getElementById('add-ai-math-problem-btn').addEventListener('click', () => openProblemCreationModal());
         // Teacher: Open AI Dictation Problem Creator
         document.getElementById('add-ai-dictation-problem-btn').addEventListener('click', () => openDictationCreationModal());
+        // Teacher: Open Manual Problem Creator
+        document.getElementById('add-manual-problem-btn').addEventListener('click', () => openManualProblemCreationModal());
 
         // Teacher: Open Math Problem Modal (new or for editing)
         function openProblemCreationModal(problemSet = null) {
@@ -1880,10 +1931,11 @@
                     <div class="divide-y divide-gray-200">
                         ${problemSets.map(problemSet => {
                             const isDictation = problemSet.type === 'dictation';
-                            const icon = isDictation ? '🎤' : '🤖';
-                            const topicText = isDictation ? 
+                            const isManual = problemSet.type === 'manual';
+                            const icon = isDictation ? '🎤' : (isManual ? '📝' : '🤖');
+                            const topicText = isDictation ?
                                 `${problemSet.dictationType === 'word' ? '단어' : '문장'} ${problemSet.count}개` :
-                                `${problemSet.topic} (${problemSet.problems?.length || 0}문제)`;
+                                isManual ? '직접 문제' : `${problemSet.topic} (${problemSet.problems?.length || 0}문제)`;
 
                             return `
                                 <div class="p-3 flex justify-between items-center">
@@ -1909,6 +1961,8 @@
                     const problemDoc = await getDoc(doc(db, "learningProblems", problemId));
                     if(problemType === 'dictation') {
                         openDictationCreationModal({id: problemDoc.id, ...problemDoc.data()});
+                    } else if(problemType === 'manual') {
+                        openManualProblemCreationModal({id: problemDoc.id, ...problemDoc.data()});
                     } else {
                         openProblemCreationModal({id: problemDoc.id, ...problemDoc.data()});
                     }
@@ -2050,7 +2104,7 @@
                 tableBody.innerHTML = '';
                 querySnapshot.forEach(docSnap => {
                     const hw = { id: docSnap.id, ...docSnap.data() };
-                    const icon = hw.type === 'dictation' ? '🎤' : '🤖';
+                    const icon = hw.type === 'dictation' ? '🎤' : (hw.type === 'manual' ? '📝' : '🤖');
                     const isCompleted = hw.status === 'completed';
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
@@ -2079,6 +2133,8 @@
                         const hwType = e.target.dataset.type;
                         if (hwType === 'dictation') {
                             openDictationModal(e.target.dataset.hwid, e.target.dataset.problemid);
+                        } else if (hwType === 'manual') {
+                            openManualProblemModal(e.target.dataset.hwid, e.target.dataset.problemid);
                         } else {
                             openHomeworkModal(e.target.dataset.hwid, e.target.dataset.problemid);
                         }
@@ -2535,6 +2591,106 @@
             }
         });
 
+        function openManualProblemCreationModal(problem = null) {
+            manualProblemCreationModal.style.display = 'flex';
+            const form = document.getElementById('manual-problem-form');
+            form.reset();
+            document.getElementById('manual-problem-id').value = problem?.id || '';
+            if (problem) {
+                document.getElementById('manual-problem-title').value = problem.title;
+                document.getElementById('manual-problem-content').value = problem.content || '';
+                document.getElementById('manual-problem-link-input').value = problem.link || '';
+                document.getElementById('manual-problem-password').value = problem.password;
+                document.getElementById('manual-problem-reward').value = problem.reward;
+            }
+        }
+
+        document.getElementById('manual-problem-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const problemId = document.getElementById('manual-problem-id').value;
+            const data = {
+                type: 'manual',
+                title: document.getElementById('manual-problem-title').value,
+                content: document.getElementById('manual-problem-content').value,
+                link: document.getElementById('manual-problem-link-input').value,
+                password: document.getElementById('manual-problem-password').value,
+                reward: Number(document.getElementById('manual-problem-reward').value),
+                teacherId: currentAuthUser.uid,
+                createdAt: serverTimestamp()
+            };
+            if (!data.title || !data.password || !data.reward) {
+                showModal('오류', '모든 필드를 입력해주세요.');
+                return;
+            }
+            try {
+                if (problemId) {
+                    await setDoc(doc(db, 'learningProblems', problemId), data, { merge: true });
+                } else {
+                    await addDoc(collection(db, 'learningProblems'), data);
+                }
+                manualProblemCreationModal.style.display = 'none';
+                loadLearningProblems();
+            } catch (error) {
+                showModal('저장 실패', `오류: ${error.message}`);
+            }
+        });
+
+        async function openManualProblemModal(assignmentId, problemId) {
+            currentAssignmentId = assignmentId;
+            const dataToShow = viewedUserData;
+            const assignmentDoc = await getDoc(doc(db, `users/${dataToShow.id}/assignedHomework`, assignmentId));
+            const problemDoc = await getDoc(doc(db, 'learningProblems', problemId));
+            if (!assignmentDoc.exists() || !problemDoc.exists()) {
+                showModal('오류', '숙제 문제를 불러올 수 없습니다.');
+                return;
+            }
+            const assignmentData = assignmentDoc.data();
+            const problem = problemDoc.data();
+            const isCompleted = assignmentData.status === 'completed';
+            document.getElementById('manual-problem-modal-title').textContent = problem.title;
+            document.getElementById('manual-problem-modal-content').textContent = problem.content || '';
+            const linkEl = document.getElementById('manual-problem-link');
+            if (problem.link) {
+                linkEl.innerHTML = `<a href="${problem.link}" target="_blank" class="text-blue-600 underline">${problem.link}</a>`;
+            } else {
+                linkEl.innerHTML = '';
+            }
+            const inputEl = document.getElementById('manual-problem-answer-input');
+            inputEl.value = '';
+            inputEl.disabled = isCompleted;
+            document.getElementById('manual-problem-footer').style.display = isCompleted ? 'none' : 'flex';
+            manualProblemModal.style.display = 'flex';
+        }
+
+        document.getElementById('complete-manual-problem-btn').addEventListener('click', async () => {
+            if (!currentAssignmentId || isAdminViewing) return;
+            const answer = document.getElementById('manual-problem-answer-input').value.trim();
+            const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
+            const assignmentDoc = await getDoc(assignmentRef);
+            const problemId = assignmentDoc.data().problemId;
+            const problemDoc = await getDoc(doc(db, 'learningProblems', problemId));
+            const correct = problemDoc.data().password || '';
+            if (answer !== correct) {
+                showModal('오류', '암호가 틀렸습니다.');
+                return;
+            }
+            try {
+                const reward = assignmentDoc.data().reward || 0;
+                const userRef = doc(db, 'users', currentUserData.id);
+                await updateDoc(assignmentRef, { status: 'completed', studentAnswers: [answer], completedAt: serverTimestamp() });
+                await updateDoc(userRef, { balance: increment(reward) });
+                const userDoc = await getDoc(userRef);
+                currentUserData = { id: userDoc.id, ...userDoc.data() };
+                viewedUserData = currentUserData;
+                manualProblemModal.style.display = 'none';
+                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을(를) 획득했습니다!`);
+                updateDashboardDisplay();
+                renderHomework();
+            } catch (error) {
+                showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
+            }
+        });
+
 
         async function loadPurchaseLog() {
             const logEl = document.getElementById('admin-purchase-log');
@@ -2609,6 +2765,8 @@
         document.getElementById('close-life-rule-modal-btn').addEventListener('click', () => lifeRuleModal.style.display = 'none');
         document.getElementById('close-dictation-creation-modal-btn').addEventListener('click', () => dictationCreationModal.style.display = 'none');
         document.getElementById('close-dictation-modal-btn').addEventListener('click', () => dictationModal.style.display = 'none');
+        document.getElementById('close-manual-problem-creation-modal-btn').addEventListener('click', () => manualProblemCreationModal.style.display = 'none');
+        document.getElementById('close-manual-problem-modal-btn').addEventListener('click', () => manualProblemModal.style.display = 'none');
 
 
         // --- Initial Load ---
