@@ -188,6 +188,7 @@
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">숙제 주제</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">배부일</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
                             </tr>
@@ -1443,6 +1444,12 @@
                                 <span class="font-bold text-amber-600">${formatCurrency(item.price)}</span>
                                 <button data-itemid="${item.id}" data-itemname="${item.name}" data-itemprice="${item.price}" class="buy-item-btn btn btn-primary px-3 py-1 text-sm" ${isAdminViewing ? 'disabled' : ''}>구매</button>
                             </div>
+                            ${currentUserData.role === 'teacher' ? `
+                            <div class="mt-2 flex justify-end space-x-2">
+                                <button data-itemid="${item.id}" class="edit-item-btn btn bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1">수정</button>
+                                <button data-itemid="${item.id}" class="delete-item-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>
+                            </div>
+                            ` : ''}
                         </div>
                     `;
                     container.appendChild(card);
@@ -1450,6 +1457,14 @@
                 document.querySelectorAll('.buy-item-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => handleBuyItem(e.target.dataset.itemid, e.target.dataset.itemname, e.target.dataset.itemprice));
                 });
+                if (currentUserData.role === 'teacher') {
+                    container.querySelectorAll('.edit-item-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => openShopItemModal(e.target.dataset.itemid));
+                    });
+                    container.querySelectorAll('.delete-item-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => deleteShopItem(e.target.dataset.itemid));
+                    });
+                }
             } catch (error) {
                 console.error("Error loading shop items: ", error);
                 container.innerHTML = `<p class="col-span-full text-center text-red-500">상점 물품 로드 실패</p>`;
@@ -1489,6 +1504,19 @@
                     updateDashboardDisplay();
                 } catch (error) {
                     showModal('구매 실패', error.message);
+                }
+            });
+        }
+
+        async function deleteShopItem(itemId) {
+            showModal('삭제 확인', '정말로 이 물품을 삭제하시겠습니까?', async () => {
+                try {
+                    await deleteDoc(doc(db, 'shopItems', itemId));
+                    modal.style.display = 'none';
+                    showModal('성공', '물품이 삭제되었습니다.');
+                    loadAndRenderShopItems();
+                } catch (error) {
+                    showModal('삭제 실패', `오류: ${error.message}`);
                 }
             });
         }
@@ -2090,14 +2118,14 @@
         async function renderHomework() {
             const dataToShow = viewedUserData;
             const tableBody = document.getElementById('homework-table-body');
-            tableBody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-gray-500">숙제를 불러오는 중...</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-gray-500">숙제를 불러오는 중...</td></tr>`;
             
             try {
                 const q = query(collection(db, `users/${dataToShow.id}/assignedHomework`), orderBy("assignedAt", "desc"));
                 const querySnapshot = await getDocs(q);
 
                 if (querySnapshot.empty) {
-                    tableBody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-gray-500">새로운 숙제가 없습니다.</td></tr>`;
+                    tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-gray-500">새로운 숙제가 없습니다.</td></tr>`;
                     return;
                 }
 
@@ -2106,9 +2134,11 @@
                     const hw = { id: docSnap.id, ...docSnap.data() };
                     const icon = hw.type === 'dictation' ? '🎤' : (hw.type === 'manual' ? '📝' : '🤖');
                     const isCompleted = hw.status === 'completed';
+                    const assignedDate = hw.assignedAt ? hw.assignedAt.toDate().toLocaleDateString('ko-KR') : '';
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${icon} ${hw.title}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${assignedDate}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${isCompleted ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
                                 ${isCompleted ? '완료' : '미완료'}
@@ -2147,7 +2177,7 @@
 
             } catch (error) {
                 console.error("Error fetching homework:", error);
-                tableBody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-red-500">숙제 로드 실패</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-red-500">숙제 로드 실패</td></tr>`;
             }
         }
         
