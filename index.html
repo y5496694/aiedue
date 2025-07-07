@@ -254,6 +254,12 @@
                                  <li>기록을 불러오는 중...</li>
                              </ul>
                         </div>
+                        <div class="bg-white p-6 rounded-xl shadow-lg">
+                             <h3 class="text-xl font-semibold text-red-600 mb-2">신규 가입 현황</h3>
+                             <ul id="admin-signup-log" class="space-y-2 text-sm max-h-80 overflow-y-auto">
+                                 <li>기록을 불러오는 중...</li>
+                             </ul>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -621,6 +627,11 @@
         //    match /purchaseLog/{logId} {
         //        allow create: if request.auth != null; // Allow any authenticated user to create a log (i.e., make a purchase)
         //        allow read, list: if isTeacher(); // Only teachers can read the logs
+        //    }
+        //
+        //    match /signupLog/{logId} {
+        //        allow create: if request.auth != null; // Log new sign-ups
+        //        allow read, list: if isTeacher();
         //    }
         //  }
         // }
@@ -1218,6 +1229,13 @@
                     createdAt: serverTimestamp()
                 });
 
+                await addDoc(collection(db, 'signupLog'), {
+                    name: name,
+                    userCode: newCode,
+                    role: 'student',
+                    signedUpAt: serverTimestamp()
+                });
+
                 showModal('등록 완료!', `환영합니다, ${name} 학생!<br>당신의 고유 코드는 <strong class="text-2xl text-amber-600">${newCode}</strong> 입니다.<br>이 코드를 꼭 기억하고 로그인해주세요.`);
                 switchView('login');
             } catch (e) {
@@ -1362,6 +1380,7 @@
                 listEl.innerHTML = `<li>사용자 정보 로드 실패: ${error.message}</li>`;
             }
             loadPurchaseLog();
+            loadSignupLog();
         }
         
         async function handleRoleSwitch(userId, userName, toRole) {
@@ -2745,6 +2764,44 @@
                 });
             } catch(error) {
                 console.error("Error loading purchase log:", error);
+                logEl.innerHTML = `
+                    <li class="text-red-500">기록 로드 실패</li>
+                    <li class="text-xs text-gray-600 mt-2">
+                        <b>원인:</b> Firestore 색인이 필요할 수 있습니다.<br>
+                        <b>해결 방법:</b>
+                        <ol class="list-decimal list-inside">
+                            <li>브라우저의 개발자 도구(F12)를 열고 Console 탭을 확인하세요.</li>
+                            <li>'FAILED_PRECONDITION' 또는 'The query requires an index'와 유사한 오류 메시지를 찾으세요.</li>
+                            <li>오류 메시지 안에 있는 링크를 클릭하여 Firebase 콘솔에서 필요한 색인을 생성하세요. 색인이 생성되기까지 몇 분 정도 걸릴 수 있습니다.</li>
+                        </ol>
+                    </li>
+                `;
+            }
+        }
+
+        async function loadSignupLog() {
+            const logEl = document.getElementById('admin-signup-log');
+            logEl.innerHTML = '<li>기록을 불러오는 중...</li>';
+            try {
+                const q = query(collection(db, 'signupLog'), orderBy('signedUpAt', 'desc'));
+                const logSnapshot = await getDocs(q);
+                if (logSnapshot.empty) {
+                    logEl.innerHTML = '<li>가입 기록이 없습니다.</li>';
+                    return;
+                }
+                logEl.innerHTML = '';
+                logSnapshot.forEach(logDoc => {
+                    const log = logDoc.data();
+                    const li = document.createElement('li');
+                    li.className = "border-b pb-2 mb-2";
+                    li.innerHTML = `
+                        <p><span class="font-semibold">${log.name}</span>(코드: ${log.userCode})님이 새로 가입하셨습니다.</p>
+                        <p class="text-xs text-gray-500">${log.signedUpAt.toDate().toLocaleString('ko-KR')}</p>
+                    `;
+                    logEl.appendChild(li);
+                });
+            } catch(error) {
+                console.error("Error loading signup log:", error);
                 logEl.innerHTML = `
                     <li class="text-red-500">기록 로드 실패</li>
                     <li class="text-xs text-gray-600 mt-2">
