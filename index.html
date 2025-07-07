@@ -121,6 +121,7 @@
                     <button data-tab="homework" id="homework-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">오늘의 숙제</button>
                     <button data-tab="life-rules-management" id="life-rules-management-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">생활 규칙 관리</button>
                     <button data-tab="learning-problems" id="learning-problems-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">학습 문제 관리</button>
+                    <button data-tab="work-management" id="work-management-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">업무 관리</button>
                 </nav>
             </div>
 
@@ -221,6 +222,15 @@
                 </div>
                 <div id="life-rule-list" class="bg-white p-4 rounded-lg shadow">
                     <!-- Life rules will be rendered here -->
+                </div>
+            </div>
+            <div id="work-management-tab-content" class="tab-content">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">📂 업무 관리</h2>
+                    <button id="open-draft-modal-btn" class="btn btn-primary">AI 기안 만들기</button>
+                </div>
+                <div id="work-doc-list" class="bg-white p-4 rounded-lg shadow">
+                    <p class="text-center text-gray-500">작성된 문서가 없습니다.</p>
                 </div>
             </div>
         </div>
@@ -559,6 +569,68 @@
             </div>
         </div>
     </div>
+    <div id="draft-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-draft-modal-btn">&times;</span>
+            <h3 class="text-xl font-bold mb-4">AI 기안 만들기</h3>
+            <form id="draft-form" class="text-left space-y-4 overflow-y-auto max-h-[70vh] p-1">
+                <div>
+                    <label for="draft-subject" class="block text-sm font-medium">주제</label>
+                    <input type="text" id="draft-subject" class="w-full p-2 border rounded-md form-input" required>
+                </div>
+                <div>
+                    <label for="draft-notes" class="block text-sm font-medium">참고 사항</label>
+                    <textarea id="draft-notes" rows="3" class="w-full p-2 border rounded-md form-input"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">관련 근거 여부</label>
+                    <div class="space-x-4">
+                        <label><input type="radio" name="has-reference" value="no" checked> 없음</label>
+                        <label><input type="radio" name="has-reference" value="yes"> 있음</label>
+                    </div>
+                    <div id="reference-container" class="mt-2 space-y-2 hidden">
+                        <!-- reference fields will be added here -->
+                    </div>
+                    <button type="button" id="add-reference-btn" class="mt-2 btn btn-secondary hidden">+ 추가</button>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">붙임 문서 여부</label>
+                    <div class="space-x-4">
+                        <label><input type="radio" name="has-attachment" value="no" checked> 없음</label>
+                        <label><input type="radio" name="has-attachment" value="yes"> 있음</label>
+                    </div>
+                    <div id="attachment-container" class="mt-2 space-y-2 hidden">
+                        <!-- attachment fields will be added here -->
+                    </div>
+                    <button type="button" id="add-attachment-btn" class="mt-2 btn btn-secondary hidden">+ 추가</button>
+                </div>
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary">AI 기안 생성</button>
+                </div>
+            </form>
+            <div id="draft-result" class="mt-4 hidden">
+                <div class="flex justify-between items-center mb-2">
+                    <h4 class="font-bold">제목</h4>
+                    <div class="space-x-2">
+                        <button id="edit-title-btn" class="btn btn-secondary btn-xs">ai 편집</button>
+                        <button id="copy-title-btn" class="btn btn-secondary btn-xs">복사</button>
+                    </div>
+                </div>
+                <p id="generated-title" class="border p-2 rounded mb-4"></p>
+                <div class="flex justify-between items-center mb-2">
+                    <h4 class="font-bold">본문</h4>
+                    <div class="space-x-2">
+                        <button id="edit-body-btn" class="btn btn-secondary btn-xs">ai 편집</button>
+                        <button id="copy-body-btn" class="btn btn-secondary btn-xs">복사</button>
+                    </div>
+                </div>
+                <pre id="generated-body" class="border p-2 rounded whitespace-pre-wrap"></pre>
+                <div class="text-right mt-4">
+                    <button id="save-draft-btn" class="btn btn-primary">완료</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
 
     <script type="module">
@@ -703,6 +775,7 @@
         const dictationModal = document.getElementById('dictation-modal');
         const manualProblemCreationModal = document.getElementById('manual-problem-creation-modal');
         const manualProblemModal = document.getElementById('manual-problem-modal');
+        const draftModal = document.getElementById('draft-modal');
         let studentToAdjustId = null;
 
 
@@ -842,6 +915,7 @@
             document.getElementById('homework-dashboard-tab').style.display = dataToShow.role === 'student' ? 'inline-block' : 'none';
             document.getElementById('learning-problems-dashboard-tab').style.display = currentUserData.role === 'teacher' ? 'inline-block' : 'none';
             document.getElementById('life-rules-management-dashboard-tab').style.display = currentUserData.role === 'teacher' ? 'inline-block' : 'none';
+            document.getElementById('work-management-tab').style.display = currentUserData.role === 'teacher' ? 'inline-block' : 'none';
             document.getElementById('teacher-admin-panel').style.display = currentUserData.role === 'teacher' ? 'block' : 'none';
             
             // Disable interactive elements if admin is viewing
@@ -875,6 +949,7 @@
             if (currentUserData.role === 'teacher') {
                 loadLearningProblems();
                 loadLifeRules();
+                loadWorkDocs();
             }
             startStockUpdates();
             document.getElementById('teacher-add-shop-item-btn').classList.toggle('hidden', currentUserData.role !== 'teacher');
@@ -2439,6 +2514,221 @@
                     showModal('삭제 실패', `오류: ${error.message}`);
                 }
             });
+        }
+
+        // --- Work Management ---
+        let currentDraftIndex = null;
+        document.getElementById('open-draft-modal-btn').addEventListener('click', () => openDraftModal());
+
+        function openDraftModal(index = null) {
+            currentDraftIndex = index;
+            draftModal.style.display = 'flex';
+            const form = document.getElementById('draft-form');
+            form.reset();
+            referenceContainer.innerHTML = '';
+            attachmentContainer.innerHTML = '';
+            draftResult.classList.add('hidden');
+            document.querySelector('input[name="has-reference"][value="no"]').checked = true;
+            document.querySelector('input[name="has-attachment"][value="no"]').checked = true;
+            addReferenceBtn.classList.add('hidden');
+            addAttachmentBtn.classList.add('hidden');
+            referenceContainer.classList.add('hidden');
+            attachmentContainer.classList.add('hidden');
+
+            if(index !== null) {
+                const docs = JSON.parse(localStorage.getItem('workDocs') || '[]');
+                const docData = docs[index];
+                if(docData) {
+                    document.getElementById('draft-subject').value = docData.subject;
+                    document.getElementById('draft-notes').value = docData.notes;
+                    if(docData.references && docData.references.length) {
+                        document.querySelector('input[name="has-reference"][value="yes"]').checked = true;
+                        referenceContainer.classList.remove('hidden');
+                        addReferenceBtn.classList.remove('hidden');
+                        docData.references.forEach(r => addReferenceField(r));
+                    }
+                    if(docData.attachments && docData.attachments.length) {
+                        document.querySelector('input[name="has-attachment"][value="yes"]').checked = true;
+                        attachmentContainer.classList.remove('hidden');
+                        addAttachmentBtn.classList.remove('hidden');
+                        docData.attachments.forEach(a => addAttachmentField(a));
+                    }
+                    generatedTitle.textContent = docData.title;
+                    generatedBody.textContent = docData.body;
+                    draftResult.classList.remove('hidden');
+                }
+            }
+        }
+
+        document.getElementById('close-draft-modal-btn').addEventListener('click', () => draftModal.style.display = 'none');
+
+        const referenceContainer = document.getElementById('reference-container');
+        const attachmentContainer = document.getElementById('attachment-container');
+        const addReferenceBtn = document.getElementById('add-reference-btn');
+        const addAttachmentBtn = document.getElementById('add-attachment-btn');
+        const draftResult = document.getElementById('draft-result');
+        const generatedTitle = document.getElementById('generated-title');
+        const generatedBody = document.getElementById('generated-body');
+
+        document.querySelectorAll('input[name="has-reference"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                if(radio.value === 'yes' && radio.checked) {
+                    referenceContainer.classList.remove('hidden');
+                    addReferenceBtn.classList.remove('hidden');
+                    if(referenceContainer.children.length === 0) addReferenceField();
+                } else if(radio.value === 'no' && radio.checked) {
+                    referenceContainer.innerHTML = '';
+                    referenceContainer.classList.add('hidden');
+                    addReferenceBtn.classList.add('hidden');
+                }
+            });
+        });
+
+        document.querySelectorAll('input[name="has-attachment"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                if(radio.value === 'yes' && radio.checked) {
+                    attachmentContainer.classList.remove('hidden');
+                    addAttachmentBtn.classList.remove('hidden');
+                    if(attachmentContainer.children.length === 0) addAttachmentField();
+                } else if(radio.value === 'no' && radio.checked) {
+                    attachmentContainer.innerHTML = '';
+                    attachmentContainer.classList.add('hidden');
+                    addAttachmentBtn.classList.add('hidden');
+                }
+            });
+        });
+
+        addReferenceBtn.addEventListener('click', () => addReferenceField());
+        addAttachmentBtn.addEventListener('click', () => addAttachmentField());
+
+        function addReferenceField(data = {}) {
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-1 md:grid-cols-4 gap-2 reference-item';
+            div.innerHTML = `
+                <input type="text" class="p-2 border rounded ref-agency" placeholder="기관" value="${data.agency || ''}">
+                <input type="text" class="p-2 border rounded ref-number" placeholder="문서 번호" value="${data.number || ''}">
+                <input type="date" class="p-2 border rounded ref-date" value="${data.date || ''}">
+                <input type="text" class="p-2 border rounded ref-content" placeholder="내용(선택)" value="${data.content || ''}">
+            `;
+            referenceContainer.appendChild(div);
+        }
+
+        function addAttachmentField(data = {}) {
+            const div = document.createElement('div');
+            div.className = 'flex items-center gap-2 attachment-item';
+            div.innerHTML = `
+                <input type="text" class="flex-1 p-2 border rounded attachment-name" placeholder="붙임 문서 이름" value="${data.name || ''}">
+                <input type="file" class="hidden attachment-file">
+                <button type="button" class="btn btn-secondary upload-file-btn">파일 업로드</button>
+            `;
+            const fileInput = div.querySelector('.attachment-file');
+            const uploadBtn = div.querySelector('.upload-file-btn');
+            uploadBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', () => {
+                if(fileInput.files[0]) {
+                    div.querySelector('.attachment-name').value = fileInput.files[0].name;
+                }
+            });
+            attachmentContainer.appendChild(div);
+        }
+
+        document.getElementById('draft-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const subject = document.getElementById('draft-subject').value.trim();
+            const notes = document.getElementById('draft-notes').value.trim();
+            const references = Array.from(referenceContainer.querySelectorAll('.reference-item')).map(item => ({
+                agency: item.querySelector('.ref-agency').value,
+                number: item.querySelector('.ref-number').value,
+                date: item.querySelector('.ref-date').value,
+                content: item.querySelector('.ref-content').value
+            }));
+            const attachments = Array.from(attachmentContainer.querySelectorAll('.attachment-item')).map(item => ({
+                name: item.querySelector('.attachment-name').value
+            }));
+
+            const { title, body } = generateDraftText(subject, notes, references, attachments);
+            generatedTitle.textContent = title;
+            generatedBody.textContent = body;
+            draftResult.classList.remove('hidden');
+        });
+
+        function generateDraftText(subject, notes, references, attachments) {
+            const title = subject;
+            let body = '';
+            if(references.length) {
+                const refStr = references.map(r => `${r.agency}-${r.number}(${r.date})${r.content ? ' 「'+r.content+'」' : ''}`).join(', ');
+                body += `1. 관련: ${refStr}\n`;
+                body += `2. ${subject}에 대하여`;
+            } else {
+                body += `1. ${subject}에 대하여`;
+            }
+            if(attachments.length) {
+                body += ' 붙임과 같이 보고하고자 합니다.';
+                body += '\n\n붙임  ';
+                if(attachments.length === 1) {
+                    body += `${attachments[0].name} 1부.  끝.`;
+                } else {
+                    body += attachments.map((a,i)=>`${i+1}. ${a.name} ${i+1}부.`).join('\n        ') + '  끝.';
+                }
+            } else {
+                body += ' 보고하고자 합니다.  끝.';
+            }
+            return { title, body };
+        }
+
+        document.getElementById('edit-title-btn').addEventListener('click', () => {
+            const newTitle = prompt('제목 수정', generatedTitle.textContent);
+            if(newTitle) generatedTitle.textContent = newTitle;
+        });
+        document.getElementById('edit-body-btn').addEventListener('click', () => {
+            const newBody = prompt('본문 수정', generatedBody.textContent);
+            if(newBody) generatedBody.textContent = newBody;
+        });
+        document.getElementById('copy-title-btn').addEventListener('click', () => navigator.clipboard.writeText(generatedTitle.textContent));
+        document.getElementById('copy-body-btn').addEventListener('click', () => navigator.clipboard.writeText(generatedBody.textContent));
+
+        document.getElementById('save-draft-btn').addEventListener('click', () => {
+            const docs = JSON.parse(localStorage.getItem('workDocs') || '[]');
+            const docData = {
+                title: generatedTitle.textContent,
+                body: generatedBody.textContent,
+                subject: document.getElementById('draft-subject').value.trim(),
+                notes: document.getElementById('draft-notes').value.trim(),
+                references: Array.from(referenceContainer.querySelectorAll('.reference-item')).map(item => ({
+                    agency: item.querySelector('.ref-agency').value,
+                    number: item.querySelector('.ref-number').value,
+                    date: item.querySelector('.ref-date').value,
+                    content: item.querySelector('.ref-content').value
+                })),
+                attachments: Array.from(attachmentContainer.querySelectorAll('.attachment-item')).map(item => ({
+                    name: item.querySelector('.attachment-name').value
+                }))
+            };
+            if(currentDraftIndex !== null) {
+                docs[currentDraftIndex] = docData;
+            } else {
+                docs.push(docData);
+            }
+            localStorage.setItem('workDocs', JSON.stringify(docs));
+            draftModal.style.display = 'none';
+            loadWorkDocs();
+        });
+
+        function loadWorkDocs() {
+            const container = document.getElementById('work-doc-list');
+            const docs = JSON.parse(localStorage.getItem('workDocs') || '[]');
+            if(!container) return;
+            if(docs.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500">작성된 문서가 없습니다.</p>';
+                return;
+            }
+            container.innerHTML = '<div class="divide-y divide-gray-200">' +
+                docs.map((d,i)=>`<div class="p-3 flex justify-between items-center"><span>${d.title}</span><button class="edit-draft-btn btn btn-secondary btn-xs" data-index="${i}">편집</button></div>`).join('') +
+                '</div>';
+            container.querySelectorAll('.edit-draft-btn').forEach(btn => btn.addEventListener('click', e => {
+                const idx = Number(e.target.dataset.index);
+                openDraftModal(idx);
+            }));
         }
         
         // --- AI Dictation Feature ---
