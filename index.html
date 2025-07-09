@@ -534,17 +534,25 @@
                     <input type="text" id="manual-problem-title" required class="w-full p-2 border rounded-md form-input">
                 </div>
                 <div>
-                    <label for="manual-problem-content" class="block text-sm font-medium">내용</label>
-                    <textarea id="manual-problem-content" rows="3" class="w-full p-2 border rounded-md form-input"></textarea>
-                </div>
-                <div>
-                    <label for="manual-problem-link-input" class="block text-sm font-medium">링크 (선택)</label>
-                    <input type="url" id="manual-problem-link-input" class="w-full p-2 border rounded-md form-input" placeholder="https://">
+                    <label class="block text-sm font-medium mb-1">내용 및 문제</label>
+                    <div id="manual-problem-items" class="space-y-2"></div>
+                    <div class="relative inline-block mt-2">
+                        <button type="button" id="add-manual-item-btn" class="btn btn-secondary">+ 추가</button>
+                        <div id="manual-item-menu" class="hidden absolute bg-white border rounded shadow-lg mt-1 z-10">
+                            <button type="button" class="block w-full text-left px-4 py-2 hover:bg-gray-100" data-type="text">내용</button>
+                            <button type="button" class="block w-full text-left px-4 py-2 hover:bg-gray-100" data-type="aiText">AI 내용 생성</button>
+                            <button type="button" class="block w-full text-left px-4 py-2 hover:bg-gray-100" data-type="question">문제(답변/채점 포함)</button>
+                            <button type="button" class="block w-full text-left px-4 py-2 hover:bg-gray-100" data-type="questionNoAnswer">문제(답변/채점 미포함)</button>
+                            <button type="button" class="block w-full text-left px-4 py-2 hover:bg-gray-100" data-type="aiQuestion">AI 문제(답변/채점 포함)</button>
+                            <button type="button" class="block w-full text-left px-4 py-2 hover:bg-gray-100" data-type="image">사진 링크</button>
+                            <button type="button" class="block w-full text-left px-4 py-2 hover:bg-gray-100" data-type="button">링크 버튼</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label for="manual-problem-password" class="block text-sm font-medium">암호</label>
-                        <input type="text" id="manual-problem-password" required class="w-full p-2 border rounded-md form-input">
+                        <label class="flex items-center space-x-2"><input type="checkbox" id="manual-problem-use-password"> <span>암호 사용</span></label>
+                        <input type="text" id="manual-problem-password" class="w-full p-2 border rounded-md form-input mt-1" placeholder="암호" disabled>
                     </div>
                     <div>
                         <label for="manual-problem-reward" class="block text-sm font-medium">완료 시 획득 금액 (원)</label>
@@ -561,8 +569,7 @@
         <div class="modal-content modal-content-lg">
             <span class="close-button" id="close-manual-problem-modal-btn">&times;</span>
             <h3 id="manual-problem-modal-title" class="text-xl font-bold mb-4"></h3>
-            <div id="manual-problem-modal-content" class="text-left mb-4 whitespace-pre-wrap"></div>
-            <div id="manual-problem-link" class="mb-4"></div>
+            <div id="manual-problem-modal-content" class="text-left mb-4 space-y-4"></div>
             <div class="flex items-center space-x-2" id="manual-problem-footer">
                 <input type="text" id="manual-problem-answer-input" class="w-full p-2 border rounded-md form-input" placeholder="암호 입력">
                 <button id="complete-manual-problem-btn" class="btn btn-primary">숙제 완료하기</button>
@@ -2730,6 +2737,116 @@
                 openDraftModal(idx);
             }));
         }
+
+        // ----- Manual Problem Item Helpers -----
+        const manualItemMenu = document.getElementById('manual-item-menu');
+        document.getElementById('add-manual-item-btn').addEventListener('click', () => {
+            manualItemMenu.classList.toggle('hidden');
+        });
+        manualItemMenu.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => {
+            addManualItem(btn.dataset.type);
+            manualItemMenu.classList.add('hidden');
+        }));
+
+        document.getElementById('manual-problem-use-password').addEventListener('change', toggleManualProblemPassword);
+
+        function toggleManualProblemPassword() {
+            const chk = document.getElementById('manual-problem-use-password');
+            const input = document.getElementById('manual-problem-password');
+            input.disabled = !chk.checked;
+            if(!chk.checked) input.value = '';
+        }
+
+        function addManualItem(type, data = {}) {
+            const container = document.getElementById('manual-problem-items');
+            const div = document.createElement('div');
+            div.className = 'manual-item border p-2 rounded relative';
+            div.dataset.type = type;
+            let html = '';
+            if (type === 'text' || type === 'aiText') {
+                html += `<textarea class="item-text w-full p-2 border rounded" placeholder="내용">${data.content || ''}</textarea>`;
+                if (type === 'aiText') html += `<button type="button" class="generate-ai-btn btn btn-secondary btn-xs mt-1">AI 생성</button>`;
+            } else if (type === 'question' || type === 'aiQuestion') {
+                html += `<input type="text" class="item-question w-full p-2 border rounded mb-2" placeholder="문제" value="${data.question || ''}">`;
+                html += `<input type="text" class="item-answer w-full p-2 border rounded" placeholder="정답" value="${data.answer || ''}">`;
+                if (type === 'aiQuestion') html += `<button type="button" class="generate-ai-question-btn btn btn-secondary btn-xs mt-1">AI 생성</button>`;
+            } else if (type === 'questionNoAnswer') {
+                html += `<input type="text" class="item-question w-full p-2 border rounded" placeholder="문제" value="${data.question || ''}">`;
+            } else if (type === 'image') {
+                html += `<input type="url" class="item-image-url w-full p-2 border rounded" placeholder="이미지 URL" value="${data.url || ''}">`;
+            } else if (type === 'button') {
+                html += `<input type="text" class="item-button-text w-full p-2 border rounded mb-2" placeholder="버튼 텍스트" value="${data.text || ''}">`;
+                html += `<input type="url" class="item-button-url w-full p-2 border rounded" placeholder="링크 URL" value="${data.url || ''}">`;
+            }
+            html += `<div class="absolute top-1 right-1 space-x-1">
+                        <button type="button" class="move-up btn btn-secondary btn-xs">▲</button>
+                        <button type="button" class="move-down btn btn-secondary btn-xs">▼</button>
+                        <button type="button" class="delete-item btn bg-red-500 hover:bg-red-600 text-white btn-xs">삭제</button>
+                    </div>`;
+            div.innerHTML = html;
+            container.appendChild(div);
+            div.querySelector('.delete-item').addEventListener('click', () => div.remove());
+            div.querySelector('.move-up').addEventListener('click', () => {
+                if (div.previousElementSibling) div.parentNode.insertBefore(div, div.previousElementSibling);
+            });
+            div.querySelector('.move-down').addEventListener('click', () => {
+                if (div.nextElementSibling) div.parentNode.insertBefore(div.nextElementSibling, div);
+            });
+            if (type === 'aiText') {
+                div.querySelector('.generate-ai-btn').addEventListener('click', async () => {
+                    const prompt = prompt('AI 내용 생성 프롬프트');
+                    if(!prompt) return;
+                    const result = await callGemini(prompt);
+                    div.querySelector('.item-text').value = result;
+                });
+            }
+            if (type === 'aiQuestion') {
+                div.querySelector('.generate-ai-question-btn').addEventListener('click', async () => {
+                    const prompt = prompt('AI 문제 생성 프롬프트 (JSON {question, answer})');
+                    if(!prompt) return;
+                    const result = await callGemini(prompt, true);
+                    if(result.question) div.querySelector('.item-question').value = result.question;
+                    if(result.answer) div.querySelector('.item-answer').value = result.answer;
+                });
+            }
+        }
+
+        function renderManualProblemItems(items) {
+            return items.map((item, idx) => {
+                if (item.type === 'text') {
+                    return `<p>${item.content}</p>`;
+                }
+                if (item.type === 'question') {
+                    return `<div class="border p-2 rounded"><p class="font-semibold mb-1">${idx + 1}. ${item.question}</p><p class="text-sm text-gray-500">정답: ${item.answer}</p></div>`;
+                }
+                if (item.type === 'questionNoAnswer') {
+                    return `<div class="border p-2 rounded"><p class="font-semibold">${idx + 1}. ${item.question}</p></div>`;
+                }
+                if (item.type === 'image') {
+                    return `<img src="${item.url}" class="w-48 h-48 object-cover"/>`;
+                }
+                if (item.type === 'button') {
+                    return `<a href="${item.url}" target="_blank" class="btn btn-primary inline-block">${item.text}</a>`;
+                }
+                return '';
+            }).join('');
+        }
+
+        async function callGemini(prompt, json = false) {
+            const apiKey = "AIzaSyC7_Gq4LIVVMv0hMD6qSwcTlGJcDSt-KgI";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            const payload = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: json ? { responseMimeType: 'application/json' } : {} };
+            try {
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                if(json) return JSON.parse(text);
+                return text;
+            } catch (e) {
+                console.error('AI error', e);
+                return json ? {} : '';
+            }
+        }
         
         // --- AI Dictation Feature ---
 
@@ -2953,29 +3070,64 @@
             const form = document.getElementById('manual-problem-form');
             form.reset();
             document.getElementById('manual-problem-id').value = problem?.id || '';
+            const itemsContainer = document.getElementById('manual-problem-items');
+            itemsContainer.innerHTML = '';
+            document.getElementById('manual-problem-use-password').checked = false;
+            document.getElementById('manual-problem-password').value = '';
+            document.getElementById('manual-problem-password').disabled = true;
             if (problem) {
                 document.getElementById('manual-problem-title').value = problem.title;
-                document.getElementById('manual-problem-content').value = problem.content || '';
-                document.getElementById('manual-problem-link-input').value = problem.link || '';
-                document.getElementById('manual-problem-password').value = problem.password;
+                if (Array.isArray(problem.items)) {
+                    problem.items.forEach(item => addManualItem(item.type, item));
+                } else {
+                    if (problem.content) addManualItem('text', { content: problem.content });
+                    if (problem.link) addManualItem('button', { text: '링크', url: problem.link });
+                }
+                if (problem.password) {
+                    document.getElementById('manual-problem-use-password').checked = true;
+                    document.getElementById('manual-problem-password').disabled = false;
+                    document.getElementById('manual-problem-password').value = problem.password;
+                }
                 document.getElementById('manual-problem-reward').value = problem.reward;
             }
+            toggleManualProblemPassword();
         }
 
         document.getElementById('manual-problem-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const problemId = document.getElementById('manual-problem-id').value;
+            const items = Array.from(document.querySelectorAll('#manual-problem-items .manual-item')).map(item => {
+                const type = item.dataset.type;
+                if (type === 'text' || type === 'aiText') {
+                    return { type: 'text', content: item.querySelector('.item-text').value };
+                }
+                if (type === 'question') {
+                    return { type: 'question', question: item.querySelector('.item-question').value, answer: item.querySelector('.item-answer').value };
+                }
+                if (type === 'questionNoAnswer') {
+                    return { type: 'questionNoAnswer', question: item.querySelector('.item-question').value };
+                }
+                if (type === 'aiQuestion') {
+                    return { type: 'question', question: item.querySelector('.item-question').value, answer: item.querySelector('.item-answer').value };
+                }
+                if (type === 'image') {
+                    return { type: 'image', url: item.querySelector('.item-image-url').value };
+                }
+                if (type === 'button') {
+                    return { type: 'button', text: item.querySelector('.item-button-text').value, url: item.querySelector('.item-button-url').value };
+                }
+            });
+
             const data = {
                 type: 'manual',
                 title: document.getElementById('manual-problem-title').value,
-                content: document.getElementById('manual-problem-content').value,
-                link: document.getElementById('manual-problem-link-input').value,
-                password: document.getElementById('manual-problem-password').value,
+                items,
+                password: document.getElementById('manual-problem-use-password').checked ? document.getElementById('manual-problem-password').value : '',
                 reward: Number(document.getElementById('manual-problem-reward').value),
                 teacherId: currentAuthUser.uid,
                 createdAt: serverTimestamp()
             };
-            if (!data.title || !data.password || !data.reward) {
+            if (!data.title || data.reward === '' || (document.getElementById('manual-problem-use-password').checked && !data.password)) {
                 showModal('오류', '모든 필드를 입력해주세요.');
                 return;
             }
@@ -3005,12 +3157,11 @@
             const problem = problemDoc.data();
             const isCompleted = assignmentData.status === 'completed';
             document.getElementById('manual-problem-modal-title').textContent = problem.title;
-            document.getElementById('manual-problem-modal-content').textContent = problem.content || '';
-            const linkEl = document.getElementById('manual-problem-link');
-            if (problem.link) {
-                linkEl.innerHTML = `<a href="${problem.link}" target="_blank" class="text-blue-600 underline">${problem.link}</a>`;
+            const modalContent = document.getElementById('manual-problem-modal-content');
+            if (Array.isArray(problem.items)) {
+                modalContent.innerHTML = renderManualProblemItems(problem.items);
             } else {
-                linkEl.innerHTML = '';
+                modalContent.textContent = problem.content || '';
             }
             const inputEl = document.getElementById('manual-problem-answer-input');
             inputEl.value = '';
@@ -3027,7 +3178,7 @@
             const problemId = assignmentDoc.data().problemId;
             const problemDoc = await getDoc(doc(db, 'learningProblems', problemId));
             const correct = problemDoc.data().password || '';
-            if (answer !== correct) {
+            if (correct && answer !== correct) {
                 showModal('오류', '암호가 틀렸습니다.');
                 return;
             }
