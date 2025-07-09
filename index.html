@@ -167,6 +167,8 @@
                         </div>
                         <div id="teacher-admin-panel" class="hidden bg-white p-6 rounded-lg shadow-md">
                             <h2 class="text-xl font-bold mb-4 text-red-600">⚙️ 관리자 메뉴</h2>
+                            <button id="assign-homework-start-btn" class="w-full py-2 mb-2 rounded-md btn bg-amber-500 hover:bg-amber-600 text-white">숙제 배부하기</button>
+                            <button id="assign-life-rule-start-btn" class="w-full py-2 mb-2 rounded-md btn bg-green-500 hover:bg-green-600 text-white">생활 규칙 배부하기</button>
                             <button id="admin-page-btn" class="w-full py-2 rounded-md btn bg-red-500 hover:bg-red-600 text-white">관리자 페이지로 이동</button>
                         </div>
                     </div>
@@ -634,6 +636,68 @@
                 <pre id="generated-body" class="border p-2 rounded whitespace-pre-wrap"></pre>
                 <div class="text-right mt-4">
                     <button id="save-draft-btn" class="btn btn-primary">완료</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="quick-link-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-quick-link-modal-btn">&times;</span>
+            <h3 class="text-xl font-bold mb-4">바로가기 추가</h3>
+            <div class="text-left space-y-3">
+                <div>
+                    <label class="block text-sm font-medium" for="quick-link-name">이름</label>
+                    <input type="text" id="quick-link-name" class="w-full p-2 border rounded-md form-input">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium" for="quick-link-image">이미지 URL</label>
+                    <input type="text" id="quick-link-image" class="w-full p-2 border rounded-md form-input">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium" for="quick-link-color">버튼 색상</label>
+                    <select id="quick-link-color" class="w-full p-2 border rounded-md form-input">
+                        <option value="#ef4444">빨강</option>
+                        <option value="#f97316">주황</option>
+                        <option value="#eab308">노랑</option>
+                        <option value="#22c55e">초록</option>
+                        <option value="#3b82f6">파랑</option>
+                        <option value="#6366f1">남색</option>
+                        <option value="#a855f7">보라</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium" for="quick-link-url">이동 링크</label>
+                    <input type="text" id="quick-link-url" class="w-full p-2 border rounded-md form-input">
+                </div>
+            </div>
+            <div class="mt-6 text-right">
+                <button id="add-quick-link-confirm-btn" class="btn btn-primary">+ 추가</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="bulk-assignment-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-bulk-assignment-modal-btn">&times;</span>
+            <div id="bulk-step1">
+                <h3 id="bulk-assignment-title" class="text-xl font-bold mb-4"></h3>
+                <div class="mb-2 relative">
+                    <input type="text" id="bulk-student-search" class="w-full p-2 pl-10 border border-gray-300 rounded-md form-input" placeholder="이름 또는 코드로 검색...">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                </div>
+                <div id="bulk-student-list" class="space-y-2 max-h-60 overflow-y-auto text-left border p-2 rounded-md"></div>
+                <div class="mt-6 text-right">
+                    <button id="bulk-select-item-btn" class="btn btn-primary">배부 문제 선택하기</button>
+                </div>
+            </div>
+            <div id="bulk-step2" class="hidden">
+                <h3 id="bulk-item-title" class="text-xl font-bold mb-4"></h3>
+                <div id="bulk-item-list" class="space-y-2 max-h-60 overflow-y-auto text-left border p-2 rounded-md"></div>
+                <div class="mt-6 text-right">
+                    <button id="bulk-assign-btn" class="btn btn-primary">배부하기</button>
                 </div>
             </div>
         </div>
@@ -1277,6 +1341,8 @@
             switchView('admin');
             loadAdminData();
         });
+        document.getElementById('assign-homework-start-btn').addEventListener('click', () => openBulkAssignment('homework'));
+        document.getElementById('assign-life-rule-start-btn').addEventListener('click', () => openBulkAssignment('lifeRule'));
         document.getElementById('back-to-dashboard-btn').addEventListener('click', () => {
             isAdminViewing = false;
             viewedUserData = currentUserData;
@@ -1829,9 +1895,53 @@
                 container.innerHTML = `<h3 class="text-lg font-bold mb-3">📜 오늘의 생활 규칙</h3><div id="life-rules-container" class="space-y-2"></div>`;
                 renderLifeRulesForStudent();
             } else if (role === 'teacher') {
-                container.innerHTML = `<p class="text-center text-gray-500 p-3">생활 규칙 및 숙제 관리는 상단 탭 메뉴를 이용해주세요.</p>`;
+                container.innerHTML = `
+                    <div id="quick-links" class="flex flex-wrap justify-center gap-2 mb-4"></div>
+                    <div class="text-center">
+                        <button id="add-quick-link-btn" class="py-2 px-4 rounded-md btn btn-secondary">+ 바로가기 추가</button>
+                    </div>`;
+                loadQuickLinks();
+                document.getElementById('add-quick-link-btn').addEventListener('click', () => openQuickLinkModal());
             }
         }
+
+        function loadQuickLinks() {
+            const container = document.getElementById('quick-links');
+            if (!container) return;
+            const links = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
+            container.innerHTML = '';
+            links.forEach(link => {
+                const btn = document.createElement('button');
+                btn.className = 'flex flex-col items-center p-2 rounded-md text-white';
+                btn.style.backgroundColor = link.color || '#3b82f6';
+                btn.innerHTML = `<img src="${link.image}" class="w-16 h-16 object-cover rounded mb-1"><span class="text-sm">${link.name}</span>`;
+                btn.addEventListener('click', () => window.open(link.url, '_blank'));
+                container.appendChild(btn);
+            });
+        }
+
+        function openQuickLinkModal() {
+            document.getElementById('quick-link-name').value = '';
+            document.getElementById('quick-link-image').value = '';
+            document.getElementById('quick-link-url').value = '';
+            document.getElementById('quick-link-color').value = '#3b82f6';
+            document.getElementById('quick-link-modal').style.display = 'flex';
+        }
+
+        document.getElementById('add-quick-link-confirm-btn').addEventListener('click', () => {
+            const name = document.getElementById('quick-link-name').value.trim();
+            const image = document.getElementById('quick-link-image').value.trim();
+            const url = document.getElementById('quick-link-url').value.trim();
+            const color = document.getElementById('quick-link-color').value;
+            if (!name || !url) { showModal('오류', '이름과 링크를 입력해주세요.'); return; }
+            const links = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
+            links.push({ name, image, url, color });
+            localStorage.setItem('teacherQuickLinks', JSON.stringify(links));
+            loadQuickLinks();
+            document.getElementById('quick-link-modal').style.display = 'none';
+        });
+
+        document.getElementById('close-quick-link-modal-btn').addEventListener('click', () => document.getElementById('quick-link-modal').style.display = 'none');
 
         async function renderLifeRulesForStudent() {
             const dataToShow = viewedUserData;
@@ -3338,6 +3448,85 @@
                 }
             });
         }
+
+        let bulkAssignmentType = null;
+        let bulkSelectedStudents = [];
+
+        async function openBulkAssignment(type) {
+            bulkAssignmentType = type;
+            bulkSelectedStudents = [];
+            document.getElementById('bulk-step1').classList.remove('hidden');
+            document.getElementById('bulk-step2').classList.add('hidden');
+            document.getElementById('bulk-assignment-title').textContent = type === 'homework' ? '숙제 배부하기 - 학생 선택' : '생활 규칙 배부하기 - 학생 선택';
+            const list = document.getElementById('bulk-student-list');
+            list.innerHTML = '학생 목록 로딩 중...';
+            document.getElementById('bulk-assignment-modal').style.display = 'flex';
+            const usersSnapshot = await getDocs(query(collection(db, 'users'), where('role', '==', 'student')));
+            if (usersSnapshot.empty) { list.innerHTML = '배부할 학생이 없습니다.'; return; }
+            list.innerHTML = usersSnapshot.docs.map(docSnap => {
+                const s = {id: docSnap.id, ...docSnap.data()};
+                return `<label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100"><input type="checkbox" data-studentid="${s.id}" class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"><span>${s.name} (코드: ${s.userCode})</span></label>`;
+            }).join('');
+            const search = document.getElementById('bulk-student-search');
+            search.value = '';
+            search.oninput = (e) => {
+                const term = e.target.value.toLowerCase();
+                document.querySelectorAll('#bulk-student-list label').forEach(lbl => {
+                    lbl.style.display = lbl.textContent.toLowerCase().includes(term) ? 'flex' : 'none';
+                });
+            };
+        }
+
+        async function loadBulkItems() {
+            const container = document.getElementById('bulk-item-list');
+            container.innerHTML = '목록 로딩 중...';
+            if (bulkAssignmentType === 'homework') {
+                const qSnap = await getDocs(query(collection(db, 'learningProblems'), where('teacherId', '==', currentUserData.id)));
+                if (qSnap.empty) { container.innerHTML = '학습 문제가 없습니다.'; return; }
+                container.innerHTML = qSnap.docs.map(d => `<label class="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded"><input type="radio" name="bulk-item" value="${d.id}" data-title="${d.data().title}"><span>${d.data().title}</span></label>`).join('');
+            } else {
+                const qSnap = await getDocs(query(collection(db, 'lifeRules'), where('teacherId', '==', currentUserData.id)));
+                if (qSnap.empty) { container.innerHTML = '생활 규칙이 없습니다.'; return; }
+                container.innerHTML = qSnap.docs.map(d => `<label class="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded"><input type="radio" name="bulk-item" value="${d.id}" data-title="${d.data().text}"><span>${d.data().text}</span></label>`).join('');
+            }
+        }
+
+        document.getElementById('bulk-select-item-btn').addEventListener('click', async () => {
+            bulkSelectedStudents = Array.from(document.querySelectorAll('#bulk-student-list input:checked')).map(i => i.dataset.studentid);
+            if (bulkSelectedStudents.length === 0) { showModal('오류', '한 명 이상의 학생을 선택해주세요.'); return; }
+            document.getElementById('bulk-step1').classList.add('hidden');
+            document.getElementById('bulk-step2').classList.remove('hidden');
+            document.getElementById('bulk-item-title').textContent = bulkAssignmentType === 'homework' ? '숙제 선택' : '생활 규칙 선택';
+            await loadBulkItems();
+        });
+
+        document.getElementById('bulk-assign-btn').addEventListener('click', async () => {
+            const sel = document.querySelector('#bulk-item-list input[name="bulk-item"]:checked');
+            if (!sel) { showModal('오류', '배부할 항목을 선택해주세요.'); return; }
+            try {
+                if (bulkAssignmentType === 'homework') {
+                    const docSnap = await getDoc(doc(db, 'learningProblems', sel.value));
+                    const ps = docSnap.data();
+                    for (const sid of bulkSelectedStudents) {
+                        const data = { problemId: sel.value, type: ps.type, title: ps.title, reward: ps.reward, status: 'assigned', assignedAt: serverTimestamp() };
+                        await addDoc(collection(db, `users/${sid}/assignedHomework`), data);
+                    }
+                } else {
+                    const docSnap = await getDoc(doc(db, 'lifeRules', sel.value));
+                    const rule = docSnap.data();
+                    for (const sid of bulkSelectedStudents) {
+                        const data = { ruleId: sel.value, text: rule.text, reward: rule.reward, repeatType: 'one-time', assignedAt: serverTimestamp(), lastCompletedAt: null };
+                        await setDoc(doc(db, `users/${sid}/assignedLifeRules`, sel.value), data);
+                    }
+                }
+                document.getElementById('bulk-assignment-modal').style.display = 'none';
+                showModal('성공', `${bulkSelectedStudents.length}명의 학생에게 배부를 완료했습니다.`);
+            } catch (error) {
+                showModal('배부 실패', `오류: ${error.message}`);
+            }
+        });
+
+        document.getElementById('close-bulk-assignment-modal-btn').addEventListener('click', () => document.getElementById('bulk-assignment-modal').style.display = 'none');
 
         // Close Modals
         document.getElementById('close-homework-modal-btn').addEventListener('click', () => homeworkModal.style.display = 'none');
