@@ -130,7 +130,7 @@
                     <div class="lg:col-span-2 space-y-6">
                         <div id="wallet-section" class="bg-white p-6 rounded-lg shadow-md">
                             <h2 class="text-xl font-bold mb-4">💰 내 지갑 현황</h2>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div id="wallet-financial-info" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                                 <div>
                                     <p class="text-sm text-gray-500">현재 잔액</p>
                                     <p id="currentBalance" class="text-3xl font-bold text-sky-600">0 원</p>
@@ -978,14 +978,17 @@
             const marketSection = document.getElementById('market');
             const assetSection = document.getElementById('asset-allocation-section');
 
+            const walletInfo = document.getElementById('wallet-financial-info');
             if (role === 'teacher') {
-                walletSection.classList.add('hidden');
+                walletSection.classList.remove('hidden');
                 marketSection.classList.add('hidden');
                 assetSection.classList.add('hidden');
+                walletInfo.classList.add('hidden');
             } else {
                 walletSection.classList.remove('hidden');
                 marketSection.classList.remove('hidden');
                 assetSection.classList.remove('hidden');
+                walletInfo.classList.remove('hidden');
             }
             
             // Show/hide tabs based on the *actual logged-in user's role*
