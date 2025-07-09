@@ -740,9 +740,23 @@
             <h3 id="shared-detail-title" class="text-xl font-bold mb-2"></h3>
             <p id="shared-detail-feature" class="mb-2"></p>
             <p id="shared-detail-author" class="text-sm text-gray-500 mb-4"></p>
-            <div class="flex justify-between items-center mt-4">
+            <div class="flex flex-wrap justify-between items-center mt-4 space-x-2">
                 <a id="shared-detail-link" href="#" target="_blank" class="btn btn-secondary">링크 이동</a>
                 <button id="save-shared-link-btn" class="btn btn-primary">내 바로가기에 저장</button>
+                <button id="edit-shared-link-btn" class="btn btn-secondary hidden">수정</button>
+                <button id="remove-shared-link-btn" class="btn bg-red-500 text-white hidden">삭제</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="ai-prompt-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-ai-prompt-modal-btn">&times;</span>
+            <h3 class="text-xl font-bold mb-2">AI 생성 프롬프트</h3>
+            <textarea id="ai-prompt-input" rows="3" class="w-full p-2 border rounded mb-4" placeholder="프롬프트 입력"></textarea>
+            <div class="text-right space-x-2">
+                <button id="cancel-ai-prompt-btn" class="btn btn-secondary">취소</button>
+                <button id="confirm-ai-prompt-btn" class="btn btn-primary">생성</button>
             </div>
         </div>
     </div>
@@ -1955,6 +1969,7 @@
         }
 
         let editingQuickLinkIndex = null;
+        let editingShared = false;
 
         function loadQuickLinks() {
             const container = document.getElementById('quick-links');
@@ -1982,11 +1997,12 @@
             });
         }
 
-        function openQuickLinkModal(idx = null) {
+        function openQuickLinkModal(idx = null, shared = false) {
             editingQuickLinkIndex = idx;
+            editingShared = shared;
             const title = document.querySelector('#quick-link-modal h3');
             const delBtn = document.getElementById('delete-quick-link-btn');
-            const links = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
+            const links = JSON.parse(localStorage.getItem(shared ? 'sharedQuickLinks' : 'teacherQuickLinks') || '[]');
 
             if (idx !== null && links[idx]) {
                 const link = links[idx];
@@ -2016,29 +2032,50 @@
             const url = document.getElementById('quick-link-url').value.trim();
             const color = document.getElementById('quick-link-color').value;
             if (!name || !url) { showModal('오류', '이름과 링크를 입력해주세요.'); return; }
-            const links = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
+            const key = editingShared ? 'sharedQuickLinks' : 'teacherQuickLinks';
+            const links = JSON.parse(localStorage.getItem(key) || '[]');
             if (editingQuickLinkIndex !== null) {
-                links[editingQuickLinkIndex] = { name, image, url, color, feature };
+                const existing = links[editingQuickLinkIndex] || {};
+                links[editingQuickLinkIndex] = editingShared
+                    ? { ...existing, name, image, url, color, feature }
+                    : { name, image, url, color, feature };
             } else {
-                links.push({ name, image, url, color, feature });
+                links.push(editingShared
+                    ? { name, image, url, color, feature, author: currentUserData?.name || '익명', authorId: currentUserData?.id || '' }
+                    : { name, image, url, color, feature });
             }
-            localStorage.setItem('teacherQuickLinks', JSON.stringify(links));
-            loadQuickLinks();
+            localStorage.setItem(key, JSON.stringify(links));
+            if (editingShared) {
+                loadSharedLinks();
+            } else {
+                loadQuickLinks();
+            }
             document.getElementById('quick-link-modal').style.display = 'none';
             editingQuickLinkIndex = null;
+            editingShared = false;
         });
 
         document.getElementById('delete-quick-link-btn').addEventListener('click', () => {
             if (editingQuickLinkIndex === null) return;
-            const links = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
+            const key = editingShared ? 'sharedQuickLinks' : 'teacherQuickLinks';
+            const links = JSON.parse(localStorage.getItem(key) || '[]');
             links.splice(editingQuickLinkIndex, 1);
-            localStorage.setItem('teacherQuickLinks', JSON.stringify(links));
-            loadQuickLinks();
+            localStorage.setItem(key, JSON.stringify(links));
+            if (editingShared) {
+                loadSharedLinks();
+            } else {
+                loadQuickLinks();
+            }
             document.getElementById('quick-link-modal').style.display = 'none';
             editingQuickLinkIndex = null;
+            editingShared = false;
         });
 
-        document.getElementById('close-quick-link-modal-btn').addEventListener('click', () => document.getElementById('quick-link-modal').style.display = 'none');
+        document.getElementById('close-quick-link-modal-btn').addEventListener('click', () => {
+            document.getElementById('quick-link-modal').style.display = 'none';
+            editingQuickLinkIndex = null;
+            editingShared = false;
+        });
 
         function openShareSpace() {
             loadSharedLinks();
@@ -2070,6 +2107,9 @@
             document.getElementById('shared-detail-feature').textContent = link.feature || '';
             document.getElementById('shared-detail-author').textContent = `게시자: ${link.author || ''}`;
             document.getElementById('shared-detail-link').href = link.url;
+            const isAuthor = link.authorId && currentUserData && link.authorId === currentUserData.id;
+            document.getElementById('edit-shared-link-btn').classList.toggle('hidden', !isAuthor);
+            document.getElementById('remove-shared-link-btn').classList.toggle('hidden', !isAuthor);
             document.getElementById('shared-link-detail-modal').style.display = 'flex';
         }
 
@@ -2084,7 +2124,7 @@
         function shareQuickLink(idx) {
             const myLinks = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
             const shared = JSON.parse(localStorage.getItem('sharedQuickLinks') || '[]');
-            const link = { ...myLinks[idx], author: currentUserData?.name || '익명' };
+            const link = { ...myLinks[idx], author: currentUserData?.name || '익명', authorId: currentUserData?.id || '' };
             shared.push(link);
             localStorage.setItem('sharedQuickLinks', JSON.stringify(shared));
             document.getElementById('share-own-quick-link-modal').style.display = 'none';
@@ -2104,6 +2144,19 @@
             localStorage.setItem('teacherQuickLinks', JSON.stringify(myLinks));
             loadQuickLinks();
             document.getElementById('shared-link-detail-modal').style.display = 'none';
+        });
+
+        document.getElementById('edit-shared-link-btn').addEventListener('click', () => {
+            openQuickLinkModal(currentSharedIndex, true);
+            document.getElementById('shared-link-detail-modal').style.display = 'none';
+        });
+
+        document.getElementById('remove-shared-link-btn').addEventListener('click', () => {
+            const links = JSON.parse(localStorage.getItem('sharedQuickLinks') || '[]');
+            links.splice(currentSharedIndex, 1);
+            localStorage.setItem('sharedQuickLinks', JSON.stringify(links));
+            document.getElementById('shared-link-detail-modal').style.display = 'none';
+            loadSharedLinks();
         });
 
         async function renderLifeRulesForStudent() {
@@ -3066,20 +3119,22 @@
                 if (div.nextElementSibling) div.parentNode.insertBefore(div.nextElementSibling, div);
             });
             if (type === 'aiText') {
-                div.querySelector('.generate-ai-btn').addEventListener('click', async () => {
-                    const prompt = prompt('AI 내용 생성 프롬프트');
-                    if(!prompt) return;
-                    const result = await callGemini(prompt);
-                    div.querySelector('.item-text').value = result;
+                div.querySelector('.generate-ai-btn').addEventListener('click', () => {
+                    openAiPromptModal(async prompt => {
+                        if(!prompt) return;
+                        const result = await callGemini(prompt);
+                        div.querySelector('.item-text').value = result;
+                    });
                 });
             }
             if (type === 'aiQuestion') {
-                div.querySelector('.generate-ai-question-btn').addEventListener('click', async () => {
-                    const prompt = prompt('AI 문제 생성 프롬프트 (JSON {question, answer})');
-                    if(!prompt) return;
-                    const result = await callGemini(prompt, true);
-                    if(result.question) div.querySelector('.item-question').value = result.question;
-                    if(result.answer) div.querySelector('.item-answer').value = result.answer;
+                div.querySelector('.generate-ai-question-btn').addEventListener('click', () => {
+                    openAiPromptModal(async prompt => {
+                        if(!prompt) return;
+                        const result = await callGemini(prompt, true);
+                        if(result.question) div.querySelector('.item-question').value = result.question;
+                        if(result.answer) div.querySelector('.item-answer').value = result.answer;
+                    });
                 });
             }
         }
@@ -3119,6 +3174,28 @@
                 console.error('AI error', e);
                 return json ? {} : '';
             }
+        }
+
+        // --- AI Prompt Modal ---
+        let aiPromptCallback = null;
+        const aiPromptModal = document.getElementById('ai-prompt-modal');
+        document.getElementById('close-ai-prompt-modal-btn').addEventListener('click', closeAiPromptModal);
+        document.getElementById('cancel-ai-prompt-btn').addEventListener('click', closeAiPromptModal);
+        document.getElementById('confirm-ai-prompt-btn').addEventListener('click', () => {
+            const prompt = document.getElementById('ai-prompt-input').value.trim();
+            if (aiPromptCallback) aiPromptCallback(prompt);
+            closeAiPromptModal();
+        });
+
+        function openAiPromptModal(callback) {
+            aiPromptCallback = callback;
+            document.getElementById('ai-prompt-input').value = '';
+            aiPromptModal.style.display = 'flex';
+        }
+
+        function closeAiPromptModal() {
+            aiPromptModal.style.display = 'none';
+            aiPromptCallback = null;
         }
         
         // --- AI Dictation Feature ---
