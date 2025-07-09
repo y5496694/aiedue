@@ -129,7 +129,7 @@
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div class="lg:col-span-2 space-y-6">
                         <div id="wallet-section" class="bg-white p-6 rounded-lg shadow-md">
-                            <h2 class="text-xl font-bold mb-4">💰 내 지갑 현황</h2>
+                            <h2 id="wallet-title" class="text-xl font-bold mb-4">💰 내 지갑 현황</h2>
                             <div id="wallet-financial-info" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                                 <div>
                                     <p class="text-sm text-gray-500">현재 잔액</p>
@@ -146,8 +146,9 @@
                                 <div id="life-rules-container" class="space-y-2 hidden"></div>
                                 <div id="teacher-quick-links" class="hidden">
                                     <div id="quick-links" class="flex flex-wrap justify-center gap-2 mb-4"></div>
-                                    <div class="text-center">
+                                    <div class="flex justify-between">
                                         <button id="add-quick-link-btn" class="py-2 px-4 rounded-md btn btn-secondary">+ 바로가기 추가</button>
+                                        <button id="open-share-space-btn" class="py-2 px-4 rounded-md btn btn-secondary">바로가기 공유 공간</button>
                                     </div>
                                 </div>
                             </div>
@@ -661,6 +662,10 @@
                     <input type="text" id="quick-link-image" class="w-full p-2 border rounded-md form-input">
                 </div>
                 <div>
+                    <label class="block text-sm font-medium" for="quick-link-feature">기능 (선택)</label>
+                    <input type="text" id="quick-link-feature" class="w-full p-2 border rounded-md form-input">
+                </div>
+                <div>
                     <label class="block text-sm font-medium" for="quick-link-color">버튼 색상</label>
                     <select id="quick-link-color" class="w-full p-2 border rounded-md form-input">
                         <option value="#ef4444">빨강</option>
@@ -677,8 +682,9 @@
                     <input type="text" id="quick-link-url" class="w-full p-2 border rounded-md form-input">
                 </div>
             </div>
-            <div class="mt-6 text-right">
-                <button id="add-quick-link-confirm-btn" class="btn btn-primary">+ 추가</button>
+            <div class="mt-6 text-right space-x-2">
+                <button id="delete-quick-link-btn" class="btn btn-secondary hidden">삭제</button>
+                <button id="add-quick-link-confirm-btn" class="btn btn-primary">완료</button>
             </div>
         </div>
     </div>
@@ -705,6 +711,38 @@
                 <div class="mt-6 text-right">
                     <button id="bulk-assign-btn" class="btn btn-primary">배부하기</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="quick-link-share-space-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-share-space-modal-btn">&times;</span>
+            <h3 class="text-xl font-bold mb-4">바로가기 공유 공간</h3>
+            <div id="shared-quick-link-list" class="grid grid-cols-2 gap-4 mb-4"></div>
+            <div class="text-right mt-4">
+                <button id="open-share-own-quick-link-modal-btn" class="btn btn-secondary">바로가기 공유하기</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="share-own-quick-link-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-share-own-quick-link-modal-btn">&times;</span>
+            <h3 class="text-xl font-bold mb-4">바로가기 공유하기</h3>
+            <div id="shareable-quick-links" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <div id="shared-link-detail-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-shared-link-detail-modal-btn">&times;</span>
+            <h3 id="shared-detail-title" class="text-xl font-bold mb-2"></h3>
+            <p id="shared-detail-feature" class="mb-2"></p>
+            <p id="shared-detail-author" class="text-sm text-gray-500 mb-4"></p>
+            <div class="flex justify-between items-center mt-4">
+                <a id="shared-detail-link" href="#" target="_blank" class="btn btn-secondary">링크 이동</a>
+                <button id="save-shared-link-btn" class="btn btn-primary">내 바로가기에 저장</button>
             </div>
         </div>
     </div>
@@ -979,16 +1017,19 @@
             const assetSection = document.getElementById('asset-allocation-section');
 
             const walletInfo = document.getElementById('wallet-financial-info');
+            const walletTitle = document.getElementById('wallet-title');
             if (role === 'teacher') {
                 walletSection.classList.remove('hidden');
                 marketSection.classList.add('hidden');
                 assetSection.classList.add('hidden');
                 walletInfo.classList.add('hidden');
+                walletTitle.textContent = '나만의 바로가기';
             } else {
                 walletSection.classList.remove('hidden');
                 marketSection.classList.remove('hidden');
                 assetSection.classList.remove('hidden');
                 walletInfo.classList.remove('hidden');
+                walletTitle.textContent = '💰 내 지갑 현황';
             }
             
             // Show/hide tabs based on the *actual logged-in user's role*
@@ -1353,6 +1394,7 @@
         document.getElementById('assign-homework-start-btn').addEventListener('click', () => openBulkAssignment('homework'));
         document.getElementById('assign-life-rule-start-btn').addEventListener('click', () => openBulkAssignment('lifeRule'));
         document.getElementById('add-quick-link-btn').addEventListener('click', () => openQuickLinkModal());
+        document.getElementById('open-share-space-btn').addEventListener('click', () => openShareSpace());
         document.getElementById('back-to-dashboard-btn').addEventListener('click', () => {
             isAdminViewing = false;
             viewedUserData = currentUserData;
@@ -1912,43 +1954,157 @@
             }
         }
 
+        let editingQuickLinkIndex = null;
+
         function loadQuickLinks() {
             const container = document.getElementById('quick-links');
             if (!container) return;
             const links = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
             container.innerHTML = '';
-            links.forEach(link => {
+            links.forEach((link, idx) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'relative group';
+
                 const btn = document.createElement('button');
                 btn.className = 'flex flex-col items-center p-2 rounded-md text-white';
                 btn.style.backgroundColor = link.color || '#3b82f6';
                 btn.innerHTML = `<img src="${link.image}" class="w-16 h-16 object-cover rounded mb-1"><span class="text-sm">${link.name}</span>`;
                 btn.addEventListener('click', () => window.open(link.url, '_blank'));
-                container.appendChild(btn);
+                wrapper.appendChild(btn);
+
+                const editBtn = document.createElement('button');
+                editBtn.className = 'hidden group-hover:block absolute -top-2 -right-2 bg-white p-1 rounded-full shadow';
+                editBtn.innerHTML = '<i class="fas fa-pencil-alt text-gray-600"></i>';
+                editBtn.addEventListener('click', (e) => { e.stopPropagation(); openQuickLinkModal(idx); });
+                wrapper.appendChild(editBtn);
+
+                container.appendChild(wrapper);
             });
         }
 
-        function openQuickLinkModal() {
-            document.getElementById('quick-link-name').value = '';
-            document.getElementById('quick-link-image').value = '';
-            document.getElementById('quick-link-url').value = '';
-            document.getElementById('quick-link-color').value = '#3b82f6';
+        function openQuickLinkModal(idx = null) {
+            editingQuickLinkIndex = idx;
+            const title = document.querySelector('#quick-link-modal h3');
+            const delBtn = document.getElementById('delete-quick-link-btn');
+            const links = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
+
+            if (idx !== null && links[idx]) {
+                const link = links[idx];
+                document.getElementById('quick-link-name').value = link.name || '';
+                document.getElementById('quick-link-image').value = link.image || '';
+                document.getElementById('quick-link-feature').value = link.feature || '';
+                document.getElementById('quick-link-url').value = link.url || '';
+                document.getElementById('quick-link-color').value = link.color || '#3b82f6';
+                title.textContent = '바로가기 편집';
+                delBtn.classList.remove('hidden');
+            } else {
+                document.getElementById('quick-link-name').value = '';
+                document.getElementById('quick-link-image').value = '';
+                document.getElementById('quick-link-feature').value = '';
+                document.getElementById('quick-link-url').value = '';
+                document.getElementById('quick-link-color').value = '#3b82f6';
+                title.textContent = '바로가기 추가';
+                delBtn.classList.add('hidden');
+            }
             document.getElementById('quick-link-modal').style.display = 'flex';
         }
 
         document.getElementById('add-quick-link-confirm-btn').addEventListener('click', () => {
             const name = document.getElementById('quick-link-name').value.trim();
             const image = document.getElementById('quick-link-image').value.trim();
+            const feature = document.getElementById('quick-link-feature').value.trim();
             const url = document.getElementById('quick-link-url').value.trim();
             const color = document.getElementById('quick-link-color').value;
             if (!name || !url) { showModal('오류', '이름과 링크를 입력해주세요.'); return; }
             const links = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
-            links.push({ name, image, url, color });
+            if (editingQuickLinkIndex !== null) {
+                links[editingQuickLinkIndex] = { name, image, url, color, feature };
+            } else {
+                links.push({ name, image, url, color, feature });
+            }
             localStorage.setItem('teacherQuickLinks', JSON.stringify(links));
             loadQuickLinks();
             document.getElementById('quick-link-modal').style.display = 'none';
+            editingQuickLinkIndex = null;
+        });
+
+        document.getElementById('delete-quick-link-btn').addEventListener('click', () => {
+            if (editingQuickLinkIndex === null) return;
+            const links = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
+            links.splice(editingQuickLinkIndex, 1);
+            localStorage.setItem('teacherQuickLinks', JSON.stringify(links));
+            loadQuickLinks();
+            document.getElementById('quick-link-modal').style.display = 'none';
+            editingQuickLinkIndex = null;
         });
 
         document.getElementById('close-quick-link-modal-btn').addEventListener('click', () => document.getElementById('quick-link-modal').style.display = 'none');
+
+        function openShareSpace() {
+            loadSharedLinks();
+            document.getElementById('quick-link-share-space-modal').style.display = 'flex';
+        }
+
+        function loadSharedLinks() {
+            const container = document.getElementById('shared-quick-link-list');
+            if (!container) return;
+            const links = JSON.parse(localStorage.getItem('sharedQuickLinks') || '[]');
+            container.innerHTML = '';
+            links.forEach((link, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'flex flex-col items-center p-2 rounded-md text-white';
+                btn.style.backgroundColor = link.color || '#3b82f6';
+                btn.innerHTML = `<img src="${link.image}" class="w-16 h-16 object-cover rounded mb-1"><span class="text-sm">${link.name}</span>`;
+                btn.addEventListener('click', () => openSharedLinkDetail(idx));
+                container.appendChild(btn);
+            });
+        }
+
+        let currentSharedIndex = null;
+        function openSharedLinkDetail(idx) {
+            currentSharedIndex = idx;
+            const links = JSON.parse(localStorage.getItem('sharedQuickLinks') || '[]');
+            const link = links[idx];
+            if (!link) return;
+            document.getElementById('shared-detail-title').textContent = link.name;
+            document.getElementById('shared-detail-feature').textContent = link.feature || '';
+            document.getElementById('shared-detail-author').textContent = `게시자: ${link.author || ''}`;
+            document.getElementById('shared-detail-link').href = link.url;
+            document.getElementById('shared-link-detail-modal').style.display = 'flex';
+        }
+
+        function openShareOwnQuickLinkModal() {
+            const container = document.getElementById('shareable-quick-links');
+            const links = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
+            container.innerHTML = links.map((l,i)=>`<div class="flex justify-between items-center border p-2 rounded"><span>${l.name}</span><button class="share-q-btn btn btn-primary" data-idx="${i}">공유</button></div>`).join('');
+            container.querySelectorAll('.share-q-btn').forEach(btn=>btn.addEventListener('click', e=>shareQuickLink(Number(e.target.dataset.idx))));
+            document.getElementById('share-own-quick-link-modal').style.display = 'flex';
+        }
+
+        function shareQuickLink(idx) {
+            const myLinks = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
+            const shared = JSON.parse(localStorage.getItem('sharedQuickLinks') || '[]');
+            const link = { ...myLinks[idx], author: currentUserData?.name || '익명' };
+            shared.push(link);
+            localStorage.setItem('sharedQuickLinks', JSON.stringify(shared));
+            document.getElementById('share-own-quick-link-modal').style.display = 'none';
+            loadSharedLinks();
+        }
+
+        document.getElementById('open-share-own-quick-link-modal-btn').addEventListener('click', () => openShareOwnQuickLinkModal());
+        document.getElementById('close-share-own-quick-link-modal-btn').addEventListener('click', () => document.getElementById('share-own-quick-link-modal').style.display = 'none');
+        document.getElementById('close-share-space-modal-btn').addEventListener('click', () => document.getElementById('quick-link-share-space-modal').style.display = 'none');
+        document.getElementById('close-shared-link-detail-modal-btn').addEventListener('click', () => document.getElementById('shared-link-detail-modal').style.display = 'none');
+        document.getElementById('save-shared-link-btn').addEventListener('click', () => {
+            const shared = JSON.parse(localStorage.getItem('sharedQuickLinks') || '[]');
+            const link = shared[currentSharedIndex];
+            if (!link) return;
+            const myLinks = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
+            myLinks.push({ name: link.name, image: link.image, url: link.url, color: link.color, feature: link.feature });
+            localStorage.setItem('teacherQuickLinks', JSON.stringify(myLinks));
+            loadQuickLinks();
+            document.getElementById('shared-link-detail-modal').style.display = 'none';
+        });
 
         async function renderLifeRulesForStudent() {
             const dataToShow = viewedUserData;
