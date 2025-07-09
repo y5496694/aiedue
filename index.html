@@ -1970,11 +1970,12 @@
 
         let editingQuickLinkIndex = null;
         let editingShared = false;
+        const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base;
 
         function loadQuickLinks() {
             const container = document.getElementById('quick-links');
             if (!container) return;
-            const links = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
+            const links = JSON.parse(localStorage.getItem(userKey('teacherQuickLinks')) || '[]');
             container.innerHTML = '';
             links.forEach((link, idx) => {
                 const wrapper = document.createElement('div');
@@ -2002,7 +2003,7 @@
             editingShared = shared;
             const title = document.querySelector('#quick-link-modal h3');
             const delBtn = document.getElementById('delete-quick-link-btn');
-            const links = JSON.parse(localStorage.getItem(shared ? 'sharedQuickLinks' : 'teacherQuickLinks') || '[]');
+            const links = JSON.parse(localStorage.getItem(shared ? 'sharedQuickLinks' : userKey('teacherQuickLinks')) || '[]');
 
             if (idx !== null && links[idx]) {
                 const link = links[idx];
@@ -2032,7 +2033,7 @@
             const url = document.getElementById('quick-link-url').value.trim();
             const color = document.getElementById('quick-link-color').value;
             if (!name || !url) { showModal('오류', '이름과 링크를 입력해주세요.'); return; }
-            const key = editingShared ? 'sharedQuickLinks' : 'teacherQuickLinks';
+            const key = editingShared ? 'sharedQuickLinks' : userKey('teacherQuickLinks');
             const links = JSON.parse(localStorage.getItem(key) || '[]');
             if (editingQuickLinkIndex !== null) {
                 const existing = links[editingQuickLinkIndex] || {};
@@ -2057,7 +2058,7 @@
 
         document.getElementById('delete-quick-link-btn').addEventListener('click', () => {
             if (editingQuickLinkIndex === null) return;
-            const key = editingShared ? 'sharedQuickLinks' : 'teacherQuickLinks';
+            const key = editingShared ? 'sharedQuickLinks' : userKey('teacherQuickLinks');
             const links = JSON.parse(localStorage.getItem(key) || '[]');
             links.splice(editingQuickLinkIndex, 1);
             localStorage.setItem(key, JSON.stringify(links));
@@ -2115,14 +2116,14 @@
 
         function openShareOwnQuickLinkModal() {
             const container = document.getElementById('shareable-quick-links');
-            const links = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
+            const links = JSON.parse(localStorage.getItem(userKey('teacherQuickLinks')) || '[]');
             container.innerHTML = links.map((l,i)=>`<div class="flex justify-between items-center border p-2 rounded"><span>${l.name}</span><button class="share-q-btn btn btn-primary" data-idx="${i}">공유</button></div>`).join('');
             container.querySelectorAll('.share-q-btn').forEach(btn=>btn.addEventListener('click', e=>shareQuickLink(Number(e.target.dataset.idx))));
             document.getElementById('share-own-quick-link-modal').style.display = 'flex';
         }
 
         function shareQuickLink(idx) {
-            const myLinks = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
+            const myLinks = JSON.parse(localStorage.getItem(userKey('teacherQuickLinks')) || '[]');
             const shared = JSON.parse(localStorage.getItem('sharedQuickLinks') || '[]');
             const link = { ...myLinks[idx], author: currentUserData?.name || '익명', authorId: currentUserData?.id || '' };
             shared.push(link);
@@ -2139,9 +2140,9 @@
             const shared = JSON.parse(localStorage.getItem('sharedQuickLinks') || '[]');
             const link = shared[currentSharedIndex];
             if (!link) return;
-            const myLinks = JSON.parse(localStorage.getItem('teacherQuickLinks') || '[]');
+            const myLinks = JSON.parse(localStorage.getItem(userKey('teacherQuickLinks')) || '[]');
             myLinks.push({ name: link.name, image: link.image, url: link.url, color: link.color, feature: link.feature });
-            localStorage.setItem('teacherQuickLinks', JSON.stringify(myLinks));
+            localStorage.setItem(userKey('teacherQuickLinks'), JSON.stringify(myLinks));
             loadQuickLinks();
             document.getElementById('shared-link-detail-modal').style.display = 'none';
         });
@@ -2869,7 +2870,7 @@
             attachmentContainer.classList.add('hidden');
 
             if(index !== null) {
-                const docs = JSON.parse(localStorage.getItem('workDocs') || '[]');
+                const docs = JSON.parse(localStorage.getItem(userKey('workDocs')) || '[]');
                 const docData = docs[index];
                 if(docData) {
                     document.getElementById('draft-subject').value = docData.subject;
@@ -3021,7 +3022,7 @@
         document.getElementById('copy-body-btn').addEventListener('click', () => navigator.clipboard.writeText(generatedBody.textContent));
 
         document.getElementById('save-draft-btn').addEventListener('click', () => {
-            const docs = JSON.parse(localStorage.getItem('workDocs') || '[]');
+            const docs = JSON.parse(localStorage.getItem(userKey('workDocs')) || '[]');
             const docData = {
                 title: generatedTitle.textContent,
                 body: generatedBody.textContent,
@@ -3042,14 +3043,14 @@
             } else {
                 docs.push(docData);
             }
-            localStorage.setItem('workDocs', JSON.stringify(docs));
+            localStorage.setItem(userKey('workDocs'), JSON.stringify(docs));
             draftModal.style.display = 'none';
             loadWorkDocs();
         });
 
         function loadWorkDocs() {
             const container = document.getElementById('work-doc-list');
-            const docs = JSON.parse(localStorage.getItem('workDocs') || '[]');
+            const docs = JSON.parse(localStorage.getItem(userKey('workDocs')) || '[]');
             if(!container) return;
             if(docs.length === 0) {
                 container.innerHTML = '<p class="text-center text-gray-500">작성된 문서가 없습니다.</p>';
