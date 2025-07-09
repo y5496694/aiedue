@@ -143,7 +143,13 @@
                             </div>
                             <hr class="my-4">
                             <div id="main-dashboard-bottom-content">
-                                <!-- Student: Life Rules / Teacher: Management Buttons -->
+                                <div id="life-rules-container" class="space-y-2 hidden"></div>
+                                <div id="teacher-quick-links" class="hidden">
+                                    <div id="quick-links" class="flex flex-wrap justify-center gap-2 mb-4"></div>
+                                    <div class="text-center">
+                                        <button id="add-quick-link-btn" class="py-2 px-4 rounded-md btn btn-secondary">+ 바로가기 추가</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <div id="market" class="bg-white p-6 rounded-lg shadow-md">
@@ -1343,6 +1349,7 @@
         });
         document.getElementById('assign-homework-start-btn').addEventListener('click', () => openBulkAssignment('homework'));
         document.getElementById('assign-life-rule-start-btn').addEventListener('click', () => openBulkAssignment('lifeRule'));
+        document.getElementById('add-quick-link-btn').addEventListener('click', () => openQuickLinkModal());
         document.getElementById('back-to-dashboard-btn').addEventListener('click', () => {
             isAdminViewing = false;
             viewedUserData = currentUserData;
@@ -1889,19 +1896,16 @@
         };
 
         function renderDashboardMainContent(role) {
-            const container = document.getElementById('main-dashboard-bottom-content');
-            container.innerHTML = '';
+            const lifeRules = document.getElementById('life-rules-container');
+            const quickLinksSection = document.getElementById('teacher-quick-links');
             if (role === 'student') {
-                container.innerHTML = `<h3 class="text-lg font-bold mb-3">📜 오늘의 생활 규칙</h3><div id="life-rules-container" class="space-y-2"></div>`;
+                lifeRules.classList.remove('hidden');
+                quickLinksSection.classList.add('hidden');
                 renderLifeRulesForStudent();
             } else if (role === 'teacher') {
-                container.innerHTML = `
-                    <div id="quick-links" class="flex flex-wrap justify-center gap-2 mb-4"></div>
-                    <div class="text-center">
-                        <button id="add-quick-link-btn" class="py-2 px-4 rounded-md btn btn-secondary">+ 바로가기 추가</button>
-                    </div>`;
+                lifeRules.classList.add('hidden');
+                quickLinksSection.classList.remove('hidden');
                 loadQuickLinks();
-                document.getElementById('add-quick-link-btn').addEventListener('click', () => openQuickLinkModal());
             }
         }
 
