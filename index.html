@@ -547,7 +547,7 @@
                     <div id="manual-problem-items" class="space-y-2"></div>
                     <div class="relative inline-block mt-2">
                         <button type="button" id="add-manual-item-btn" class="btn btn-secondary">+ 추가</button>
-                        <div id="manual-item-menu" class="hidden absolute bg-white border rounded shadow-lg mt-1 z-10">
+                        <div id="manual-item-menu" class="hidden absolute bg-white border rounded shadow-lg mt-1 z-10 w-48">
                             <button type="button" class="block w-full text-left px-4 py-2 hover:bg-gray-100" data-type="text">내용</button>
                             <button type="button" class="block w-full text-left px-4 py-2 hover:bg-gray-100" data-type="aiText">AI 내용 생성</button>
                             <button type="button" class="block w-full text-left px-4 py-2 hover:bg-gray-100" data-type="question">문제(답변/채점 포함)</button>
@@ -579,9 +579,15 @@
             <span class="close-button" id="close-manual-problem-modal-btn">&times;</span>
             <h3 id="manual-problem-modal-title" class="text-xl font-bold mb-4"></h3>
             <div id="manual-problem-modal-content" class="text-left mb-4 space-y-4"></div>
-            <div class="flex items-center space-x-2" id="manual-problem-footer">
-                <input type="text" id="manual-problem-answer-input" class="w-full p-2 border rounded-md form-input" placeholder="암호 입력">
-                <button id="complete-manual-problem-btn" class="btn btn-primary">숙제 완료하기</button>
+            <div id="manual-problem-footer" class="space-y-2">
+                <div class="flex justify-between items-center">
+                    <div id="manual-score-display" class="text-lg font-bold"></div>
+                    <button id="grade-all-manual-btn" class="btn btn-secondary">모두 채점</button>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="text" id="manual-problem-answer-input" class="w-full p-2 border rounded-md form-input" placeholder="암호 입력">
+                    <button id="complete-manual-problem-btn" class="btn btn-primary btn-disabled" disabled>숙제 완료하기</button>
+                </div>
             </div>
         </div>
     </div>
@@ -3145,20 +3151,105 @@
                 if (item.type === 'text') {
                     return `<p>${item.content}</p>`;
                 }
-                if (item.type === 'question') {
-                    return `<div class="border p-2 rounded"><p class="font-semibold mb-1">${idx + 1}. ${item.question}</p><p class="text-sm text-gray-500">정답: ${item.answer}</p></div>`;
+                if (item.type === 'question' || item.type === 'aiQuestion') {
+                    return `
+                        <div class="manual-question border p-2 rounded space-y-1" data-answer="${item.answer}" data-result="pending">
+                            <p class="font-semibold flex items-center"><span class="manual-status-icon text-lg mr-2"></span>${idx + 1}. ${item.question}</p>
+                            <div class="flex items-center mt-1">
+                                <input type="text" class="manual-answer-input w-full p-2 border rounded-md form-input" placeholder="답변을 입력하세요">
+                                <button type="button" class="manual-grade-btn btn btn-secondary text-xs px-3 py-2 ml-2 whitespace-nowrap">채점</button>
+                            </div>
+                            <p class="manual-correct-answer text-sm text-blue-600 mt-1 hidden">정답: ${item.answer}</p>
+                        </div>`;
                 }
                 if (item.type === 'questionNoAnswer') {
-                    return `<div class="border p-2 rounded"><p class="font-semibold">${idx + 1}. ${item.question}</p></div>`;
+                    return `
+                        <div class="manual-question border p-2 rounded space-y-1" data-answer="" data-result="pending">
+                            <p class="font-semibold flex items-center"><span class="manual-status-icon text-lg mr-2"></span>${idx + 1}. ${item.question}</p>
+                            <div class="flex items-center mt-1">
+                                <input type="text" class="manual-answer-input w-full p-2 border rounded-md form-input" placeholder="답변을 입력하세요">
+                                <button type="button" class="manual-grade-btn btn btn-secondary text-xs px-3 py-2 ml-2 whitespace-nowrap" disabled>채점</button>
+                            </div>
+                        </div>`;
                 }
                 if (item.type === 'image') {
-                    return `<img src="${item.url}" class="w-48 h-48 object-cover"/>`;
+                    return `<img src="${item.url}" class="max-w-full h-auto object-contain"/>`;
                 }
                 if (item.type === 'button') {
                     return `<a href="${item.url}" target="_blank" class="btn btn-primary inline-block">${item.text}</a>`;
                 }
                 return '';
             }).join('');
+        }
+
+        function setupManualProblemGrading() {
+            document.querySelectorAll('#manual-problem-modal-content .manual-question').forEach(item => {
+                const gradeBtn = item.querySelector('.manual-grade-btn');
+                const inputEl = item.querySelector('.manual-answer-input');
+                if (item.dataset.answer === '') {
+                    gradeBtn.disabled = inputEl.value.trim() === '';
+                    inputEl.addEventListener('input', () => {
+                        gradeBtn.disabled = inputEl.value.trim() === '';
+                    });
+                }
+                gradeBtn.addEventListener('click', () => {
+                    gradeManualItem(item);
+                    updateManualScore();
+                });
+            });
+            document.getElementById('grade-all-manual-btn').onclick = () => {
+                document.querySelectorAll('#manual-problem-modal-content .manual-question').forEach(item => gradeManualItem(item));
+                updateManualScore();
+            };
+        }
+
+        function gradeManualItem(item) {
+            const answer = item.dataset.answer.trim();
+            const inputEl = item.querySelector('.manual-answer-input');
+            const userAnswer = inputEl.value.trim();
+            const iconEl = item.querySelector('.manual-status-icon');
+            const correctAnsEl = item.querySelector('.manual-correct-answer');
+            let correct;
+            if (answer) {
+                correctAnsEl.classList.remove('hidden');
+                correct = userAnswer === answer;
+            } else {
+                correct = true;
+            }
+            if (correct) {
+                iconEl.innerHTML = '⭕';
+                iconEl.classList.remove('text-yellow-400');
+                iconEl.classList.add('text-red-500');
+                item.dataset.result = 'correct';
+            } else {
+                iconEl.innerHTML = '⭐';
+                iconEl.classList.remove('text-red-500');
+                iconEl.classList.add('text-yellow-400');
+                item.dataset.result = 'wrong';
+            }
+        }
+
+        function calculateManualScore() {
+            const items = document.querySelectorAll('#manual-problem-modal-content .manual-question');
+            if (items.length === 0) return 100;
+            let correctCount = 0;
+            items.forEach(item => {
+                if (item.dataset.result === 'correct') correctCount++;
+            });
+            return Math.round((correctCount / items.length) * 100);
+        }
+
+        function updateManualScore() {
+            const score = calculateManualScore();
+            document.getElementById('manual-score-display').textContent = `점수: ${score} / 100`;
+            const completeBtn = document.getElementById('complete-manual-problem-btn');
+            if (score === 100) {
+                completeBtn.classList.remove('btn-disabled');
+                completeBtn.disabled = false;
+            } else {
+                completeBtn.classList.add('btn-disabled');
+                completeBtn.disabled = true;
+            }
         }
 
         async function callGemini(prompt, json = false) {
@@ -3495,9 +3586,9 @@
             }
         });
 
-        async function openManualProblemModal(assignmentId, problemId) {
-            currentAssignmentId = assignmentId;
-            const dataToShow = viewedUserData;
+       async function openManualProblemModal(assignmentId, problemId) {
+           currentAssignmentId = assignmentId;
+           const dataToShow = viewedUserData;
             const assignmentDoc = await getDoc(doc(db, `users/${dataToShow.id}/assignedHomework`, assignmentId));
             const problemDoc = await getDoc(doc(db, 'learningProblems', problemId));
             if (!assignmentDoc.exists() || !problemDoc.exists()) {
@@ -3517,13 +3608,25 @@
             const inputEl = document.getElementById('manual-problem-answer-input');
             inputEl.value = '';
             inputEl.disabled = isCompleted;
-            document.getElementById('manual-problem-footer').style.display = isCompleted ? 'none' : 'flex';
+            const hasPassword = !!problem.password;
+            inputEl.style.display = hasPassword ? 'block' : 'none';
+            document.getElementById('manual-problem-footer').style.display = isCompleted ? 'none' : 'block';
+            document.getElementById('manual-score-display').textContent = '';
+
+            setupManualProblemGrading();
+            updateManualScore();
+
             manualProblemModal.style.display = 'flex';
         }
 
-        document.getElementById('complete-manual-problem-btn').addEventListener('click', async () => {
-            if (!currentAssignmentId || isAdminViewing) return;
+       document.getElementById('complete-manual-problem-btn').addEventListener('click', async () => {
+           if (!currentAssignmentId || isAdminViewing) return;
+            if (calculateManualScore() !== 100) {
+                showModal('오류', '모든 문제를 맞혀야 숙제 완료가 가능합니다.');
+                return;
+            }
             const answer = document.getElementById('manual-problem-answer-input').value.trim();
+            const inputAnswers = Array.from(document.querySelectorAll('#manual-problem-modal-content .manual-answer-input')).map(el => el.value.trim());
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
             const assignmentDoc = await getDoc(assignmentRef);
             const problemId = assignmentDoc.data().problemId;
@@ -3536,7 +3639,7 @@
             try {
                 const reward = assignmentDoc.data().reward || 0;
                 const userRef = doc(db, 'users', currentUserData.id);
-                await updateDoc(assignmentRef, { status: 'completed', studentAnswers: [answer], completedAt: serverTimestamp() });
+                await updateDoc(assignmentRef, { status: 'completed', studentAnswers: [...inputAnswers, answer], completedAt: serverTimestamp() });
                 await updateDoc(userRef, { balance: increment(reward) });
                 const userDoc = await getDoc(userRef);
                 currentUserData = { id: userDoc.id, ...userDoc.data() };
