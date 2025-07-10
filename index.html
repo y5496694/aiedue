@@ -578,7 +578,7 @@
         <div class="modal-content modal-content-lg">
             <span class="close-button" id="close-manual-problem-modal-btn">&times;</span>
             <h3 id="manual-problem-modal-title" class="text-xl font-bold mb-4"></h3>
-            <div id="manual-problem-modal-content" class="text-left mb-4 space-y-4"></div>
+            <div id="manual-problem-modal-content" class="text-left mb-4 space-y-4 max-h-[60vh] overflow-y-auto"></div>
             <div id="manual-problem-footer" class="space-y-2">
                 <div class="flex justify-between items-center">
                     <div id="manual-score-display" class="text-lg font-bold"></div>
@@ -3176,7 +3176,7 @@
                         </div>`;
                 }
                 if (item.type === 'image') {
-                    return `<img src="${item.url}" class="max-w-full h-auto object-contain"/>`;
+                    return `<img src="${item.url}" class="w-1/2 max-w-full h-auto object-contain mx-auto"/>`;
                 }
                 if (item.type === 'button') {
                     return `<a href="${item.url}" target="_blank" class="btn btn-primary inline-block">${item.text}</a>`;
