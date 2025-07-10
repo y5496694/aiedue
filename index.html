@@ -2729,7 +2729,10 @@
 
         // Student: Complete the math homework assignment
         document.getElementById('complete-homework-btn').addEventListener('click', async () => {
-            if (!currentAssignmentId || isAdminViewing) return;
+            const btn = document.getElementById('complete-homework-btn');
+            if (!currentAssignmentId || isAdminViewing || btn.disabled) return;
+            btn.disabled = true;
+            btn.classList.add('btn-disabled');
 
             const userRef = doc(db, "users", currentUserData.id);
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
@@ -3478,7 +3481,10 @@
         });
 
         document.getElementById('complete-dictation-btn').addEventListener('click', async () => {
-            if (!currentAssignmentId || isAdminViewing) return;
+            const btn = document.getElementById('complete-dictation-btn');
+            if (!currentAssignmentId || isAdminViewing || btn.disabled) return;
+            btn.disabled = true;
+            btn.classList.add('btn-disabled');
 
             const userRef = doc(db, "users", currentUserData.id);
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
@@ -3620,11 +3626,14 @@
         }
 
        document.getElementById('complete-manual-problem-btn').addEventListener('click', async () => {
-           if (!currentAssignmentId || isAdminViewing) return;
-            if (calculateManualScore() !== 100) {
-                showModal('오류', '모든 문제를 맞혀야 숙제 완료가 가능합니다.');
-                return;
-            }
+           const btn = document.getElementById('complete-manual-problem-btn');
+           if (!currentAssignmentId || isAdminViewing || btn.disabled) return;
+           btn.disabled = true;
+           btn.classList.add('btn-disabled');
+           if (calculateManualScore() !== 100) {
+               showModal('오류', '모든 문제를 맞혀야 숙제 완료가 가능합니다.');
+               return;
+           }
             const answer = document.getElementById('manual-problem-answer-input').value.trim();
             const inputAnswers = Array.from(document.querySelectorAll('#manual-problem-modal-content .manual-answer-input')).map(el => el.value.trim());
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
