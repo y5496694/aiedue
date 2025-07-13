@@ -882,6 +882,11 @@
         let currentAssignmentType = null; // 'math', 'dictation', or 'lifeRule'
         let currentDictationTemplate = null; // For student dictation homework
 
+        // Quick links & work docs (loaded from Firestore)
+        let quickLinksData = [];
+        let sharedLinksData = [];
+        let workDocsData = [];
+
         // --- DOM Elements ---
         const views = {
             login: document.getElementById('login-view'),
@@ -1975,15 +1980,19 @@
         }
 
         let editingQuickLinkIndex = null;
+        let editingQuickLinkId = null;
         let editingShared = false;
         const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base;
 
-        function loadQuickLinks() {
+        async function loadQuickLinks() {
             const container = document.getElementById('quick-links');
-            if (!container) return;
-            const links = JSON.parse(localStorage.getItem(userKey('teacherQuickLinks')) || '[]');
+            if (!container || !currentUserData) return;
+            container.innerHTML = '<p class="text-sm text-gray-500">로딩 중...</p>';
+            const q = query(collection(db, 'quickLinks'), where('teacherId', '==', currentUserData.id), orderBy('createdAt', 'desc'));
+            const snap = await getDocs(q);
+            quickLinksData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             container.innerHTML = '';
-            links.forEach((link, idx) => {
+            quickLinksData.forEach((link, idx) => {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'relative group';
 
@@ -2007,12 +2016,14 @@
         function openQuickLinkModal(idx = null, shared = false) {
             editingQuickLinkIndex = idx;
             editingShared = shared;
+            editingQuickLinkId = null;
             const title = document.querySelector('#quick-link-modal h3');
             const delBtn = document.getElementById('delete-quick-link-btn');
-            const links = JSON.parse(localStorage.getItem(shared ? 'sharedQuickLinks' : userKey('teacherQuickLinks')) || '[]');
+            const links = shared ? sharedLinksData : quickLinksData;
 
             if (idx !== null && links[idx]) {
                 const link = links[idx];
+                editingQuickLinkId = link.id;
                 document.getElementById('quick-link-name').value = link.name || '';
                 document.getElementById('quick-link-image').value = link.image || '';
                 document.getElementById('quick-link-feature').value = link.feature || '';
@@ -2032,42 +2043,40 @@
             document.getElementById('quick-link-modal').style.display = 'flex';
         }
 
-        document.getElementById('add-quick-link-confirm-btn').addEventListener('click', () => {
+        document.getElementById('add-quick-link-confirm-btn').addEventListener('click', async () => {
             const name = document.getElementById('quick-link-name').value.trim();
             const image = document.getElementById('quick-link-image').value.trim();
             const feature = document.getElementById('quick-link-feature').value.trim();
             const url = document.getElementById('quick-link-url').value.trim();
             const color = document.getElementById('quick-link-color').value;
             if (!name || !url) { showModal('오류', '이름과 링크를 입력해주세요.'); return; }
-            const key = editingShared ? 'sharedQuickLinks' : userKey('teacherQuickLinks');
-            const links = JSON.parse(localStorage.getItem(key) || '[]');
-            if (editingQuickLinkIndex !== null) {
-                const existing = links[editingQuickLinkIndex] || {};
-                links[editingQuickLinkIndex] = editingShared
-                    ? { ...existing, name, image, url, color, feature }
-                    : { name, image, url, color, feature };
-            } else {
-                links.push(editingShared
-                    ? { name, image, url, color, feature, author: currentUserData?.name || '익명', authorId: currentUserData?.id || '' }
-                    : { name, image, url, color, feature });
-            }
-            localStorage.setItem(key, JSON.stringify(links));
             if (editingShared) {
+                const data = { name, image, url, color, feature, author: currentUserData?.name || '익명', authorId: currentUserData?.id || '', createdAt: serverTimestamp() };
+                if (editingQuickLinkId) {
+                    await setDoc(doc(db, 'sharedQuickLinks', editingQuickLinkId), data, { merge: true });
+                } else {
+                    await addDoc(collection(db, 'sharedQuickLinks'), data);
+                }
                 loadSharedLinks();
             } else {
+                const data = { name, image, url, color, feature, teacherId: currentUserData.id, createdAt: serverTimestamp() };
+                if (editingQuickLinkId) {
+                    await setDoc(doc(db, 'quickLinks', editingQuickLinkId), data, { merge: true });
+                } else {
+                    await addDoc(collection(db, 'quickLinks'), data);
+                }
                 loadQuickLinks();
             }
             document.getElementById('quick-link-modal').style.display = 'none';
             editingQuickLinkIndex = null;
+            editingQuickLinkId = null;
             editingShared = false;
         });
 
-        document.getElementById('delete-quick-link-btn').addEventListener('click', () => {
-            if (editingQuickLinkIndex === null) return;
-            const key = editingShared ? 'sharedQuickLinks' : userKey('teacherQuickLinks');
-            const links = JSON.parse(localStorage.getItem(key) || '[]');
-            links.splice(editingQuickLinkIndex, 1);
-            localStorage.setItem(key, JSON.stringify(links));
+        document.getElementById('delete-quick-link-btn').addEventListener('click', async () => {
+            if (!editingQuickLinkId) return;
+            const col = editingShared ? 'sharedQuickLinks' : 'quickLinks';
+            await deleteDoc(doc(db, col, editingQuickLinkId));
             if (editingShared) {
                 loadSharedLinks();
             } else {
@@ -2075,6 +2084,7 @@
             }
             document.getElementById('quick-link-modal').style.display = 'none';
             editingQuickLinkIndex = null;
+            editingQuickLinkId = null;
             editingShared = false;
         });
 
@@ -2089,12 +2099,15 @@
             document.getElementById('quick-link-share-space-modal').style.display = 'flex';
         }
 
-        function loadSharedLinks() {
+        async function loadSharedLinks() {
             const container = document.getElementById('shared-quick-link-list');
             if (!container) return;
-            const links = JSON.parse(localStorage.getItem('sharedQuickLinks') || '[]');
+            container.innerHTML = '<p class="text-sm text-gray-500">로딩 중...</p>';
+            const q = query(collection(db, 'sharedQuickLinks'), orderBy('createdAt', 'desc'));
+            const snap = await getDocs(q);
+            sharedLinksData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             container.innerHTML = '';
-            links.forEach((link, idx) => {
+            sharedLinksData.forEach((link, idx) => {
                 const btn = document.createElement('button');
                 btn.className = 'flex flex-col items-center p-2 rounded-md text-white';
                 btn.style.backgroundColor = link.color || '#3b82f6';
@@ -2107,8 +2120,7 @@
         let currentSharedIndex = null;
         function openSharedLinkDetail(idx) {
             currentSharedIndex = idx;
-            const links = JSON.parse(localStorage.getItem('sharedQuickLinks') || '[]');
-            const link = links[idx];
+            const link = sharedLinksData[idx];
             if (!link) return;
             document.getElementById('shared-detail-title').textContent = link.name;
             document.getElementById('shared-detail-feature').textContent = link.feature || '';
@@ -2122,18 +2134,16 @@
 
         function openShareOwnQuickLinkModal() {
             const container = document.getElementById('shareable-quick-links');
-            const links = JSON.parse(localStorage.getItem(userKey('teacherQuickLinks')) || '[]');
-            container.innerHTML = links.map((l,i)=>`<div class="flex justify-between items-center border p-2 rounded"><span>${l.name}</span><button class="share-q-btn btn btn-primary" data-idx="${i}">공유</button></div>`).join('');
+            container.innerHTML = quickLinksData.map((l,i)=>`<div class="flex justify-between items-center border p-2 rounded"><span>${l.name}</span><button class="share-q-btn btn btn-primary" data-idx="${i}">공유</button></div>`).join('');
             container.querySelectorAll('.share-q-btn').forEach(btn=>btn.addEventListener('click', e=>shareQuickLink(Number(e.target.dataset.idx))));
             document.getElementById('share-own-quick-link-modal').style.display = 'flex';
         }
 
-        function shareQuickLink(idx) {
-            const myLinks = JSON.parse(localStorage.getItem(userKey('teacherQuickLinks')) || '[]');
-            const shared = JSON.parse(localStorage.getItem('sharedQuickLinks') || '[]');
-            const link = { ...myLinks[idx], author: currentUserData?.name || '익명', authorId: currentUserData?.id || '' };
-            shared.push(link);
-            localStorage.setItem('sharedQuickLinks', JSON.stringify(shared));
+        async function shareQuickLink(idx) {
+            const link = quickLinksData[idx];
+            if (!link) return;
+            const data = { name: link.name, image: link.image, url: link.url, color: link.color, feature: link.feature, author: currentUserData?.name || '익명', authorId: currentUserData?.id || '', createdAt: serverTimestamp() };
+            await addDoc(collection(db, 'sharedQuickLinks'), data);
             document.getElementById('share-own-quick-link-modal').style.display = 'none';
             loadSharedLinks();
         }
@@ -2142,13 +2152,18 @@
         document.getElementById('close-share-own-quick-link-modal-btn').addEventListener('click', () => document.getElementById('share-own-quick-link-modal').style.display = 'none');
         document.getElementById('close-share-space-modal-btn').addEventListener('click', () => document.getElementById('quick-link-share-space-modal').style.display = 'none');
         document.getElementById('close-shared-link-detail-modal-btn').addEventListener('click', () => document.getElementById('shared-link-detail-modal').style.display = 'none');
-        document.getElementById('save-shared-link-btn').addEventListener('click', () => {
-            const shared = JSON.parse(localStorage.getItem('sharedQuickLinks') || '[]');
-            const link = shared[currentSharedIndex];
+        document.getElementById('save-shared-link-btn').addEventListener('click', async () => {
+            const link = sharedLinksData[currentSharedIndex];
             if (!link) return;
-            const myLinks = JSON.parse(localStorage.getItem(userKey('teacherQuickLinks')) || '[]');
-            myLinks.push({ name: link.name, image: link.image, url: link.url, color: link.color, feature: link.feature });
-            localStorage.setItem(userKey('teacherQuickLinks'), JSON.stringify(myLinks));
+            await addDoc(collection(db, 'quickLinks'), {
+                name: link.name,
+                image: link.image,
+                url: link.url,
+                color: link.color,
+                feature: link.feature,
+                teacherId: currentUserData.id,
+                createdAt: serverTimestamp()
+            });
             loadQuickLinks();
             document.getElementById('shared-link-detail-modal').style.display = 'none';
         });
@@ -2158,10 +2173,10 @@
             document.getElementById('shared-link-detail-modal').style.display = 'none';
         });
 
-        document.getElementById('remove-shared-link-btn').addEventListener('click', () => {
-            const links = JSON.parse(localStorage.getItem('sharedQuickLinks') || '[]');
-            links.splice(currentSharedIndex, 1);
-            localStorage.setItem('sharedQuickLinks', JSON.stringify(links));
+        document.getElementById('remove-shared-link-btn').addEventListener('click', async () => {
+            const link = sharedLinksData[currentSharedIndex];
+            if (!link) return;
+            await deleteDoc(doc(db, 'sharedQuickLinks', link.id));
             document.getElementById('shared-link-detail-modal').style.display = 'none';
             loadSharedLinks();
         });
@@ -2861,10 +2876,12 @@
 
         // --- Work Management ---
         let currentDraftIndex = null;
+        let currentDraftId = null;
         document.getElementById('open-draft-modal-btn').addEventListener('click', () => openDraftModal());
 
         function openDraftModal(index = null) {
             currentDraftIndex = index;
+            currentDraftId = null;
             draftModal.style.display = 'flex';
             const form = document.getElementById('draft-form');
             form.reset();
@@ -2879,9 +2896,9 @@
             attachmentContainer.classList.add('hidden');
 
             if(index !== null) {
-                const docs = JSON.parse(localStorage.getItem(userKey('workDocs')) || '[]');
-                const docData = docs[index];
+                const docData = workDocsData[index];
                 if(docData) {
+                    currentDraftId = docData.id;
                     document.getElementById('draft-subject').value = docData.subject;
                     document.getElementById('draft-notes').value = docData.notes;
                     if(docData.references && docData.references.length) {
@@ -3030,8 +3047,7 @@
         document.getElementById('copy-title-btn').addEventListener('click', () => navigator.clipboard.writeText(generatedTitle.textContent));
         document.getElementById('copy-body-btn').addEventListener('click', () => navigator.clipboard.writeText(generatedBody.textContent));
 
-        document.getElementById('save-draft-btn').addEventListener('click', () => {
-            const docs = JSON.parse(localStorage.getItem(userKey('workDocs')) || '[]');
+        document.getElementById('save-draft-btn').addEventListener('click', async () => {
             const docData = {
                 title: generatedTitle.textContent,
                 body: generatedBody.textContent,
@@ -3047,26 +3063,29 @@
                     name: item.querySelector('.attachment-name').value
                 }))
             };
-            if(currentDraftIndex !== null) {
-                docs[currentDraftIndex] = docData;
+            if(currentDraftId) {
+                await setDoc(doc(db, 'workDocs', currentDraftId), { ...docData, teacherId: currentUserData.id }, { merge: true });
             } else {
-                docs.push(docData);
+                await addDoc(collection(db, 'workDocs'), { ...docData, teacherId: currentUserData.id, createdAt: serverTimestamp() });
             }
-            localStorage.setItem(userKey('workDocs'), JSON.stringify(docs));
+            currentDraftId = null;
             draftModal.style.display = 'none';
             loadWorkDocs();
         });
 
-        function loadWorkDocs() {
+        async function loadWorkDocs() {
             const container = document.getElementById('work-doc-list');
-            const docs = JSON.parse(localStorage.getItem(userKey('workDocs')) || '[]');
-            if(!container) return;
-            if(docs.length === 0) {
+            if(!container || !currentUserData) return;
+            container.innerHTML = '<p class="text-center text-gray-500">목록을 불러오는 중...</p>';
+            const q = query(collection(db, 'workDocs'), where('teacherId', '==', currentUserData.id), orderBy('createdAt', 'desc'));
+            const snap = await getDocs(q);
+            workDocsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            if(workDocsData.length === 0) {
                 container.innerHTML = '<p class="text-center text-gray-500">작성된 문서가 없습니다.</p>';
                 return;
             }
             container.innerHTML = '<div class="divide-y divide-gray-200">' +
-                docs.map((d,i)=>`<div class="p-3 flex justify-between items-center"><span>${d.title}</span><button class="edit-draft-btn btn btn-secondary btn-xs" data-index="${i}">편집</button></div>`).join('') +
+                workDocsData.map((d,i)=>`<div class="p-3 flex justify-between items-center"><span>${d.title}</span><button class="edit-draft-btn btn btn-secondary btn-xs" data-index="${i}">편집</button></div>`).join('') +
                 '</div>';
             container.querySelectorAll('.edit-draft-btn').forEach(btn => btn.addEventListener('click', e => {
                 const idx = Number(e.target.dataset.index);
