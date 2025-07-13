@@ -1988,9 +1988,15 @@
             const container = document.getElementById('quick-links');
             if (!container || !currentUserData) return;
             container.innerHTML = '<p class="text-sm text-gray-500">로딩 중...</p>';
-            const q = query(collection(db, 'quickLinks'), where('teacherId', '==', currentUserData.id), orderBy('createdAt', 'desc'));
-            const snap = await getDocs(q);
-            quickLinksData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            try {
+                const q = query(collection(db, 'quickLinks'), where('teacherId', '==', currentUserData.id), orderBy('createdAt', 'desc'));
+                const snap = await getDocs(q);
+                quickLinksData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            } catch (error) {
+                console.error('Failed to load quick links', error);
+                container.innerHTML = '<p class="text-sm text-red-500">로딩 실패</p>';
+                return;
+            }
             container.innerHTML = '';
             quickLinksData.forEach((link, idx) => {
                 const wrapper = document.createElement('div');
@@ -2050,27 +2056,32 @@
             const url = document.getElementById('quick-link-url').value.trim();
             const color = document.getElementById('quick-link-color').value;
             if (!name || !url) { showModal('오류', '이름과 링크를 입력해주세요.'); return; }
-            if (editingShared) {
-                const data = { name, image, url, color, feature, author: currentUserData?.name || '익명', authorId: currentUserData?.id || '', createdAt: serverTimestamp() };
-                if (editingQuickLinkId) {
-                    await setDoc(doc(db, 'sharedQuickLinks', editingQuickLinkId), data, { merge: true });
+            try {
+                if (editingShared) {
+                    const data = { name, image, url, color, feature, author: currentUserData?.name || '익명', authorId: currentUserData?.id || '', createdAt: serverTimestamp() };
+                    if (editingQuickLinkId) {
+                        await setDoc(doc(db, 'sharedQuickLinks', editingQuickLinkId), data, { merge: true });
+                    } else {
+                        await addDoc(collection(db, 'sharedQuickLinks'), data);
+                    }
+                    await loadSharedLinks();
                 } else {
-                    await addDoc(collection(db, 'sharedQuickLinks'), data);
+                    const data = { name, image, url, color, feature, teacherId: currentUserData.id, createdAt: serverTimestamp() };
+                    if (editingQuickLinkId) {
+                        await setDoc(doc(db, 'quickLinks', editingQuickLinkId), data, { merge: true });
+                    } else {
+                        await addDoc(collection(db, 'quickLinks'), data);
+                    }
+                    await loadQuickLinks();
                 }
-                loadSharedLinks();
-            } else {
-                const data = { name, image, url, color, feature, teacherId: currentUserData.id, createdAt: serverTimestamp() };
-                if (editingQuickLinkId) {
-                    await setDoc(doc(db, 'quickLinks', editingQuickLinkId), data, { merge: true });
-                } else {
-                    await addDoc(collection(db, 'quickLinks'), data);
-                }
-                loadQuickLinks();
+                document.getElementById('quick-link-modal').style.display = 'none';
+                editingQuickLinkIndex = null;
+                editingQuickLinkId = null;
+                editingShared = false;
+            } catch (error) {
+                console.error('Failed to save quick link', error);
+                showModal('오류', '바로가기 저장 중 오류가 발생했습니다.');
             }
-            document.getElementById('quick-link-modal').style.display = 'none';
-            editingQuickLinkIndex = null;
-            editingQuickLinkId = null;
-            editingShared = false;
         });
 
         document.getElementById('delete-quick-link-btn').addEventListener('click', async () => {
