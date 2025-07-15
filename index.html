@@ -562,6 +562,7 @@
                     <div>
                         <label class="flex items-center space-x-2"><input type="checkbox" id="manual-problem-use-password"> <span>암호 사용</span></label>
                         <input type="text" id="manual-problem-password" class="w-full p-2 border rounded-md form-input mt-1" placeholder="암호" disabled>
+                        <label class="flex items-center space-x-2 mt-2"><input type="checkbox" id="manual-problem-use-proof-code"> <span>증명 코드 사용</span></label>
                     </div>
                     <div>
                         <label for="manual-problem-reward" class="block text-sm font-medium">완료 시 획득 금액 (원)</label>
@@ -584,10 +585,13 @@
                     <div id="manual-score-display" class="text-lg font-bold"></div>
                     <button id="grade-all-manual-btn" class="btn btn-secondary">모두 채점</button>
                 </div>
-                <div class="flex items-center space-x-2">
-                    <input type="text" id="manual-problem-answer-input" class="w-full p-2 border rounded-md form-input" placeholder="암호 입력">
-                    <button id="complete-manual-problem-btn" class="btn btn-primary btn-disabled" disabled>숙제 완료하기</button>
+                <input type="text" id="manual-problem-answer-input" class="w-full p-2 border rounded-md form-input" placeholder="암호 입력">
+                <div id="proof-code-container" class="flex items-center space-x-2 hidden">
+                    <input type="text" id="proof-code-input" class="w-full p-2 border rounded-md form-input" placeholder="증명 코드 입력">
+                    <button type="button" id="verify-code-btn" class="btn btn-secondary">코드 확인</button>
                 </div>
+                <div id="result-message" class="text-sm"></div>
+                <button id="complete-manual-problem-btn" class="btn btn-primary btn-disabled" disabled>숙제 완료하기</button>
             </div>
         </div>
     </div>
@@ -852,6 +856,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, runTransaction, updateDoc, increment, deleteField, serverTimestamp, Timestamp, orderBy, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
         // IMPORTANT: Replace with your actual Firebase config
         const firebaseConfig = {
@@ -865,6 +870,7 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const functions = getFunctions(app, 'asia-northeast3');
 
         // --- Global State ---
         let currentAuthUser = null;
@@ -3537,6 +3543,7 @@
             document.getElementById('manual-problem-use-password').checked = false;
             document.getElementById('manual-problem-password').value = '';
             document.getElementById('manual-problem-password').disabled = true;
+            document.getElementById('manual-problem-use-proof-code').checked = false;
             if (problem) {
                 document.getElementById('manual-problem-title').value = problem.title;
                 if (Array.isArray(problem.items)) {
@@ -3549,6 +3556,9 @@
                     document.getElementById('manual-problem-use-password').checked = true;
                     document.getElementById('manual-problem-password').disabled = false;
                     document.getElementById('manual-problem-password').value = problem.password;
+                }
+                if (problem.requireProof) {
+                    document.getElementById('manual-problem-use-proof-code').checked = true;
                 }
                 document.getElementById('manual-problem-reward').value = problem.reward;
             }
@@ -3585,6 +3595,7 @@
                 title: document.getElementById('manual-problem-title').value,
                 items,
                 password: document.getElementById('manual-problem-use-password').checked ? document.getElementById('manual-problem-password').value : '',
+                requireProof: document.getElementById('manual-problem-use-proof-code').checked,
                 reward: Number(document.getElementById('manual-problem-reward').value),
                 teacherId: currentAuthUser.uid,
                 createdAt: serverTimestamp()
@@ -3626,10 +3637,18 @@
                 modalContent.textContent = problem.content || '';
             }
             const inputEl = document.getElementById('manual-problem-answer-input');
+            const proofContainer = document.getElementById('proof-code-container');
+            const proofInput = document.getElementById('proof-code-input');
+            const resultMsg = document.getElementById('result-message');
             inputEl.value = '';
             inputEl.disabled = isCompleted;
+            proofInput.value = '';
+            resultMsg.textContent = '';
+            proofInput.disabled = isCompleted;
             const hasPassword = !!problem.password;
+            const needProof = !!problem.requireProof;
             inputEl.style.display = hasPassword ? 'block' : 'none';
+            proofContainer.classList.toggle('hidden', !needProof);
             document.getElementById('manual-problem-footer').style.display = isCompleted ? 'none' : 'block';
             document.getElementById('manual-score-display').textContent = '';
 
@@ -3638,6 +3657,34 @@
 
             manualProblemModal.style.display = 'flex';
         }
+
+        document.getElementById('verify-code-btn').addEventListener('click', async () => {
+            const verifyBtn = document.getElementById('verify-code-btn');
+            const codeInput = document.getElementById('proof-code-input');
+            const resultMessage = document.getElementById('result-message');
+            const code = codeInput.value;
+            if (!code) { resultMessage.textContent = '코드를 입력해주세요.'; resultMessage.style.color = 'red'; return; }
+            if (!auth.currentUser) { resultMessage.textContent = '인증 정보가 없습니다. 새로고침 해주세요.'; resultMessage.style.color = 'red'; return; }
+            try {
+                verifyBtn.disabled = true;
+                resultMessage.textContent = '코드를 확인하는 중...';
+                const verifyCodeFunction = httpsCallable(functions, 'verifyCode');
+                const result = await verifyCodeFunction({ code });
+                if (result.data.success) {
+                    resultMessage.textContent = result.data.message;
+                    resultMessage.style.color = 'green';
+                } else {
+                    resultMessage.textContent = result.data.message || '알 수 없는 오류가 발생했습니다.';
+                    resultMessage.style.color = 'red';
+                }
+            } catch (error) {
+                console.error('코드 검증 상세 오류:', error);
+                resultMessage.textContent = `오류가 발생했습니다: ${error.message}`;
+                resultMessage.style.color = 'red';
+            } finally {
+                verifyBtn.disabled = false;
+            }
+        });
 
        document.getElementById('complete-manual-problem-btn').addEventListener('click', async () => {
            const btn = document.getElementById('complete-manual-problem-btn');
@@ -3655,9 +3702,36 @@
             const problemId = assignmentDoc.data().problemId;
             const problemDoc = await getDoc(doc(db, 'learningProblems', problemId));
             const correct = problemDoc.data().password || '';
+            const needProof = !!problemDoc.data().requireProof;
             if (correct && answer !== correct) {
                 showModal('오류', '암호가 틀렸습니다.');
+                btn.disabled = false;
+                btn.classList.remove('btn-disabled');
                 return;
+            }
+            if (needProof) {
+                const code = document.getElementById('proof-code-input').value.trim();
+                if (!code) {
+                    showModal('오류', '증명 코드를 입력해주세요.');
+                    btn.disabled = false;
+                    btn.classList.remove('btn-disabled');
+                    return;
+                }
+                try {
+                    const verifyCodeFunction = httpsCallable(functions, 'verifyCode');
+                    const result = await verifyCodeFunction({ code });
+                    if (!result.data.success) {
+                        showModal('오류', result.data.message || '증명 코드가 올바르지 않습니다.');
+                        btn.disabled = false;
+                        btn.classList.remove('btn-disabled');
+                        return;
+                    }
+                } catch (error) {
+                    showModal('오류', `증명 코드 확인 중 오류가 발생했습니다: ${error.message}`);
+                    btn.disabled = false;
+                    btn.classList.remove('btn-disabled');
+                    return;
+                }
             }
             try {
                 const reward = assignmentDoc.data().reward || 0;
