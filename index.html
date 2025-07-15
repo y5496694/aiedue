@@ -2205,6 +2205,7 @@
                             <button data-ruleid="${rule.id}" data-reward="${rule.reward}" data-repeat="${rule.repeatType}" class="complete-rule-btn ${isCompletedToday ? 'bg-gray-300' : 'bg-green-500 hover:bg-green-600'} text-white text-xs font-bold py-1 px-3 rounded-full" ${isCompletedToday || isAdminViewing ? 'disabled' : ''}>
                                 ${isCompletedToday ? '완료됨' : '지켰어요'}
                             </button>
+                            ${!isCompletedToday && !isAdminViewing ? `<button data-ruleid="${rule.id}" class="fail-rule-btn bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-1 px-3 rounded-full">못 지켰어요</button>` : ''}
                             ${isAdminViewing ? `<button data-ruleid="${rule.id}" class="delete-assigned-rule-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>` : ''}
                         </div>
                     `;
@@ -2232,6 +2233,19 @@
                     viewedUserData = currentUserData;
                     showModal('참 잘했어요!', `${formatCurrency(reward)}을(를) 획득했습니다!`);
                     updateDashboardDisplay();
+                    renderLifeRulesForStudent();
+                });
+            });
+
+            document.querySelectorAll('.fail-rule-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    if (isAdminViewing) return;
+                    const ruleId = e.target.dataset.ruleid;
+                    const ruleRef = doc(db, `users/${currentUserData.id}/assignedLifeRules`, ruleId);
+
+                    await updateDoc(ruleRef, { lastCompletedAt: serverTimestamp() });
+
+                    showModal('다음에는 더 잘해봐요!', '포인트를 받지 못했어요.');
                     renderLifeRulesForStudent();
                 });
             });
