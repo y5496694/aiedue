@@ -120,6 +120,10 @@
                                 </div>
                             </div>
                         </div>
+                        <div id="today-homework-section" class="bg-white p-6 rounded-lg shadow-md">
+                            <h2 class="text-xl font-bold mb-4">📚 오늘의 숙제</h2>
+                            <ul id="today-homework-list" class="space-y-2"></ul>
+                        </div>
                         <div id="market" class="bg-white p-6 rounded-lg shadow-md">
                             <h2 class="text-xl font-bold mb-4">📈 주식 시장</h2>
                             <div>
@@ -180,6 +184,10 @@
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-bold">📝 학습 문제 관리</h2>
                     <div class="space-x-2">
+                        <button id="lp-create-category-btn" class="btn btn-secondary">카테고리 생성</button>
+                        <select id="lp-category-filter" class="p-2 border rounded">
+                            <option value="">전체</option>
+                        </select>
                         <button id="add-manual-problem-btn" class="btn bg-gray-500 hover:bg-gray-600 text-white">+ 직접 문제 추가</button>
                         <button id="add-ai-dictation-problem-btn" class="btn bg-teal-500 hover:bg-teal-600 text-white">🎤 AI 받아쓰기 문제 만들기</button>
                         <button id="add-ai-math-problem-btn" class="btn bg-blue-500 hover:bg-blue-600 text-white">🤖 AI 수학 문제 만들기</button>
@@ -193,6 +201,10 @@
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-bold">📜 생활 규칙 관리</h2>
                     <div class="space-x-2">
+                        <button id="lr-create-category-btn" class="btn btn-secondary">카테고리 생성</button>
+                        <select id="lr-category-filter" class="p-2 border rounded">
+                            <option value="">전체</option>
+                        </select>
                         <button id="add-life-rule-btn" class="btn bg-green-500 hover:bg-green-600 text-white">+ 새 규칙 만들기</button>
                     </div>
                 </div>
@@ -203,7 +215,13 @@
             <div id="work-management-tab-content" class="tab-content">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-bold">📂 업무 관리</h2>
-                    <button id="open-draft-modal-btn" class="btn btn-primary">AI 기안 만들기</button>
+                    <div class="space-x-2">
+                        <button id="work-create-category-btn" class="btn btn-secondary">카테고리 생성</button>
+                        <select id="work-category-filter" class="p-2 border rounded">
+                            <option value="">전체</option>
+                        </select>
+                        <button id="open-draft-modal-btn" class="btn btn-primary">AI 기안 만들기</button>
+                    </div>
                 </div>
                 <div id="work-doc-list" class="bg-white p-4 rounded-lg shadow">
                     <p class="text-center text-gray-500">작성된 문서가 없습니다.</p>
