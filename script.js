@@ -317,6 +317,7 @@
             if (role === 'student') {
                 renderHomework();
                 renderLifeRulesForStudent();
+                renderTodayHomework();
             }
             if (currentUserData.role === 'teacher') {
                 loadLearningProblems();
@@ -1207,7 +1208,39 @@
 
         let editingQuickLinkIndex = null;
         let editingShared = false;
-        const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base;
+const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base;
+
+        function getCategories() {
+            return JSON.parse(localStorage.getItem(userKey('categories')) || '[]');
+        }
+
+        function saveCategories(cats) {
+            localStorage.setItem(userKey('categories'), JSON.stringify(cats));
+        }
+
+        function addCategory(name) {
+            const cats = getCategories();
+            if(!cats.includes(name)) {
+                cats.push(name);
+                saveCategories(cats);
+            }
+        }
+
+        function populateCategorySelects() {
+            const categories = getCategories();
+            document.querySelectorAll('#lp-category-filter,#lr-category-filter,#work-category-filter').forEach(sel => {
+                if(!sel) return;
+                const current = sel.value;
+                sel.innerHTML = '<option value="">전체</option>';
+                categories.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c;
+                    opt.textContent = c;
+                    sel.appendChild(opt);
+                });
+                sel.value = current || '';
+            });
+        }
 
         function loadQuickLinks() {
             const container = document.getElementById('quick-links');
@@ -1648,8 +1681,11 @@
                     return;
                 }
                 
-                const problemSets = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                let problemSets = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 problemSets.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
+
+                const filter = document.getElementById('lp-category-filter')?.value || '';
+                if(filter) problemSets = problemSets.filter(p => (p.category || '일반') === filter);
 
 
                 container.innerHTML = `
@@ -1669,6 +1705,8 @@
                                         <p class="text-sm text-gray-500">${topicText}, ${formatCurrency(problemSet.reward)}</p>
                                     </div>
                                     <div class="space-x-2">
+                                        <span class="text-sm text-gray-600">${problemSet.category || '일반'}</span>
+                                        <button data-id="${problemSet.id}" class="assign-problem-category-btn btn btn-secondary btn-xs">카테고리 부여</button>
                                         <button data-id="${problemSet.id}" data-title="${problemSet.title}" class="assign-homework-btn btn bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-1">배부</button>
                                         <button data-id="${problemSet.id}" data-type="${problemSet.type}" class="edit-problem-btn btn bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1">수정</button>
                                         <button data-id="${problemSet.id}" class="delete-problem-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>
@@ -1690,6 +1728,14 @@
                         openManualProblemCreationModal({id: problemDoc.id, ...problemDoc.data()});
                     } else {
                         openProblemCreationModal({id: problemDoc.id, ...problemDoc.data()});
+                    }
+                }));
+                container.querySelectorAll('.assign-problem-category-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                    const categories = getCategories();
+                    const choice = prompt('카테고리 선택\n' + categories.join('\n')); 
+                    if(choice !== null) {
+                        await setDoc(doc(db, 'learningProblems', e.target.dataset.id), { category: choice.trim() || '' }, { merge: true });
+                        loadLearningProblems();
                     }
                 }));
                 container.querySelectorAll('.delete-problem-btn').forEach(btn => btn.addEventListener('click', (e) => deleteLearningProblem(e.target.dataset.id)));
@@ -1877,6 +1923,48 @@
                 tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-red-500">숙제 로드 실패</td></tr>`;
             }
         }
+
+        async function renderTodayHomework() {
+            const dataToShow = viewedUserData;
+            const list = document.getElementById('today-homework-list');
+            if(!list) return;
+            list.innerHTML = '<p class="text-sm text-gray-500">불러오는 중...</p>';
+            try {
+                const q = query(collection(db, `users/${dataToShow.id}/assignedHomework`), orderBy('assignedAt', 'desc'));
+                const snapshot = await getDocs(q);
+                const today = new Date();
+                list.innerHTML = '';
+                let has = false;
+                snapshot.forEach(docSnap => {
+                    const hw = {id: docSnap.id, ...docSnap.data()};
+                    const assigned = hw.assignedAt?.toDate();
+                    if(isSameDay(assigned, today)) {
+                        has = true;
+                        const icon = hw.type === 'dictation' ? '🎤' : (hw.type === 'manual' ? '📝' : '🤖');
+                        const li = document.createElement('li');
+                        li.className = 'flex justify-between items-center bg-gray-50 p-2 rounded';
+                        li.innerHTML = `<span>${icon} ${hw.title}</span><button data-hwid="${hw.id}" data-problemid="${hw.problemId}" data-type="${hw.type}" class="today-hw-btn text-amber-600 hover:text-amber-900 text-sm">${hw.status === 'completed' ? '결과 보기' : '가기'}</button>`;
+                        list.appendChild(li);
+                    }
+                });
+                if(!has) list.innerHTML = '<p class="text-sm text-gray-500">오늘 숙제가 없습니다.</p>';
+                list.querySelectorAll('.today-hw-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const hwType = e.target.dataset.type;
+                        if (hwType === 'dictation') {
+                            openDictationModal(e.target.dataset.hwid, e.target.dataset.problemid);
+                        } else if (hwType === 'manual') {
+                            openManualProblemModal(e.target.dataset.hwid, e.target.dataset.problemid);
+                        } else {
+                            openHomeworkModal(e.target.dataset.hwid, e.target.dataset.problemid);
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error('Error loading today homework:', error);
+                list.innerHTML = '<p class="text-sm text-red-500">로드 실패</p>';
+            }
+        }
         
         // Student: Open and do Math homework
         async function openHomeworkModal(assignmentId, problemId) {
@@ -2025,8 +2113,11 @@
                     return;
                 }
                 
-                const rules = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                let rules = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 rules.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
+
+                const filter = document.getElementById('lr-category-filter')?.value || '';
+                if(filter) rules = rules.filter(r => (r.category || '일반') === filter);
 
                 container.innerHTML = `
                     <div class="divide-y divide-gray-200">
@@ -2037,6 +2128,8 @@
                                     <p class="text-sm text-gray-500">보상: ${formatCurrency(rule.reward)}</p>
                                 </div>
                                 <div class="space-x-2">
+                                    <span class="text-sm text-gray-600">${rule.category || '일반'}</span>
+                                    <button data-id="${rule.id}" class="assign-life-category-btn btn btn-secondary btn-xs">카테고리 부여</button>
                                     <button data-id="${rule.id}" data-title="${rule.text}" class="assign-rule-btn btn bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-1">배부</button>
                                     <button data-id="${rule.id}" class="edit-rule-btn btn bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1">수정</button>
                                     <button data-id="${rule.id}" class="delete-rule-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>
@@ -2050,6 +2143,14 @@
                 container.querySelectorAll('.edit-rule-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                     const ruleDoc = await getDoc(doc(db, "lifeRules", e.target.dataset.id));
                     openLifeRuleModal({id: ruleDoc.id, ...ruleDoc.data()});
+                }));
+                container.querySelectorAll('.assign-life-category-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                    const categories = getCategories();
+                    const choice = prompt('카테고리 선택\n' + categories.join('\n'));
+                    if(choice !== null) {
+                        await setDoc(doc(db, 'lifeRules', e.target.dataset.id), { category: choice.trim() || '' }, { merge: true });
+                        loadLifeRules();
+                    }
                 }));
                 container.querySelectorAll('.delete-rule-btn').forEach(btn => btn.addEventListener('click', (e) => deleteLifeRule(e.target.dataset.id)));
 
@@ -2302,17 +2403,29 @@
             loadWorkDocs();
         });
 
-        function loadWorkDocs() {
+       function loadWorkDocs() {
             const container = document.getElementById('work-doc-list');
             const docs = JSON.parse(localStorage.getItem(userKey('workDocs')) || '[]');
+            const filter = document.getElementById('work-category-filter')?.value || '';
+            const filtered = filter ? docs.filter(d => (d.category || '일반') === filter) : docs;
             if(!container) return;
-            if(docs.length === 0) {
+            if(filtered.length === 0) {
                 container.innerHTML = '<p class="text-center text-gray-500">작성된 문서가 없습니다.</p>';
                 return;
             }
             container.innerHTML = '<div class="divide-y divide-gray-200">' +
-                docs.map((d,i)=>`<div class="p-3 flex justify-between items-center"><span>${d.title}</span><button class="edit-draft-btn btn btn-secondary btn-xs" data-index="${i}">편집</button></div>`).join('') +
+                filtered.map((d,i)=>`<div class="p-3 flex justify-between items-center"><span>${d.title}</span><div class="space-x-2"><span class="text-sm text-gray-600">${d.category || '일반'}</span><button class="assign-work-category-btn btn btn-secondary btn-xs" data-index="${i}">카테고리 부여</button><button class="edit-draft-btn btn btn-secondary btn-xs" data-index="${i}">편집</button></div></div>`).join('') +
                 '</div>';
+            container.querySelectorAll('.assign-work-category-btn').forEach(btn => btn.addEventListener('click', e => {
+                const idx = Number(e.target.dataset.index);
+                const categories = getCategories();
+                const choice = prompt('카테고리 선택\n' + categories.join('\n'));
+                if(choice !== null) {
+                    docs[idx].category = choice.trim() || '';
+                    localStorage.setItem(userKey('workDocs'), JSON.stringify(docs));
+                    loadWorkDocs();
+                }
+            }));
             container.querySelectorAll('.edit-draft-btn').forEach(btn => btn.addEventListener('click', e => {
                 const idx = Number(e.target.dataset.index);
                 openDraftModal(idx);
@@ -3203,6 +3316,18 @@
         document.getElementById('close-dictation-modal-btn').addEventListener('click', () => dictationModal.style.display = 'none');
         document.getElementById('close-manual-problem-creation-modal-btn').addEventListener('click', () => manualProblemCreationModal.style.display = 'none');
         document.getElementById('close-manual-problem-modal-btn').addEventListener('click', () => manualProblemModal.style.display = 'none');
+
+        // Category Buttons & Filters
+        document.querySelectorAll('#lp-create-category-btn,#lr-create-category-btn,#work-create-category-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const name = prompt('새 카테고리 이름');
+                if(name) { addCategory(name.trim()); populateCategorySelects(); loadLearningProblems(); loadLifeRules(); loadWorkDocs(); }
+            });
+        });
+        document.getElementById('lp-category-filter')?.addEventListener('change', loadLearningProblems);
+        document.getElementById('lr-category-filter')?.addEventListener('change', loadLifeRules);
+        document.getElementById('work-category-filter')?.addEventListener('change', loadWorkDocs);
+        populateCategorySelects();
 
 
         // --- Initial Load ---
