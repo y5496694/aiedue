@@ -4117,7 +4117,9 @@
                 return `<label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100"><input type="checkbox" data-studentid="${s.id}" class="bulk-student-checkbox h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"><span>${s.name} (코드: ${s.userCode})</span></label>`;
             }).join('');
             let classHtml = '';
+            let classStudents = [];
             if (classSnap.exists()) {
+                classStudents = classSnap.data().students || [];
                 classHtml = `<label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100 font-semibold"><input type="checkbox" id="bulk-select-class" class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"><span>${classSnap.data().name} 학급 전체 배부</span></label>`;
             }
             list.innerHTML = classHtml + studentsHtml;
@@ -4125,12 +4127,20 @@
             if (classCheckbox) {
                 const studentCbs = list.querySelectorAll('input.bulk-student-checkbox');
                 classCheckbox.onchange = e => {
-                    studentCbs.forEach(cb => cb.checked = e.target.checked);
+                    studentCbs.forEach(cb => {
+                        if (classStudents.includes(cb.dataset.studentid)) {
+                            cb.checked = e.target.checked;
+                        }
+                    });
                 };
                 studentCbs.forEach(cb => {
-                    cb.addEventListener('change', () => {
-                        classCheckbox.checked = Array.from(studentCbs).every(c => c.checked);
-                    });
+                    if (classStudents.includes(cb.dataset.studentid)) {
+                        cb.addEventListener('change', () => {
+                            classCheckbox.checked = Array.from(studentCbs)
+                                .filter(c => classStudents.includes(c.dataset.studentid))
+                                .every(c => c.checked);
+                        });
+                    }
                 });
             }
             const search = document.getElementById('bulk-student-search');
