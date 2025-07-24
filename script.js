@@ -112,6 +112,10 @@
         let currentAssignmentItemId = null; // For teacher assignment (homework or life rule)
         let currentAssignmentType = null; // 'math', 'dictation', or 'lifeRule'
         let currentDictationTemplate = null; // For student dictation homework
+        let bulkAssignmentDate = new Date();
+        let currentAssignmentReleaseDate = new Date();
+        let calendarYear = new Date().getFullYear();
+        let calendarMonth = new Date().getMonth();
 
         // --- DOM Elements ---
         const views = {
@@ -322,7 +326,8 @@
             if (currentUserData.role === 'teacher') {
                 loadLearningProblems();
                 loadLifeRules();
-                loadWorkDocs();
+                renderTeacherClassSection();
+                renderTeacherCalendar();
             }
             startStockUpdates();
             document.getElementById('teacher-add-shop-item-btn').classList.toggle('hidden', currentUserData.role !== 'teacher');
@@ -643,8 +648,8 @@
             switchView('admin');
             loadAdminData();
         });
-        document.getElementById('assign-homework-start-btn').addEventListener('click', () => openBulkAssignment('homework'));
-        document.getElementById('assign-life-rule-start-btn').addEventListener('click', () => openBulkAssignment('lifeRule'));
+        document.getElementById('assign-homework-start-btn').addEventListener('click', () => openBulkAssignment('homework', new Date()));
+        document.getElementById('assign-life-rule-start-btn').addEventListener('click', () => openBulkAssignment('lifeRule', new Date()));
         document.getElementById('add-quick-link-btn').addEventListener('click', () => openQuickLinkModal());
         document.getElementById('open-share-space-btn').addEventListener('click', () => openShareSpace());
         document.getElementById('back-to-dashboard-btn').addEventListener('click', () => {
@@ -1195,13 +1200,16 @@
         function renderDashboardMainContent(role) {
             const lifeRules = document.getElementById('life-rules-container');
             const quickLinksSection = document.getElementById('teacher-quick-links');
+            const todayHwSection = document.getElementById('today-homework-section');
             if (role === 'student') {
                 lifeRules.classList.remove('hidden');
                 quickLinksSection.classList.add('hidden');
+                todayHwSection.classList.remove('hidden');
                 renderLifeRulesForStudent();
             } else if (role === 'teacher') {
                 lifeRules.classList.add('hidden');
                 quickLinksSection.classList.remove('hidden');
+                todayHwSection.classList.add('hidden');
                 loadQuickLinks();
             }
         }
@@ -1717,7 +1725,7 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
                     </div>
                 `;
 
-                container.querySelectorAll('.assign-homework-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignmentModal('homework', e.target.dataset.id, e.target.dataset.title)));
+                container.querySelectorAll('.assign-homework-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignmentModal('homework', e.target.dataset.id, e.target.dataset.title, new Date())));
                 container.querySelectorAll('.edit-problem-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                     const problemId = e.target.dataset.id;
                     const problemType = e.target.dataset.type;
@@ -1761,9 +1769,10 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
         }
 
         // Teacher: Open assignment modal (for both homework and life rules)
-        async function openAssignmentModal(type, itemId, itemTitle) {
+        async function openAssignmentModal(type, itemId, itemTitle, date = new Date()) {
             currentAssignmentType = type;
             currentAssignmentItemId = itemId;
+            currentAssignmentReleaseDate = date;
             
             document.getElementById('assignment-modal-title').textContent = `${type === 'homework' ? '숙제' : '생활 규칙'} 배부하기`;
             document.getElementById('assignment-item-title').textContent = `"${itemTitle}"`;
@@ -1829,7 +1838,8 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
                             title: problemSet.title,
                             reward: problemSet.reward,
                             status: 'assigned',
-                            assignedAt: serverTimestamp()
+                            assignedAt: serverTimestamp(),
+                            releaseDate: Timestamp.fromDate(currentAssignmentReleaseDate)
                         };
                         await addDoc(collection(db, `users/${studentId}/assignedHomework`), assignmentData);
                     }
@@ -1842,8 +1852,9 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
                             ruleId: currentAssignmentItemId,
                             text: rule.text,
                             reward: rule.reward,
-                            repeatType: repeatType, 
+                            repeatType: repeatType,
                             assignedAt: serverTimestamp(),
+                            releaseDate: Timestamp.fromDate(currentAssignmentReleaseDate),
                             lastCompletedAt: null
                         };
                         await setDoc(doc(db, `users/${studentId}/assignedLifeRules`, currentAssignmentItemId), assignmentData);
@@ -1873,8 +1884,11 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
                 }
 
                 tableBody.innerHTML = '';
+                const now = new Date();
                 querySnapshot.forEach(docSnap => {
                     const hw = { id: docSnap.id, ...docSnap.data() };
+                    const release = hw.releaseDate ? hw.releaseDate.toDate() : (hw.assignedAt ? hw.assignedAt.toDate() : now);
+                    if(release > now) return;
                     const icon = hw.type === 'dictation' ? '🎤' : (hw.type === 'manual' ? '📝' : '🤖');
                     const isCompleted = hw.status === 'completed';
                     const assignedDate = hw.assignedAt ? hw.assignedAt.toDate().toLocaleDateString('ko-KR') : '';
@@ -1937,8 +1951,9 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
                 let has = false;
                 snapshot.forEach(docSnap => {
                     const hw = {id: docSnap.id, ...docSnap.data()};
-                    const assigned = hw.assignedAt?.toDate();
-                    if(isSameDay(assigned, today)) {
+                    const release = hw.releaseDate ? hw.releaseDate.toDate() : (hw.assignedAt ? hw.assignedAt.toDate() : today);
+                    if(release > today) return;
+                    if(isSameDay(release, today)) {
                         has = true;
                         const icon = hw.type === 'dictation' ? '🎤' : (hw.type === 'manual' ? '📝' : '🤖');
                         const li = document.createElement('li');
@@ -2139,7 +2154,7 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
                     </div>
                 `;
 
-                container.querySelectorAll('.assign-rule-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignmentModal('lifeRule', e.target.dataset.id, e.target.dataset.title)));
+                container.querySelectorAll('.assign-rule-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignmentModal('lifeRule', e.target.dataset.id, e.target.dataset.title, new Date())));
                 container.querySelectorAll('.edit-rule-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                     const ruleDoc = await getDoc(doc(db, "lifeRules", e.target.dataset.id));
                     openLifeRuleModal({id: ruleDoc.id, ...ruleDoc.data()});
@@ -2207,7 +2222,8 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
 
         // --- Work Management ---
         let currentDraftIndex = null;
-        document.getElementById('open-draft-modal-btn').addEventListener('click', () => openDraftModal());
+        const openDraftBtn = document.getElementById('open-draft-modal-btn');
+        if(openDraftBtn) openDraftBtn.addEventListener('click', () => openDraftModal());
 
         function openDraftModal(index = null) {
             currentDraftIndex = index;
@@ -2249,7 +2265,8 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
             }
         }
 
-        document.getElementById('close-draft-modal-btn').addEventListener('click', () => draftModal.style.display = 'none');
+        const closeDraftBtn = document.getElementById('close-draft-modal-btn');
+        if(closeDraftBtn) closeDraftBtn.addEventListener('click', () => draftModal.style.display = 'none');
 
         const referenceContainer = document.getElementById('reference-container');
         const attachmentContainer = document.getElementById('attachment-container');
@@ -2650,6 +2667,106 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
             aiPromptModal.style.display = 'none';
             aiPromptCallback = null;
         }
+
+        function getClassInfo() {
+            return JSON.parse(localStorage.getItem(userKey('classInfo')) || '{}');
+        }
+
+        function saveClassInfo(info) {
+            localStorage.setItem(userKey('classInfo'), JSON.stringify(info));
+        }
+
+        async function renderTeacherClassSection() {
+            const section = document.getElementById('teacher-class-section');
+            if(!section) return;
+            if(currentUserData.role !== 'teacher') { section.classList.add('hidden'); return; }
+            section.classList.remove('hidden');
+            const info = getClassInfo();
+            const createBtn = document.getElementById('create-class-btn');
+            const addBtn = document.getElementById('add-class-student-btn');
+            const nameEl = document.getElementById('class-name');
+            const listEl = document.getElementById('class-student-list');
+            if(!info.name) {
+                createBtn.classList.remove('hidden');
+                addBtn.classList.add('hidden');
+                nameEl.textContent = '';
+                listEl.innerHTML = '';
+            } else {
+                createBtn.classList.add('hidden');
+                addBtn.classList.remove('hidden');
+                nameEl.textContent = info.name;
+                listEl.innerHTML = '';
+                if(info.students && info.students.length) {
+                    info.students.forEach(s => {
+                        const li = document.createElement('li');
+                        li.textContent = `${s.name} (${s.code})`;
+                        listEl.appendChild(li);
+                    });
+                } else {
+                    listEl.innerHTML = '<li class="text-gray-500 text-sm">학생 없음</li>';
+                }
+            }
+        }
+
+        document.getElementById('create-class-btn')?.addEventListener('click', () => {
+            const name = prompt('학급 이름');
+            if(name) { saveClassInfo({name, students: []}); renderTeacherClassSection(); }
+        });
+
+        document.getElementById('add-class-student-btn')?.addEventListener('click', async () => {
+            const code = prompt('추가할 학생 고유 코드');
+            if(!code) return;
+            const snap = await getDocs(query(collection(db,'users'), where('role','==','student')));
+            let found = null;
+            snap.forEach(d => { if(d.data().userCode === code) found = {id:d.id, ...d.data()}; });
+            if(!found) { showModal('오류','학생을 찾을 수 없습니다.'); return; }
+            const info = getClassInfo();
+            info.students = info.students || [];
+            if(!info.students.some(s=>s.id===found.id)) {
+                info.students.push({id:found.id,name:found.name,code:found.userCode});
+                saveClassInfo(info);
+            }
+            renderTeacherClassSection();
+        });
+
+        function renderTeacherCalendar(date = new Date(calendarYear, calendarMonth, 1)) {
+            const section = document.getElementById('teacher-calendar-section');
+            if(!section) return;
+            if(currentUserData.role !== 'teacher') { section.classList.add('hidden'); return; }
+            section.classList.remove('hidden');
+            calendarYear = date.getFullYear();
+            calendarMonth = date.getMonth();
+            document.getElementById('calendar-month').textContent = `${calendarYear}년 ${calendarMonth+1}월`;
+            const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
+            const lastDate = new Date(calendarYear, calendarMonth+1, 0).getDate();
+            let html='';
+            let day=1;
+            for(let w=0; w<6; w++) {
+                html += '<tr>';
+                for(let d=0; d<7; d++) {
+                    if(w===0 && d<firstDay || day>lastDate) {
+                        html += '<td class="p-1 border"></td>';
+                    } else {
+                        html += `<td class="p-1 border align-top"><div>${day}</div><button class="cal-hw-btn btn btn-primary btn-xs mb-1" data-day="${day}">숙제 배부</button><button class="cal-rule-btn btn btn-secondary btn-xs" data-day="${day}">생활 규칙 배부</button></td>`;
+                        day++;
+                    }
+                }
+                html += '</tr>';
+                if(day>lastDate) break;
+            }
+            const body = document.getElementById('calendar-body');
+            body.innerHTML = html;
+            body.querySelectorAll('.cal-hw-btn').forEach(btn => btn.addEventListener('click', () => openBulkAssignment('homework', new Date(calendarYear, calendarMonth, Number(btn.dataset.day)))));
+            body.querySelectorAll('.cal-rule-btn').forEach(btn => btn.addEventListener('click', () => openBulkAssignment('lifeRule', new Date(calendarYear, calendarMonth, Number(btn.dataset.day)))));
+        }
+
+        document.getElementById('prev-month-btn')?.addEventListener('click', () => {
+            renderTeacherCalendar(new Date(calendarYear, calendarMonth - 1, 1));
+        });
+        document.getElementById('next-month-btn')?.addEventListener('click', () => {
+            renderTeacherCalendar(new Date(calendarYear, calendarMonth + 1, 1));
+        });
+
         
         // --- AI Dictation Feature ---
 
@@ -3231,9 +3348,10 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
         let bulkAssignmentType = null;
         let bulkSelectedStudents = [];
 
-        async function openBulkAssignment(type) {
+        async function openBulkAssignment(type, date = new Date()) {
             bulkAssignmentType = type;
             bulkSelectedStudents = [];
+            bulkAssignmentDate = date;
             document.getElementById('bulk-step1').classList.remove('hidden');
             document.getElementById('bulk-step2').classList.add('hidden');
             document.getElementById('bulk-assignment-title').textContent = type === 'homework' ? '숙제 배부하기 - 학생 선택' : '생활 규칙 배부하기 - 학생 선택';
@@ -3287,14 +3405,14 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
                     const docSnap = await getDoc(doc(db, 'learningProblems', sel.value));
                     const ps = docSnap.data();
                     for (const sid of bulkSelectedStudents) {
-                        const data = { problemId: sel.value, type: ps.type, title: ps.title, reward: ps.reward, status: 'assigned', assignedAt: serverTimestamp() };
+                        const data = { problemId: sel.value, type: ps.type, title: ps.title, reward: ps.reward, status: 'assigned', assignedAt: serverTimestamp(), releaseDate: Timestamp.fromDate(bulkAssignmentDate) };
                         await addDoc(collection(db, `users/${sid}/assignedHomework`), data);
                     }
                 } else {
                     const docSnap = await getDoc(doc(db, 'lifeRules', sel.value));
                     const rule = docSnap.data();
                     for (const sid of bulkSelectedStudents) {
-                        const data = { ruleId: sel.value, text: rule.text, reward: rule.reward, repeatType: 'one-time', assignedAt: serverTimestamp(), lastCompletedAt: null };
+                        const data = { ruleId: sel.value, text: rule.text, reward: rule.reward, repeatType: 'one-time', assignedAt: serverTimestamp(), releaseDate: Timestamp.fromDate(bulkAssignmentDate), lastCompletedAt: null };
                         await setDoc(doc(db, `users/${sid}/assignedLifeRules`, sel.value), data);
                     }
                 }
@@ -3318,15 +3436,14 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
         document.getElementById('close-manual-problem-modal-btn').addEventListener('click', () => manualProblemModal.style.display = 'none');
 
         // Category Buttons & Filters
-        document.querySelectorAll('#lp-create-category-btn,#lr-create-category-btn,#work-create-category-btn').forEach(btn => {
+        document.querySelectorAll('#lp-create-category-btn,#lr-create-category-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const name = prompt('새 카테고리 이름');
-                if(name) { addCategory(name.trim()); populateCategorySelects(); loadLearningProblems(); loadLifeRules(); loadWorkDocs(); }
+                if(name) { addCategory(name.trim()); populateCategorySelects(); loadLearningProblems(); loadLifeRules(); }
             });
         });
         document.getElementById('lp-category-filter')?.addEventListener('change', loadLearningProblems);
         document.getElementById('lr-category-filter')?.addEventListener('change', loadLifeRules);
-        document.getElementById('work-category-filter')?.addEventListener('change', loadWorkDocs);
         populateCategorySelects();
 
 
