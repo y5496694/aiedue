@@ -2315,49 +2315,73 @@
             if (!container) return;
             container.innerHTML = '<p class="text-center text-gray-500">로딩 중...</p>';
             const docRef = doc(db, 'classes', currentUserData.id);
-            const docSnap = await getDoc(docRef);
-            if (!docSnap.exists()) {
-                container.innerHTML = '<h2 class="text-xl font-bold mb-4">🏫 내 학급</h2><button id="create-class-btn" class="btn btn-primary w-full">내 학급 만들기</button>';
-                document.getElementById('create-class-btn').onclick = async () => {
-                    const name = prompt('학급 이름을 입력하세요');
-                    if (name) {
-                        await setDoc(docRef, { name, students: [] });
-                        loadMyClass();
+            try {
+                const docSnap = await getDoc(docRef);
+                if (!docSnap.exists()) {
+                    container.innerHTML = '<h2 class="text-xl font-bold mb-4">🏫 내 학급</h2><button id="create-class-btn" class="btn btn-primary w-full">내 학급 만들기</button>';
+                    document.getElementById('create-class-btn').onclick = async () => {
+                        const name = prompt('학급 이름을 입력하세요');
+                        if (name) {
+                            try {
+                                await setDoc(docRef, { name, students: [] });
+                                loadMyClass();
+                            } catch (err) {
+                                container.innerHTML = '<p class="text-red-500 text-center">학급 생성 실패</p>';
+                                showModal('오류', `학급 생성 중 오류가 발생했습니다: ${err.message}`);
+                            }
+                        }
+                    };
+                    return;
+                }
+                const data = docSnap.data();
+                const studentIds = data.students || [];
+                let listHtml = '';
+                for (const sid of studentIds) {
+                    try {
+                        const sd = await getDoc(doc(db, 'users', sid));
+                        if (sd.exists()) listHtml += `<li>${sd.data().name}</li>`;
+                    } catch (err) {
+                        listHtml += `<li class="text-red-500">오류: ${err.message}</li>`;
                     }
-                };
-                return;
+                }
+                container.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 class="text-xl font-bold">🏫 ${data.name}</h2>
+                        <button id="add-class-student-btn" class="btn btn-primary btn-sm">학생 추가</button>
+                    </div>
+                    <ul class="list-disc list-inside space-y-1">${listHtml || '<li class="text-sm text-gray-500">학생 없음</li>'}</ul>
+                `;
+                document.getElementById('add-class-student-btn').onclick = () => openAddStudentsModal();
+            } catch (error) {
+                container.innerHTML = '<p class="text-red-500 text-center">학급 정보를 불러오지 못했습니다.</p>';
+                showModal('오류', `학급 정보를 불러오는 중 오류가 발생했습니다: ${error.message}`);
             }
-            const data = docSnap.data();
-            const studentIds = data.students || [];
-            let listHtml = '';
-            for (const sid of studentIds) {
-                const sd = await getDoc(doc(db, 'users', sid));
-                if (sd.exists()) listHtml += `<li>${sd.data().name}</li>`;
-            }
-            container.innerHTML = `
-                <div class="flex justify-between items-center mb-2">
-                    <h2 class="text-xl font-bold">🏫 ${data.name}</h2>
-                    <button id="add-class-student-btn" class="btn btn-primary btn-sm">학생 추가</button>
-                </div>
-                <ul class="list-disc list-inside space-y-1">${listHtml || '<li class="text-sm text-gray-500">학생 없음</li>'}</ul>
-            `;
-            document.getElementById('add-class-student-btn').onclick = () => openAddStudentsModal();
         }
 
         let currentClassStudents = [];
         async function openAddStudentsModal() {
-            const classDoc = await getDoc(doc(db, 'classes', currentUserData.id));
-            currentClassStudents = classDoc.data().students || [];
+            try {
+                const classDoc = await getDoc(doc(db, 'classes', currentUserData.id));
+                currentClassStudents = classDoc.data().students || [];
+            } catch (err) {
+                showModal('오류', `학급 정보를 불러오지 못했습니다: ${err.message}`);
+                return;
+            }
             const modal = document.getElementById('class-add-students-modal');
             const listEl = document.getElementById('class-student-list');
             listEl.innerHTML = '학생 목록 로딩 중...';
             modal.style.display = 'flex';
-            const usersSnapshot = await getDocs(query(collection(db, 'users'), where('role', '==', 'student')));
-            listEl.innerHTML = usersSnapshot.docs.map(d => {
-                const s = { id: d.id, ...d.data() };
-                const checked = currentClassStudents.includes(s.id) ? 'checked disabled' : '';
-                return `<label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100"><input type="checkbox" data-studentid="${s.id}" class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500" ${checked}><span>${s.name} (코드: ${s.userCode})</span></label>`;
-            }).join('');
+            try {
+                const usersSnapshot = await getDocs(query(collection(db, 'users'), where('role', '==', 'student')));
+                listEl.innerHTML = usersSnapshot.docs.map(d => {
+                    const s = { id: d.id, ...d.data() };
+                    const checked = currentClassStudents.includes(s.id) ? 'checked disabled' : '';
+                    return `<label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100"><input type="checkbox" data-studentid="${s.id}" class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500" ${checked}><span>${s.name} (코드: ${s.userCode})</span></label>`;
+                }).join('');
+            } catch (err) {
+                listEl.innerHTML = `<p class="text-red-500 text-center">학생 목록을 불러오지 못했습니다.</p>`;
+                showModal('오류', `학생 목록을 불러오는 중 오류가 발생했습니다: ${err.message}`);
+            }
             const search = document.getElementById('class-student-search');
             search.value = '';
             search.oninput = e => {
@@ -2371,7 +2395,11 @@
         document.getElementById('class-add-students-confirm-btn').addEventListener('click', async () => {
             const selected = Array.from(document.querySelectorAll('#class-student-list input:checked:not(:disabled)')).map(i => i.dataset.studentid);
             if (selected.length > 0) {
-                await updateDoc(doc(db, 'classes', currentUserData.id), { students: arrayUnion(...selected) });
+                try {
+                    await updateDoc(doc(db, 'classes', currentUserData.id), { students: arrayUnion(...selected) });
+                } catch (err) {
+                    showModal('오류', `학생을 추가하는 중 오류가 발생했습니다: ${err.message}`);
+                }
             }
             document.getElementById('class-add-students-modal').style.display = 'none';
             loadMyClass();
