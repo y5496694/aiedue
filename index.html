@@ -4107,12 +4107,32 @@
             const list = document.getElementById('bulk-student-list');
             list.innerHTML = '학생 목록 로딩 중...';
             document.getElementById('bulk-assignment-modal').style.display = 'flex';
-            const usersSnapshot = await getDocs(query(collection(db, 'users'), where('role', '==', 'student')));
+            const [usersSnapshot, classSnap] = await Promise.all([
+                getDocs(query(collection(db, 'users'), where('role', '==', 'student'))),
+                getDoc(doc(db, 'classes', currentUserData.id))
+            ]);
             if (usersSnapshot.empty) { list.innerHTML = '배부할 학생이 없습니다.'; return; }
-            list.innerHTML = usersSnapshot.docs.map(docSnap => {
+            const studentsHtml = usersSnapshot.docs.map(docSnap => {
                 const s = {id: docSnap.id, ...docSnap.data()};
-                return `<label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100"><input type="checkbox" data-studentid="${s.id}" class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"><span>${s.name} (코드: ${s.userCode})</span></label>`;
+                return `<label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100"><input type="checkbox" data-studentid="${s.id}" class="bulk-student-checkbox h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"><span>${s.name} (코드: ${s.userCode})</span></label>`;
             }).join('');
+            let classHtml = '';
+            if (classSnap.exists()) {
+                classHtml = `<label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100 font-semibold"><input type="checkbox" id="bulk-select-class" class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"><span>${classSnap.data().name} 학급 전체 배부</span></label>`;
+            }
+            list.innerHTML = classHtml + studentsHtml;
+            const classCheckbox = document.getElementById('bulk-select-class');
+            if (classCheckbox) {
+                const studentCbs = list.querySelectorAll('input.bulk-student-checkbox');
+                classCheckbox.onchange = e => {
+                    studentCbs.forEach(cb => cb.checked = e.target.checked);
+                };
+                studentCbs.forEach(cb => {
+                    cb.addEventListener('change', () => {
+                        classCheckbox.checked = Array.from(studentCbs).every(c => c.checked);
+                    });
+                });
+            }
             const search = document.getElementById('bulk-student-search');
             search.value = '';
             search.oninput = (e) => {
@@ -4138,7 +4158,7 @@
         }
 
         document.getElementById('bulk-select-item-btn').addEventListener('click', async () => {
-            bulkSelectedStudents = Array.from(document.querySelectorAll('#bulk-student-list input:checked')).map(i => i.dataset.studentid);
+            bulkSelectedStudents = Array.from(document.querySelectorAll('#bulk-student-list input[data-studentid]:checked')).map(i => i.dataset.studentid);
             if (bulkSelectedStudents.length === 0) { showModal('오류', '한 명 이상의 학생을 선택해주세요.'); return; }
             document.getElementById('bulk-step1').classList.add('hidden');
             document.getElementById('bulk-step2').classList.remove('hidden');
