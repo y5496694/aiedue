@@ -121,7 +121,6 @@
                     <button data-tab="homework" id="homework-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">오늘의 숙제</button>
                     <button data-tab="life-rules-management" id="life-rules-management-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">생활 규칙 관리</button>
                     <button data-tab="learning-problems" id="learning-problems-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">학습 문제 관리</button>
-                    <button data-tab="work-management" id="work-management-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">업무 관리</button>
                 </nav>
             </div>
 
@@ -181,6 +180,14 @@
                             <button id="assign-homework-start-btn" class="w-full py-2 mb-2 rounded-md btn bg-amber-500 hover:bg-amber-600 text-white">숙제 배부하기</button>
                             <button id="assign-life-rule-start-btn" class="w-full py-2 mb-2 rounded-md btn bg-green-500 hover:bg-green-600 text-white">생활 규칙 배부하기</button>
                             <button id="admin-page-btn" class="w-full py-2 rounded-md btn bg-red-500 hover:bg-red-600 text-white">관리자 페이지로 이동</button>
+                        </div>
+                        <div id="teacher-class-section" class="hidden bg-white p-6 rounded-lg shadow-md">
+                            <h2 class="text-xl font-bold mb-4">🏫 내 학급</h2>
+                            <div id="class-info"></div>
+                        </div>
+                        <div id="teacher-calendar-section" class="hidden bg-white p-6 rounded-lg shadow-md">
+                            <h2 class="text-xl font-bold mb-4">📅 학사 일정</h2>
+                            <div id="calendar"></div>
                         </div>
                     </div>
                 </div>
@@ -245,21 +252,6 @@
                     <!-- Life rules will be rendered here -->
                 </div>
             </div>
-            <div id="work-management-tab-content" class="tab-content">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold">📂 업무 관리</h2>
-                    <div class="space-x-2">
-                        <button id="work-create-category-btn" class="btn btn-secondary">카테고리 생성</button>
-                        <select id="work-category-filter" class="p-2 border rounded">
-                            <option value="">전체</option>
-                        </select>
-                        <button id="open-draft-modal-btn" class="btn btn-primary">AI 기안 만들기</button>
-                    </div>
-                </div>
-                <div id="work-doc-list" class="bg-white p-4 rounded-lg shadow">
-                    <p class="text-center text-gray-500">작성된 문서가 없습니다.</p>
-                </div>
-            </div>
         </div>
         
         <!-- Admin View -->
@@ -315,6 +307,18 @@
             <h3 id="modal-title" class="text-xl font-bold mb-4"></h3>
             <p id="modal-message" class="mb-6"></p>
             <button id="modal-confirm-btn" class="py-2 px-6 rounded-md btn btn-primary">확인</button>
+        </div>
+    </div>
+
+    <div id="class-student-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-class-student-modal-btn">&times;</span>
+            <h3 class="text-xl font-bold mb-4">학생 추가</h3>
+            <input type="text" id="class-student-search" class="w-full p-2 mb-2 border rounded-md form-input" placeholder="검색...">
+            <div id="class-student-list" class="space-y-2 max-h-60 overflow-y-auto text-left border p-2 rounded-md"></div>
+            <div class="mt-4 text-right">
+                <button id="add-selected-class-students-btn" class="btn btn-primary">추가</button>
+            </div>
         </div>
     </div>
     <div id="homework-modal" class="modal-overlay hidden">
@@ -613,68 +617,6 @@
             </div>
         </div>
     </div>
-    <div id="draft-modal" class="modal-overlay hidden">
-        <div class="modal-content modal-content-lg">
-            <span class="close-button" id="close-draft-modal-btn">&times;</span>
-            <h3 class="text-xl font-bold mb-4">AI 기안 만들기</h3>
-            <form id="draft-form" class="text-left space-y-4 overflow-y-auto max-h-[70vh] p-1">
-                <div>
-                    <label for="draft-subject" class="block text-sm font-medium">주제</label>
-                    <input type="text" id="draft-subject" class="w-full p-2 border rounded-md form-input" required>
-                </div>
-                <div>
-                    <label for="draft-notes" class="block text-sm font-medium">참고 사항</label>
-                    <textarea id="draft-notes" rows="3" class="w-full p-2 border rounded-md form-input"></textarea>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">관련 근거 여부</label>
-                    <div class="space-x-4">
-                        <label><input type="radio" name="has-reference" value="no" checked> 없음</label>
-                        <label><input type="radio" name="has-reference" value="yes"> 있음</label>
-                    </div>
-                    <div id="reference-container" class="mt-2 space-y-2 hidden">
-                        <!-- reference fields will be added here -->
-                    </div>
-                    <button type="button" id="add-reference-btn" class="mt-2 btn btn-secondary hidden">+ 추가</button>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">붙임 문서 여부</label>
-                    <div class="space-x-4">
-                        <label><input type="radio" name="has-attachment" value="no" checked> 없음</label>
-                        <label><input type="radio" name="has-attachment" value="yes"> 있음</label>
-                    </div>
-                    <div id="attachment-container" class="mt-2 space-y-2 hidden">
-                        <!-- attachment fields will be added here -->
-                    </div>
-                    <button type="button" id="add-attachment-btn" class="mt-2 btn btn-secondary hidden">+ 추가</button>
-                </div>
-                <div class="text-right">
-                    <button type="submit" class="btn btn-primary">AI 기안 생성</button>
-                </div>
-            </form>
-            <div id="draft-result" class="mt-4 hidden">
-                <div class="flex justify-between items-center mb-2">
-                    <h4 class="font-bold">제목</h4>
-                    <div class="space-x-2">
-                        <button id="edit-title-btn" class="btn btn-secondary btn-xs">ai 편집</button>
-                        <button id="copy-title-btn" class="btn btn-secondary btn-xs">복사</button>
-                    </div>
-                </div>
-                <p id="generated-title" class="border p-2 rounded mb-4"></p>
-                <div class="flex justify-between items-center mb-2">
-                    <h4 class="font-bold">본문</h4>
-                    <div class="space-x-2">
-                        <button id="edit-body-btn" class="btn btn-secondary btn-xs">ai 편집</button>
-                        <button id="copy-body-btn" class="btn btn-secondary btn-xs">복사</button>
-                    </div>
-                </div>
-                <pre id="generated-body" class="border p-2 rounded whitespace-pre-wrap"></pre>
-                <div class="text-right mt-4">
-                    <button id="save-draft-btn" class="btn btn-primary">완료</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <div id="quick-link-modal" class="modal-overlay hidden">
         <div class="modal-content">
@@ -721,7 +663,8 @@
         <div class="modal-content modal-content-lg">
             <span class="close-button" id="close-bulk-assignment-modal-btn">&times;</span>
             <div id="bulk-step1">
-                <h3 id="bulk-assignment-title" class="text-xl font-bold mb-4"></h3>
+                <h3 id="bulk-assignment-title" class="text-xl font-bold mb-2"></h3>
+                <p id="bulk-assignment-date" class="text-sm text-gray-500 mb-2"></p>
                 <div class="mb-2 relative">
                     <input type="text" id="bulk-student-search" class="w-full p-2 pl-10 border border-gray-300 rounded-md form-input" placeholder="이름 또는 코드로 검색...">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -734,7 +677,8 @@
                 </div>
             </div>
             <div id="bulk-step2" class="hidden">
-                <h3 id="bulk-item-title" class="text-xl font-bold mb-4"></h3>
+                <h3 id="bulk-item-title" class="text-xl font-bold mb-2"></h3>
+                <p id="bulk-item-date" class="text-sm text-gray-500 mb-2"></p>
                 <div id="bulk-item-list" class="space-y-2 max-h-60 overflow-y-auto text-left border p-2 rounded-md"></div>
                 <div class="mt-6 text-right">
                     <button id="bulk-assign-btn" class="btn btn-primary">배부하기</button>
@@ -872,7 +816,7 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, runTransaction, updateDoc, increment, deleteField, serverTimestamp, Timestamp, orderBy, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, runTransaction, updateDoc, increment, deleteField, serverTimestamp, Timestamp, orderBy, addDoc, deleteDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
         // IMPORTANT: Replace with your actual Firebase config
@@ -1079,7 +1023,6 @@
             document.getElementById('homework-dashboard-tab').style.display = dataToShow.role === 'student' ? 'inline-block' : 'none';
             document.getElementById('learning-problems-dashboard-tab').style.display = currentUserData.role === 'teacher' ? 'inline-block' : 'none';
             document.getElementById('life-rules-management-dashboard-tab').style.display = currentUserData.role === 'teacher' ? 'inline-block' : 'none';
-            document.getElementById('work-management-tab').style.display = currentUserData.role === 'teacher' ? 'inline-block' : 'none';
             document.getElementById('teacher-admin-panel').style.display = currentUserData.role === 'teacher' ? 'block' : 'none';
             
             // Disable interactive elements if admin is viewing
@@ -1114,7 +1057,8 @@
             if (currentUserData.role === 'teacher') {
                 loadLearningProblems();
                 loadLifeRules();
-                loadWorkDocs();
+                loadTeacherClass();
+                renderTeacherCalendar();
             }
             startStockUpdates();
             document.getElementById('teacher-add-shop-item-btn').classList.toggle('hidden', currentUserData.role !== 'teacher');
@@ -1435,8 +1379,8 @@
             switchView('admin');
             loadAdminData();
         });
-        document.getElementById('assign-homework-start-btn').addEventListener('click', () => openBulkAssignment('homework'));
-        document.getElementById('assign-life-rule-start-btn').addEventListener('click', () => openBulkAssignment('lifeRule'));
+        document.getElementById('assign-homework-start-btn').addEventListener('click', () => openBulkAssignment('homework', new Date(), currentClassData?.students || []));
+        document.getElementById('assign-life-rule-start-btn').addEventListener('click', () => openBulkAssignment('lifeRule', new Date(), currentClassData?.students || []));
         document.getElementById('add-quick-link-btn').addEventListener('click', () => openQuickLinkModal());
         document.getElementById('open-share-space-btn').addEventListener('click', () => openShareSpace());
         document.getElementById('back-to-dashboard-btn').addEventListener('click', () => {
@@ -1987,13 +1931,22 @@
         function renderDashboardMainContent(role) {
             const lifeRules = document.getElementById('life-rules-container');
             const quickLinksSection = document.getElementById('teacher-quick-links');
+            const todayHw = document.getElementById('today-homework-section');
+            const classSec = document.getElementById('teacher-class-section');
+            const calSec = document.getElementById('teacher-calendar-section');
             if (role === 'student') {
                 lifeRules.classList.remove('hidden');
                 quickLinksSection.classList.add('hidden');
+                todayHw.classList.remove('hidden');
+                classSec?.classList.add('hidden');
+                calSec?.classList.add('hidden');
                 renderLifeRulesForStudent();
             } else if (role === 'teacher') {
                 lifeRules.classList.add('hidden');
                 quickLinksSection.classList.remove('hidden');
+                todayHw.classList.add('hidden');
+                classSec?.classList.remove('hidden');
+                calSec?.classList.remove('hidden');
                 loadQuickLinks();
             }
         }
@@ -2020,7 +1973,7 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
 
         function populateCategorySelects() {
             const categories = getCategories();
-            document.querySelectorAll('#lp-category-filter,#lr-category-filter,#work-category-filter').forEach(sel => {
+            document.querySelectorAll('#lp-category-filter,#lr-category-filter').forEach(sel => {
                 if(!sel) return;
                 const current = sel.value;
                 sel.innerHTML = '<option value="">전체</option>';
@@ -2665,11 +2618,16 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
                 }
 
                 tableBody.innerHTML = '';
+                const todayDate = new Date();
+                const today = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
                 querySnapshot.forEach(docSnap => {
                     const hw = { id: docSnap.id, ...docSnap.data() };
+                    const scheduled = hw.scheduledFor ? hw.scheduledFor.toDate() : (hw.assignedAt?.toDate() || new Date());
+                    const scheduledDate = new Date(scheduled.getFullYear(), scheduled.getMonth(), scheduled.getDate());
+                    if (scheduledDate > today) return;
                     const icon = hw.type === 'dictation' ? '🎤' : (hw.type === 'manual' ? '📝' : '🤖');
                     const isCompleted = hw.status === 'completed';
-                    const assignedDate = hw.assignedAt ? hw.assignedAt.toDate().toLocaleDateString('ko-KR') : '';
+                    const assignedDate = scheduledDate.toLocaleDateString('ko-KR');
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${icon} ${hw.title}</td>
@@ -2724,13 +2682,14 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
             try {
                 const q = query(collection(db, `users/${dataToShow.id}/assignedHomework`), orderBy('assignedAt', 'desc'));
                 const snapshot = await getDocs(q);
-                const today = new Date();
+                const now = new Date();
+                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                 list.innerHTML = '';
                 let has = false;
                 snapshot.forEach(docSnap => {
                     const hw = {id: docSnap.id, ...docSnap.data()};
-                    const assigned = hw.assignedAt?.toDate();
-                    if(isSameDay(assigned, today)) {
+                    const scheduled = hw.scheduledFor ? hw.scheduledFor.toDate() : (hw.assignedAt?.toDate() || new Date());
+                    if(isSameDay(scheduled, today)) {
                         has = true;
                         const icon = hw.type === 'dictation' ? '🎤' : (hw.type === 'manual' ? '📝' : '🤖');
                         const li = document.createElement('li');
@@ -2999,7 +2958,7 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
 
         // --- Work Management ---
         let currentDraftIndex = null;
-        document.getElementById('open-draft-modal-btn').addEventListener('click', () => openDraftModal());
+        document.getElementById('open-draft-modal-btn')?.addEventListener('click', () => openDraftModal());
 
         function openDraftModal(index = null) {
             currentDraftIndex = index;
@@ -3041,7 +3000,7 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
             }
         }
 
-        document.getElementById('close-draft-modal-btn').addEventListener('click', () => draftModal.style.display = 'none');
+        document.getElementById('close-draft-modal-btn')?.addEventListener('click', () => draftModal.style.display = 'none');
 
         const referenceContainer = document.getElementById('reference-container');
         const attachmentContainer = document.getElementById('attachment-container');
@@ -4022,13 +3981,16 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
 
         let bulkAssignmentType = null;
         let bulkSelectedStudents = [];
+        let bulkScheduledDate = null;
 
-        async function openBulkAssignment(type) {
+        async function openBulkAssignment(type, date = null, preselect = []) {
             bulkAssignmentType = type;
+            bulkScheduledDate = date;
             bulkSelectedStudents = [];
             document.getElementById('bulk-step1').classList.remove('hidden');
             document.getElementById('bulk-step2').classList.add('hidden');
             document.getElementById('bulk-assignment-title').textContent = type === 'homework' ? '숙제 배부하기 - 학생 선택' : '생활 규칙 배부하기 - 학생 선택';
+            document.getElementById('bulk-assignment-date').textContent = date ? date.toLocaleDateString('ko-KR') : '';
             const list = document.getElementById('bulk-student-list');
             list.innerHTML = '학생 목록 로딩 중...';
             document.getElementById('bulk-assignment-modal').style.display = 'flex';
@@ -4036,7 +3998,8 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
             if (usersSnapshot.empty) { list.innerHTML = '배부할 학생이 없습니다.'; return; }
             list.innerHTML = usersSnapshot.docs.map(docSnap => {
                 const s = {id: docSnap.id, ...docSnap.data()};
-                return `<label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100"><input type="checkbox" data-studentid="${s.id}" class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"><span>${s.name} (코드: ${s.userCode})</span></label>`;
+                const checked = preselect.includes(s.id) ? 'checked' : '';
+                return `<label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100"><input type="checkbox" data-studentid="${s.id}" class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500" ${checked}><span>${s.name} (코드: ${s.userCode})</span></label>`;
             }).join('');
             const search = document.getElementById('bulk-student-search');
             search.value = '';
@@ -4068,6 +4031,7 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
             document.getElementById('bulk-step1').classList.add('hidden');
             document.getElementById('bulk-step2').classList.remove('hidden');
             document.getElementById('bulk-item-title').textContent = bulkAssignmentType === 'homework' ? '숙제 선택' : '생활 규칙 선택';
+            document.getElementById('bulk-item-date').textContent = bulkScheduledDate ? bulkScheduledDate.toLocaleDateString('ko-KR') : '';
             await loadBulkItems();
         });
 
@@ -4079,25 +4043,26 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
                     const docSnap = await getDoc(doc(db, 'learningProblems', sel.value));
                     const ps = docSnap.data();
                     for (const sid of bulkSelectedStudents) {
-                        const data = { problemId: sel.value, type: ps.type, title: ps.title, reward: ps.reward, status: 'assigned', assignedAt: serverTimestamp() };
+                        const data = { problemId: sel.value, type: ps.type, title: ps.title, reward: ps.reward, status: 'assigned', assignedAt: serverTimestamp(), scheduledFor: bulkScheduledDate ? Timestamp.fromDate(bulkScheduledDate) : serverTimestamp() };
                         await addDoc(collection(db, `users/${sid}/assignedHomework`), data);
                     }
                 } else {
                     const docSnap = await getDoc(doc(db, 'lifeRules', sel.value));
                     const rule = docSnap.data();
                     for (const sid of bulkSelectedStudents) {
-                        const data = { ruleId: sel.value, text: rule.text, reward: rule.reward, repeatType: 'one-time', assignedAt: serverTimestamp(), lastCompletedAt: null };
+                        const data = { ruleId: sel.value, text: rule.text, reward: rule.reward, repeatType: 'one-time', assignedAt: serverTimestamp(), scheduledFor: bulkScheduledDate ? Timestamp.fromDate(bulkScheduledDate) : serverTimestamp(), lastCompletedAt: null };
                         await setDoc(doc(db, `users/${sid}/assignedLifeRules`, sel.value), data);
                     }
                 }
                 document.getElementById('bulk-assignment-modal').style.display = 'none';
+                bulkScheduledDate = null;
                 showModal('성공', `${bulkSelectedStudents.length}명의 학생에게 배부를 완료했습니다.`);
             } catch (error) {
                 showModal('배부 실패', `오류: ${error.message}`);
             }
         });
 
-        document.getElementById('close-bulk-assignment-modal-btn').addEventListener('click', () => document.getElementById('bulk-assignment-modal').style.display = 'none');
+        document.getElementById('close-bulk-assignment-modal-btn').addEventListener('click', () => { document.getElementById('bulk-assignment-modal').style.display = 'none'; bulkScheduledDate = null; });
 
         // Close Modals
         document.getElementById('close-homework-modal-btn').addEventListener('click', () => homeworkModal.style.display = 'none');
@@ -4109,16 +4074,125 @@ const userKey = base => currentUserData ? `${base}_${currentUserData.id}` : base
         document.getElementById('close-manual-problem-creation-modal-btn').addEventListener('click', () => manualProblemCreationModal.style.display = 'none');
         document.getElementById('close-manual-problem-modal-btn').addEventListener('click', () => manualProblemModal.style.display = 'none');
 
+        let currentClassData = null;
+
+        async function loadTeacherClass() {
+            const section = document.getElementById('teacher-class-section');
+            const info = document.getElementById('class-info');
+            if (!section) return;
+            const docRef = doc(db, 'classes', currentUserData.id);
+            const snap = await getDoc(docRef);
+            section.classList.remove('hidden');
+            if (!snap.exists()) {
+                info.innerHTML = '<button id="create-class-btn" class="btn btn-primary w-full">내 학급 만들기</button>';
+                document.getElementById('create-class-btn').onclick = async () => {
+                    const name = prompt('학급 이름을 입력하세요');
+                    if (!name) return;
+                    await setDoc(docRef, { teacherId: currentUserData.id, name, students: [] });
+                    loadTeacherClass();
+                };
+                currentClassData = { id: currentUserData.id, students: [] };
+                return;
+            }
+            currentClassData = { id: docRef.id, ...snap.data() };
+            info.innerHTML = `<h3 class="font-bold mb-2">${currentClassData.name}</h3><ul id="class-student-ul" class="mb-2"></ul><button id="add-class-student-btn" class="btn btn-secondary">+ 추가</button>`;
+            const ul = document.getElementById('class-student-ul');
+            ul.innerHTML = '';
+            if (currentClassData.students && currentClassData.students.length) {
+                for (const sid of currentClassData.students) {
+                    const sSnap = await getDoc(doc(db, 'users', sid));
+                    if (sSnap.exists()) {
+                        const li = document.createElement('li');
+                        li.textContent = sSnap.data().name;
+                        ul.appendChild(li);
+                    }
+                }
+            } else {
+                ul.innerHTML = '<li class="text-sm text-gray-500">학생 없음</li>';
+            }
+            document.getElementById('add-class-student-btn').onclick = openClassStudentModal;
+        }
+
+        async function openClassStudentModal() {
+            const modal = document.getElementById('class-student-modal');
+            const list = document.getElementById('class-student-list');
+            const search = document.getElementById('class-student-search');
+            modal.style.display = 'flex';
+            list.innerHTML = '로딩 중...';
+            const qSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'student')));
+            list.innerHTML = qSnap.docs.map(d => {
+                const checked = currentClassData.students?.includes(d.id) ? 'checked' : '';
+                return `<label class="flex items-center space-x-2 p-1"><input type="checkbox" data-id="${d.id}" ${checked}><span>${d.data().name}</span></label>`;
+            }).join('');
+            search.value = '';
+            search.oninput = (e) => {
+                const term = e.target.value.toLowerCase();
+                list.querySelectorAll('label').forEach(lb => { lb.style.display = lb.textContent.toLowerCase().includes(term) ? 'flex' : 'none'; });
+            };
+        }
+
+        document.getElementById('add-selected-class-students-btn').addEventListener('click', async () => {
+            const selected = Array.from(document.querySelectorAll('#class-student-list input:checked')).map(i => i.dataset.id);
+            if (selected.length) {
+                await updateDoc(doc(db, 'classes', currentUserData.id), { students: arrayUnion(...selected) });
+            }
+            document.getElementById('class-student-modal').style.display = 'none';
+            loadTeacherClass();
+        });
+        document.getElementById('close-class-student-modal-btn').addEventListener('click', () => document.getElementById('class-student-modal').style.display = 'none');
+
+        function renderTeacherCalendar() {
+            const container = document.getElementById('calendar');
+            if (!container) return;
+            container.innerHTML = '';
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const table = document.createElement('table');
+            table.className = 'w-full text-center';
+            const head = document.createElement('tr');
+            ['일','월','화','수','목','금','토'].forEach(d => { const th = document.createElement('th'); th.textContent = d; th.className = 'p-1'; head.appendChild(th); });
+            table.appendChild(head);
+            let day = 1;
+            for (let i=0;i<6;i++) {
+                const tr = document.createElement('tr');
+                for (let j=0;j<7;j++) {
+                    const td = document.createElement('td');
+                    td.className = 'border p-1 align-top h-24';
+                    if (i===0 && j<firstDay || day>daysInMonth) {
+                        td.innerHTML = '&nbsp;';
+                    } else {
+                        const dObj = new Date(year, month, day);
+                        td.innerHTML = `<div class="text-right text-xs mb-1">${day}</div>`+
+                            `<button class="calendar-hw-btn btn btn-secondary btn-xs mb-1" data-date="${dObj.toISOString()}">숙제 배부</button>`+
+                            `<button class="calendar-lr-btn btn btn-secondary btn-xs" data-date="${dObj.toISOString()}">생활 규칙 배부</button>`;
+                        day++;
+                    }
+                    tr.appendChild(td);
+                }
+                table.appendChild(tr);
+                if (day>daysInMonth) break;
+            }
+            container.appendChild(table);
+            container.querySelectorAll('.calendar-hw-btn').forEach(btn => btn.addEventListener('click', e => {
+                openBulkAssignment('homework', new Date(e.target.dataset.date), currentClassData?.students || []);
+            }));
+            container.querySelectorAll('.calendar-lr-btn').forEach(btn => btn.addEventListener('click', e => {
+                openBulkAssignment('lifeRule', new Date(e.target.dataset.date), currentClassData?.students || []);
+            }));
+        }
+
         // Category Buttons & Filters
-        document.querySelectorAll('#lp-create-category-btn,#lr-create-category-btn,#work-create-category-btn').forEach(btn => {
+        document.querySelectorAll('#lp-create-category-btn,#lr-create-category-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const name = prompt('새 카테고리 이름');
-                if(name) { addCategory(name.trim()); populateCategorySelects(); loadLearningProblems(); loadLifeRules(); loadWorkDocs(); }
+                if(name) { addCategory(name.trim()); populateCategorySelects(); loadLearningProblems(); loadLifeRules(); }
             });
         });
         document.getElementById('lp-category-filter')?.addEventListener('change', loadLearningProblems);
         document.getElementById('lr-category-filter')?.addEventListener('change', loadLifeRules);
-        document.getElementById('work-category-filter')?.addEventListener('change', loadWorkDocs);
         populateCategorySelects();
 
 
