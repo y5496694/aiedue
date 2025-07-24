@@ -150,6 +150,10 @@
                                         <button id="open-share-space-btn" class="py-2 px-4 rounded-md btn btn-secondary">바로가기 공유 공간</button>
                                     </div>
                                 </div>
+                                <div id="teacher-calendar-section" class="hidden mt-6">
+                                    <h2 class="text-2xl font-bold mb-4">📅 에이두 달력</h2>
+                                    <div id="calendar"></div>
+                                </div>
                             </div>
                         </div>
                         <div id="today-homework-section" class="bg-white p-6 rounded-lg shadow-md">
@@ -175,19 +179,15 @@
                             <h2 class="text-xl font-bold mb-4">내 정보</h2>
                             <p>고유 코드: <strong id="dashboard-code" class="text-lg"></strong></p>
                         </div>
+                        <div id="teacher-class-section" class="hidden bg-white p-6 rounded-lg shadow-md">
+                            <h2 class="text-xl font-bold mb-4 flex justify-between items-center">🏫 내 학급 <button id="add-class-btn" class="btn btn-primary btn-xs">학급 추가+</button></h2>
+                            <div id="class-info"></div>
+                        </div>
                         <div id="teacher-admin-panel" class="hidden bg-white p-6 rounded-lg shadow-md">
                             <h2 class="text-xl font-bold mb-4 text-red-600">⚙️ 관리자 메뉴</h2>
                             <button id="assign-homework-start-btn" class="w-full py-2 mb-2 rounded-md btn bg-amber-500 hover:bg-amber-600 text-white">숙제 배부하기</button>
                             <button id="assign-life-rule-start-btn" class="w-full py-2 mb-2 rounded-md btn bg-green-500 hover:bg-green-600 text-white">생활 규칙 배부하기</button>
                             <button id="admin-page-btn" class="w-full py-2 rounded-md btn bg-red-500 hover:bg-red-600 text-white">관리자 페이지로 이동</button>
-                        </div>
-                        <div id="teacher-class-section" class="hidden bg-white p-6 rounded-lg shadow-md">
-                            <h2 class="text-xl font-bold mb-4">🏫 내 학급</h2>
-                            <div id="class-info"></div>
-                        </div>
-                        <div id="teacher-calendar-section" class="hidden bg-white p-6 rounded-lg shadow-md">
-                            <h2 class="text-xl font-bold mb-4">📅 학사 일정</h2>
-                            <div id="calendar"></div>
                         </div>
                     </div>
                 </div>
