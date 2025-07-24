@@ -150,8 +150,13 @@
                                         <button id="add-quick-link-btn" class="py-2 px-4 rounded-md btn btn-secondary">+ 바로가기 추가</button>
                                         <button id="open-share-space-btn" class="py-2 px-4 rounded-md btn btn-secondary">바로가기 공유 공간</button>
                                     </div>
+                                    <div id="aedu-calendar" class="mt-4"></div>
                                 </div>
                             </div>
+                        </div>
+                        <div id="today-homework-section" class="bg-white p-6 rounded-lg shadow-md hidden">
+                            <h2 class="text-xl font-bold mb-4">📚 오늘의 숙제</h2>
+                            <ul id="today-homework-list" class="space-y-2 text-sm"></ul>
                         </div>
                         <div id="market" class="bg-white p-6 rounded-lg shadow-md">
                             <h2 class="text-xl font-bold mb-4">📈 주식 시장</h2>
@@ -172,6 +177,7 @@
                             <h2 class="text-xl font-bold mb-4">내 정보</h2>
                             <p>고유 코드: <strong id="dashboard-code" class="text-lg"></strong></p>
                         </div>
+                        <div id="my-class-section" class="hidden bg-white p-6 rounded-lg shadow-md"></div>
                         <div id="teacher-admin-panel" class="hidden bg-white p-6 rounded-lg shadow-md">
                             <h2 class="text-xl font-bold mb-4 text-red-600">⚙️ 관리자 메뉴</h2>
                             <button id="assign-homework-start-btn" class="w-full py-2 mb-2 rounded-md btn bg-amber-500 hover:bg-amber-600 text-white">숙제 배부하기</button>
@@ -744,6 +750,23 @@
         </div>
     </div>
 
+    <div id="class-add-students-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-class-add-students-btn">&times;</span>
+            <h3 class="text-xl font-bold mb-4">학생 추가</h3>
+            <div class="mb-2 relative">
+                <input type="text" id="class-student-search" class="w-full p-2 pl-10 border border-gray-300 rounded-md form-input" placeholder="이름 또는 코드로 검색...">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-gray-400"></i>
+                </div>
+            </div>
+            <div id="class-student-list" class="space-y-2 max-h-60 overflow-y-auto text-left border p-2 rounded-md"></div>
+            <div class="mt-6 text-right">
+                <button id="class-add-students-confirm-btn" class="btn btn-primary">추가</button>
+            </div>
+        </div>
+    </div>
+
     <div id="shared-link-detail-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <span class="close-button" id="close-shared-link-detail-modal-btn">&times;</span>
@@ -855,7 +878,7 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, runTransaction, updateDoc, increment, deleteField, serverTimestamp, Timestamp, orderBy, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, runTransaction, updateDoc, increment, deleteField, serverTimestamp, Timestamp, orderBy, addDoc, deleteDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
         // IMPORTANT: Replace with your actual Firebase config
@@ -1038,9 +1061,12 @@
             const codeEl = document.getElementById('dashboard-code');
             const studentPanel = document.getElementById('student-info-panel');
             const teacherPanel = document.getElementById('teacher-admin-panel');
-            const walletSection = document.getElementById('wallet-section');
-            const marketSection = document.getElementById('market');
-            const assetSection = document.getElementById('asset-allocation-section');
+           const walletSection = document.getElementById('wallet-section');
+           const marketSection = document.getElementById('market');
+           const assetSection = document.getElementById('asset-allocation-section');
+            const todayHomeworkSection = document.getElementById('today-homework-section');
+            const classSection = document.getElementById('my-class-section');
+            const calendarEl = document.getElementById('aedu-calendar');
 
             const walletInfo = document.getElementById('wallet-financial-info');
             const walletTitle = document.getElementById('wallet-title');
@@ -1050,12 +1076,21 @@
                 assetSection.classList.add('hidden');
                 walletInfo.classList.add('hidden');
                 walletTitle.textContent = '나만의 바로가기';
+                todayHomeworkSection.classList.add('hidden');
+                classSection.classList.remove('hidden');
+                calendarEl.classList.remove('hidden');
+                loadMyClass();
+                renderCalendar();
             } else {
                 walletSection.classList.remove('hidden');
                 marketSection.classList.remove('hidden');
                 assetSection.classList.remove('hidden');
                 walletInfo.classList.remove('hidden');
                 walletTitle.textContent = '💰 내 지갑 현황';
+                todayHomeworkSection.classList.remove('hidden');
+                classSection.classList.add('hidden');
+                calendarEl.classList.add('hidden');
+                renderTodayHomework();
             }
             
             // Show/hide tabs based on the *actual logged-in user's role*
@@ -2274,6 +2309,130 @@
             }
         }
 
+        // --- My Class Management ---
+        async function loadMyClass() {
+            const container = document.getElementById('my-class-section');
+            if (!container) return;
+            container.innerHTML = '<p class="text-center text-gray-500">로딩 중...</p>';
+            const docRef = doc(db, 'classes', currentUserData.id);
+            const docSnap = await getDoc(docRef);
+            if (!docSnap.exists()) {
+                container.innerHTML = '<h2 class="text-xl font-bold mb-4">🏫 내 학급</h2><button id="create-class-btn" class="btn btn-primary w-full">내 학급 만들기</button>';
+                document.getElementById('create-class-btn').onclick = async () => {
+                    const name = prompt('학급 이름을 입력하세요');
+                    if (name) {
+                        await setDoc(docRef, { name, students: [] });
+                        loadMyClass();
+                    }
+                };
+                return;
+            }
+            const data = docSnap.data();
+            const studentIds = data.students || [];
+            let listHtml = '';
+            for (const sid of studentIds) {
+                const sd = await getDoc(doc(db, 'users', sid));
+                if (sd.exists()) listHtml += `<li>${sd.data().name}</li>`;
+            }
+            container.innerHTML = `
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-xl font-bold">🏫 ${data.name}</h2>
+                    <button id="add-class-student-btn" class="btn btn-primary btn-sm">학생 추가</button>
+                </div>
+                <ul class="list-disc list-inside space-y-1">${listHtml || '<li class="text-sm text-gray-500">학생 없음</li>'}</ul>
+            `;
+            document.getElementById('add-class-student-btn').onclick = () => openAddStudentsModal();
+        }
+
+        let currentClassStudents = [];
+        async function openAddStudentsModal() {
+            const classDoc = await getDoc(doc(db, 'classes', currentUserData.id));
+            currentClassStudents = classDoc.data().students || [];
+            const modal = document.getElementById('class-add-students-modal');
+            const listEl = document.getElementById('class-student-list');
+            listEl.innerHTML = '학생 목록 로딩 중...';
+            modal.style.display = 'flex';
+            const usersSnapshot = await getDocs(query(collection(db, 'users'), where('role', '==', 'student')));
+            listEl.innerHTML = usersSnapshot.docs.map(d => {
+                const s = { id: d.id, ...d.data() };
+                const checked = currentClassStudents.includes(s.id) ? 'checked disabled' : '';
+                return `<label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100"><input type="checkbox" data-studentid="${s.id}" class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500" ${checked}><span>${s.name} (코드: ${s.userCode})</span></label>`;
+            }).join('');
+            const search = document.getElementById('class-student-search');
+            search.value = '';
+            search.oninput = e => {
+                const term = e.target.value.toLowerCase();
+                document.querySelectorAll('#class-student-list label').forEach(lbl => {
+                    lbl.style.display = lbl.textContent.toLowerCase().includes(term) ? 'flex' : 'none';
+                });
+            };
+        }
+
+        document.getElementById('class-add-students-confirm-btn').addEventListener('click', async () => {
+            const selected = Array.from(document.querySelectorAll('#class-student-list input:checked:not(:disabled)')).map(i => i.dataset.studentid);
+            if (selected.length > 0) {
+                await updateDoc(doc(db, 'classes', currentUserData.id), { students: arrayUnion(...selected) });
+            }
+            document.getElementById('class-add-students-modal').style.display = 'none';
+            loadMyClass();
+        });
+
+        document.getElementById('close-class-add-students-btn').addEventListener('click', () => {
+            document.getElementById('class-add-students-modal').style.display = 'none';
+        });
+
+        // --- Teacher Calendar ---
+        let calendarCurrentDate = new Date();
+        function renderCalendar() {
+            const container = document.getElementById('aedu-calendar');
+            if (!container) return;
+            container.innerHTML = `
+                <div class="flex justify-between items-center mb-2">
+                    <button id="calendar-prev-btn" class="btn btn-secondary btn-xs">&lt;</button>
+                    <h3 id="calendar-title" class="font-bold"></h3>
+                    <button id="calendar-next-btn" class="btn btn-secondary btn-xs">&gt;</button>
+                </div>
+                <div id="calendar-grid" class="grid grid-cols-7 gap-1 text-xs"></div>
+            `;
+            const titleEl = container.querySelector('#calendar-title');
+            titleEl.textContent = `${calendarCurrentDate.getMonth() + 1}월 ${calendarCurrentDate.getFullYear()}`;
+            const grid = container.querySelector('#calendar-grid');
+            const firstDay = new Date(calendarCurrentDate.getFullYear(), calendarCurrentDate.getMonth(), 1).getDay();
+            const lastDate = new Date(calendarCurrentDate.getFullYear(), calendarCurrentDate.getMonth() + 1, 0).getDate();
+            grid.innerHTML = '';
+            for (let i = 0; i < firstDay; i++) grid.appendChild(document.createElement('div'));
+            for (let d = 1; d <= lastDate; d++) {
+                const day = new Date(calendarCurrentDate.getFullYear(), calendarCurrentDate.getMonth(), d);
+                const cell = document.createElement('div');
+                cell.className = 'border p-1 text-center space-y-1';
+                cell.innerHTML = `<div>${d}</div><button class="cal-hw-btn btn btn-xs btn-primary" data-date="${day.toISOString()}">숙제 배부</button><button class="cal-lr-btn btn btn-xs btn-secondary" data-date="${day.toISOString()}">생활 규칙 배부</button>`;
+                grid.appendChild(cell);
+            }
+            container.querySelector('#calendar-prev-btn').onclick = () => { calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() - 1); renderCalendar(); };
+            container.querySelector('#calendar-next-btn').onclick = () => { calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() + 1); renderCalendar(); };
+            container.querySelectorAll('.cal-hw-btn').forEach(btn => btn.onclick = () => openBulkAssignment('homework', new Date(btn.dataset.date)) );
+            container.querySelectorAll('.cal-lr-btn').forEach(btn => btn.onclick = () => openBulkAssignment('lifeRule', new Date(btn.dataset.date)) );
+        }
+
+        // --- Today Homework Card ---
+        async function renderTodayHomework() {
+            const dataToShow = viewedUserData;
+            const list = document.getElementById('today-homework-list');
+            list.innerHTML = '<li class="text-sm text-gray-500">불러오는 중...</li>';
+            const qSnap = await getDocs(query(collection(db, `users/${dataToShow.id}/assignedHomework`), orderBy('assignedAt', 'desc')));
+            const todayStr = new Date().toDateString();
+            const todays = [];
+            qSnap.forEach(d => {
+                const hw = { id: d.id, ...d.data() };
+                if (hw.assignedAt && hw.assignedAt.toDate().toDateString() === todayStr) todays.push(hw);
+            });
+            if (todays.length === 0) {
+                list.innerHTML = '<li class="text-sm text-gray-500">오늘 배부된 숙제가 없습니다.</li>';
+                return;
+            }
+            list.innerHTML = todays.map(h => `<li>${h.title}</li>`).join('');
+        }
+
         // --- Learning Problems & Homework (NEW & UPDATED) ---
 
         // Teacher: Open AI Math Problem Creator
@@ -2602,8 +2761,24 @@
                 }
 
                 tableBody.innerHTML = '';
+                const allHws = [];
                 querySnapshot.forEach(docSnap => {
                     const hw = { id: docSnap.id, ...docSnap.data() };
+                    allHws.push(hw);
+                });
+
+                let hwsToShow = allHws;
+                if (dataToShow.role === 'student' && !isAdminViewing) {
+                    const now = new Date();
+                    hwsToShow = allHws.filter(h => !h.assignedAt || h.assignedAt.toDate() <= now);
+                }
+
+                if (hwsToShow.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-gray-500">새로운 숙제가 없습니다.</td></tr>`;
+                    return;
+                }
+
+                hwsToShow.forEach(hw => {
                     const icon = hw.type === 'dictation' ? '🎤' : (hw.type === 'manual' ? '📝' : '🤖');
                     const isCompleted = hw.status === 'completed';
                     const assignedDate = hw.assignedAt ? hw.assignedAt.toDate().toLocaleDateString('ko-KR') : '';
@@ -3892,10 +4067,12 @@
 
         let bulkAssignmentType = null;
         let bulkSelectedStudents = [];
+        let bulkScheduleDate = null;
 
-        async function openBulkAssignment(type) {
+        async function openBulkAssignment(type, date = null) {
             bulkAssignmentType = type;
             bulkSelectedStudents = [];
+            bulkScheduleDate = date;
             document.getElementById('bulk-step1').classList.remove('hidden');
             document.getElementById('bulk-step2').classList.add('hidden');
             document.getElementById('bulk-assignment-title').textContent = type === 'homework' ? '숙제 배부하기 - 학생 선택' : '생활 규칙 배부하기 - 학생 선택';
@@ -3949,25 +4126,29 @@
                     const docSnap = await getDoc(doc(db, 'learningProblems', sel.value));
                     const ps = docSnap.data();
                     for (const sid of bulkSelectedStudents) {
-                        const data = { problemId: sel.value, type: ps.type, title: ps.title, reward: ps.reward, status: 'assigned', assignedAt: serverTimestamp() };
+                        const data = { problemId: sel.value, type: ps.type, title: ps.title, reward: ps.reward, status: 'assigned', assignedAt: bulkScheduleDate ? Timestamp.fromDate(bulkScheduleDate) : serverTimestamp() };
                         await addDoc(collection(db, `users/${sid}/assignedHomework`), data);
                     }
                 } else {
                     const docSnap = await getDoc(doc(db, 'lifeRules', sel.value));
                     const rule = docSnap.data();
                     for (const sid of bulkSelectedStudents) {
-                        const data = { ruleId: sel.value, text: rule.text, reward: rule.reward, repeatType: 'one-time', assignedAt: serverTimestamp(), lastCompletedAt: null };
+                        const data = { ruleId: sel.value, text: rule.text, reward: rule.reward, repeatType: 'one-time', assignedAt: bulkScheduleDate ? Timestamp.fromDate(bulkScheduleDate) : serverTimestamp(), lastCompletedAt: null };
                         await setDoc(doc(db, `users/${sid}/assignedLifeRules`, sel.value), data);
                     }
                 }
                 document.getElementById('bulk-assignment-modal').style.display = 'none';
                 showModal('성공', `${bulkSelectedStudents.length}명의 학생에게 배부를 완료했습니다.`);
+                bulkScheduleDate = null;
             } catch (error) {
                 showModal('배부 실패', `오류: ${error.message}`);
             }
         });
 
-        document.getElementById('close-bulk-assignment-modal-btn').addEventListener('click', () => document.getElementById('bulk-assignment-modal').style.display = 'none');
+        document.getElementById('close-bulk-assignment-modal-btn').addEventListener('click', () => {
+            document.getElementById('bulk-assignment-modal').style.display = 'none';
+            bulkScheduleDate = null;
+        });
 
         // Close Modals
         document.getElementById('close-homework-modal-btn').addEventListener('click', () => homeworkModal.style.display = 'none');
