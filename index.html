@@ -309,12 +309,18 @@
         <div class="modal-content modal-content-lg">
             <span class="close-button" id="close-homework-modal-btn">&times;</span>
             <h3 id="homework-modal-title" class="text-xl font-bold mb-4"></h3>
-            <div id="homework-modal-content" class="text-left mb-6 max-h-[70vh] overflow-y-auto"></div>
-            <div id="homework-modal-footer" class="mt-6 flex justify-between items-center">
-                <div id="homework-score-display" class="text-lg font-bold"></div>
-                <div class="space-x-2">
-                    <button id="grade-all-homework-btn" class="btn btn-secondary">모두 채점</button>
-                    <button id="complete-homework-btn" class="btn btn-primary btn-disabled" disabled>숙제 완료하기</button>
+            <div id="homework-initial-view" class="hidden">
+                <p class="mb-4">AI 문제 생성 버튼을 눌러 문제를 받아보세요.</p>
+                <button id="generate-math-questions-btn" class="btn btn-primary">AI 문제 생성</button>
+            </div>
+            <div id="homework-main-view" class="hidden">
+                <div id="homework-modal-content" class="text-left mb-6 max-h-[70vh] overflow-y-auto"></div>
+                <div id="homework-modal-footer" class="mt-6 flex justify-between items-center">
+                    <div id="homework-score-display" class="text-lg font-bold"></div>
+                    <div class="space-x-2">
+                        <button id="grade-all-homework-btn" class="btn btn-secondary">모두 채점</button>
+                        <button id="complete-homework-btn" class="btn btn-primary btn-disabled" disabled>숙제 완료하기</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -910,6 +916,7 @@
         let currentAssignmentItemId = null; // For teacher assignment (homework or life rule)
         let currentAssignmentType = null; // 'math', 'dictation', or 'lifeRule'
         let currentDictationTemplate = null; // For student dictation homework
+        let currentMathTemplate = null;    // For student-generated math homework
 
         // --- DOM Elements ---
         const views = {
@@ -2475,20 +2482,19 @@
             problemCreationModal.style.display = 'flex';
             document.getElementById('problem-creation-form-container').style.display = 'block';
             document.getElementById('problem-display-area').innerHTML = '';
-            document.getElementById('problem-creation-footer').classList.add('hidden');
+            document.getElementById('problem-creation-footer').classList.remove('hidden');
             
             const form = document.getElementById('problem-creation-form-container');
             form.querySelector('#problem-set-id').value = problemSet?.id || '';
             form.querySelector('#problem-set-title').value = problemSet?.title || '';
-            form.querySelector('#problem-count').value = problemSet?.problems?.length || '';
+            form.querySelector('#problem-count').value = problemSet?.count ?? problemSet?.problems?.length ?? '';
             form.querySelector('#problem-topic').value = problemSet?.topic || '';
             form.querySelector('#problem-reward').value = problemSet?.reward || '';
             form.querySelector('#is-word-problem').checked = problemSet?.isWordProblem || false;
 
+            currentProblemSet = problemSet ? { ...problemSet } : null;
             if (problemSet && problemSet.problems) {
-                currentProblemSet = problemSet;
                 renderProblemDisplay(problemSet.problems);
-                document.getElementById('problem-creation-footer').classList.remove('hidden');
             }
         }
 
@@ -2530,9 +2536,10 @@
                 }
 
                 currentProblemSet = {
-                    type: 'math', // Add type for math problems
+                    type: 'math',
                     title,
                     topic,
+                    count: Number(count),
                     reward: Number(reward),
                     isWordProblem,
                     problems: generatedData.problems.map(p => ({
@@ -2569,12 +2576,25 @@
 
         // Teacher: Save the created math problem set to Firestore
         document.getElementById('save-problem-set-btn').addEventListener('click', async () => {
-            if (!currentProblemSet) {
-                showModal('오류', '저장할 문제가 없습니다.');
+            const form = document.getElementById('problem-creation-form-container');
+            const title = form.querySelector('#problem-set-title').value;
+            const count = Number(form.querySelector('#problem-count').value);
+            const topic = form.querySelector('#problem-topic').value;
+            const reward = Number(form.querySelector('#problem-reward').value);
+            const isWordProblem = form.querySelector('#is-word-problem').checked;
+
+            if (!title || !count || !topic || !reward) {
+                showModal('입력 오류', '모든 필드를 채워주세요.');
                 return;
             }
-            
-            const problemSetId = document.getElementById('problem-set-id').value;
+
+            if (currentProblemSet) {
+                currentProblemSet = { ...currentProblemSet, title, topic, reward: Number(reward), count, isWordProblem };
+            } else {
+                currentProblemSet = { type: 'math', title, topic, reward: Number(reward), count, isWordProblem };
+            }
+
+            const problemSetId = form.querySelector('#problem-set-id').value;
             const dataToSave = {
                 ...currentProblemSet,
                 teacherId: currentAuthUser.uid,
@@ -2622,7 +2642,7 @@
                             const icon = isDictation ? '🎤' : (isManual ? '📝' : '🤖');
                             const topicText = isDictation ?
                                 `${problemSet.dictationType === 'word' ? '단어' : '문장'} ${problemSet.count}개` :
-                                isManual ? '직접 문제' : `${problemSet.topic} (${problemSet.problems?.length || 0}문제)`;
+                                isManual ? '직접 문제' : `${problemSet.topic} (${problemSet.problems ? problemSet.problems.length : problemSet.count || 0}문제${problemSet.problems ? '' : '·학생 생성'})`;
 
                             return `
                                 <div class="p-3 flex justify-between items-center">
@@ -2862,7 +2882,7 @@
             const dataToShow = viewedUserData;
             const assignmentDoc = await getDoc(doc(db, `users/${dataToShow.id}/assignedHomework`, assignmentId));
             const problemDoc = await getDoc(doc(db, "learningProblems", problemId));
-            
+
             if (!problemDoc.exists() || !assignmentDoc.exists()) {
                 showModal('오류', '숙제 문제를 불러올 수 없습니다.');
                 return;
@@ -2872,39 +2892,61 @@
             const isCompleted = assignmentData.status === 'completed';
 
             document.getElementById('homework-modal-title').textContent = problemSet.title;
-            const contentArea = document.getElementById('homework-modal-content');
-            
-            contentArea.innerHTML = problemSet.problems.map((p, index) => {
-                const studentAnswer = assignmentData.studentAnswers?.[index] || '';
-                const isCorrect = studentAnswer.trim() === p.answer.trim();
-                return `
-                <div class="problem-item border-b py-4" data-answer="${p.answer}">
-                    <div class="flex items-center mb-2">
-                        <span class="problem-status-icon text-lg mr-2">${isCompleted ? (isCorrect ? '⭕' : '⭐') : ''}</span>
-                        <span class="problem-number font-bold mr-2">${index + 1}.</span>
-                        <button class="speak-btn text-blue-500 hover:text-blue-700 mr-3" data-text="${p.question}"><i class="fas fa-play-circle"></i></button>
-                        <p class="problem-text flex-grow">${p.question}</p>
-                    </div>
-                    <div class="flex items-center ml-10">
-                        <input type="text" class="student-answer-input w-full p-2 border rounded-md form-input" placeholder="정답을 입력하세요" value="${studentAnswer}" ${isCompleted ? 'disabled' : ''}>
-                        ${!isCompleted ? '<button class="grade-one-btn btn btn-secondary text-xs px-3 py-2 ml-2 whitespace-nowrap">채점</button>' : ''}
-                    </div>
-                    ${isCompleted ? `<p class="ml-10 mt-1 text-sm ${isCorrect ? 'text-green-600' : 'text-red-500'}">정답: ${p.answer}</p>` : ''}
-                </div>
-            `}).join('');
+            const initialView = document.getElementById('homework-initial-view');
+            const mainView = document.getElementById('homework-main-view');
 
-            document.getElementById('homework-modal-footer').style.display = isCompleted ? 'none' : 'flex';
+            const problems = assignmentData.problems || problemSet.problems;
+
+            if (isCompleted) {
+                initialView.style.display = 'none';
+                mainView.style.display = 'block';
+                renderHomeworkQuestions(problems, assignmentData.studentAnswers || [], true);
+                document.getElementById('homework-modal-footer').style.display = 'none';
+            } else if (problems) {
+                initialView.style.display = 'none';
+                mainView.style.display = 'block';
+                renderHomeworkQuestions(problems, assignmentData.studentAnswers || [], false);
+                document.getElementById('homework-modal-footer').style.display = 'flex';
+            } else {
+                currentMathTemplate = problemSet;
+                initialView.style.display = 'block';
+                mainView.style.display = 'none';
+                document.getElementById('homework-modal-footer').style.display = 'none';
+            }
+
             document.getElementById('homework-score-display').textContent = '';
             const completeBtn = document.getElementById('complete-homework-btn');
             completeBtn.classList.add('btn-disabled');
             completeBtn.disabled = true;
 
+            homeworkModal.style.display = 'flex';
+        }
+
+        function renderHomeworkQuestions(problems, studentAnswers = [], isReview = false) {
+            const contentArea = document.getElementById('homework-modal-content');
+            contentArea.innerHTML = problems.map((p, index) => {
+                const studentAnswer = studentAnswers[index] || '';
+                const isCorrect = studentAnswer.trim() === p.answer.trim();
+                return `
+                <div class="problem-item border-b py-4" data-answer="${p.answer}">
+                    <div class="flex items-center mb-2">
+                        <span class="problem-status-icon text-lg mr-2">${isReview ? (isCorrect ? '⭕' : '⭐') : ''}</span>
+                        <span class="problem-number font-bold mr-2">${index + 1}.</span>
+                        <button class="speak-btn text-blue-500 hover:text-blue-700 mr-3" data-text="${p.question}"><i class="fas fa-play-circle"></i></button>
+                        <p class="problem-text flex-grow">${p.question}</p>
+                    </div>
+                    <div class="flex items-center ml-10">
+                        <input type="text" class="student-answer-input w-full p-2 border rounded-md form-input" placeholder="정답을 입력하세요" value="${studentAnswer}" ${isReview ? 'disabled' : ''}>
+                        ${!isReview ? '<button class="grade-one-btn btn btn-secondary text-xs px-3 py-2 ml-2 whitespace-nowrap">채점</button>' : ''}
+                    </div>
+                    ${isReview ? `<p class="ml-10 mt-1 text-sm ${isCorrect ? 'text-green-600' : 'text-red-500'}">정답: ${p.answer}</p>` : ''}
+                </div>
+            `}).join('');
+
             contentArea.querySelectorAll('.speak-btn').forEach(btn => btn.addEventListener('click', (e) => speak(e.currentTarget.dataset.text)));
             contentArea.querySelectorAll('.grade-one-btn').forEach((btn, index) => {
                 btn.addEventListener('click', () => gradeOneProblem(index));
             });
-
-            homeworkModal.style.display = 'flex';
         }
 
         // Student: Grade a single math problem
@@ -2986,6 +3028,28 @@
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
                 console.error(error);
             }
+        });
+
+        document.getElementById('generate-math-questions-btn').addEventListener('click', async () => {
+            if (!currentMathTemplate) return;
+            const { count, topic, isWordProblem } = currentMathTemplate;
+            const wordText = isWordProblem ? '문장형' : '';
+            const prompt = `초등학생을 위한 ${topic} 주제의 ${wordText} 수학 문제 ${count}개를 만들어줘. 각 문제에는 질문과 정답이 모두 포함되어야 해. 응답은 반드시 JSON 형식으로 "problems"라는 키 아래에 배열로 제공해줘. 각 배열 요소는 "question"과 "answer" 키를 가진 객체여야 해.`;
+
+            const contentArea = document.getElementById('homework-modal-content');
+            contentArea.innerHTML = `<div class="flex items-center justify-center p-4"><div class="loading-spinner"></div><p class="ml-2">AI가 문제를 만들고 있습니다...</p></div>`;            
+            document.getElementById('homework-initial-view').style.display = 'none';
+            document.getElementById('homework-main-view').style.display = 'block';
+            document.getElementById('homework-modal-footer').style.display = 'flex';
+
+            const result = await callGemini(prompt, true);
+            if (!result.problems || !Array.isArray(result.problems)) {
+                contentArea.innerHTML = '<p class="text-red-500 text-center">문제 생성 실패</p>';
+                return;
+            }
+            const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
+            await updateDoc(assignmentRef, { problems: result.problems });
+            renderHomeworkQuestions(result.problems, [], false);
         });
 
         // --- Teacher: Life Rule Management ---
