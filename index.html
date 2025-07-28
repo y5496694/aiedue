@@ -2465,7 +2465,35 @@
                 list.innerHTML = '<li class="text-sm text-gray-500">오늘 배부된 숙제가 없습니다.</li>';
                 return;
             }
-            list.innerHTML = todays.map(h => `<li>${h.title}</li>`).join('');
+            list.innerHTML = '';
+            const openHw = (hw) => {
+                if (isAdminViewing && hw.status !== 'completed') {
+                    showModal('알림', '관리자 조회 모드에서는 숙제를 풀 수 없습니다. 완료된 숙제의 결과만 볼 수 있습니다.');
+                    return;
+                }
+                if (hw.type === 'dictation') {
+                    openDictationModal(hw.id, hw.problemId);
+                } else if (hw.type === 'manual') {
+                    openManualProblemModal(hw.id, hw.problemId);
+                } else {
+                    openHomeworkModal(hw.id, hw.problemId);
+                }
+            };
+            todays.forEach(hw => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center bg-gray-50 p-2 rounded';
+                const titleBtn = document.createElement('button');
+                titleBtn.className = 'flex-grow text-left hover:underline';
+                titleBtn.textContent = hw.title;
+                titleBtn.addEventListener('click', () => openHw(hw));
+                const goBtn = document.createElement('button');
+                goBtn.className = 'ml-2 text-blue-500 hover:text-blue-700';
+                goBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
+                goBtn.addEventListener('click', () => openHw(hw));
+                li.appendChild(titleBtn);
+                li.appendChild(goBtn);
+                list.appendChild(li);
+            });
         }
 
         // --- Learning Problems & Homework (NEW & UPDATED) ---
