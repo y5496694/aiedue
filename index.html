@@ -4002,12 +4002,17 @@
                 resultMessage.textContent = '코드를 확인하는 중...';
                 const verifyCodeFunction = httpsCallable(functions, 'verifyCode');
                 const result = await verifyCodeFunction({ code });
+                const completeBtn = document.getElementById('complete-manual-problem-btn');
                 if (result.data.success) {
                     resultMessage.textContent = result.data.message;
                     resultMessage.style.color = 'green';
+                    completeBtn.classList.remove('btn-disabled');
+                    completeBtn.disabled = false;
                 } else {
                     resultMessage.textContent = result.data.message || '알 수 없는 오류가 발생했습니다.';
                     resultMessage.style.color = 'red';
+                    completeBtn.classList.add('btn-disabled');
+                    completeBtn.disabled = true;
                 }
             } catch (error) {
                 console.error('코드 검증 상세 오류:', error);
