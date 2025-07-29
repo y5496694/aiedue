@@ -109,6 +109,7 @@
             <header class="flex justify-between items-center mb-8">
                 <h1 id="dashboard-title" class="text-3xl font-bold"></h1>
                 <div class="flex items-center space-x-4">
+                    <button id="back-to-home-btn" class="hidden py-2 px-4 rounded-md btn btn-secondary">홈으로 돌아가기</button>
                     <button id="back-to-admin-btn" class="hidden py-2 px-4 rounded-md btn bg-red-500 hover:bg-red-600 text-white">관리자 페이지로 돌아가기</button>
                     <button id="logout-btn" class="py-2 px-4 rounded-md btn btn-secondary">로그아웃</button>
                 </div>
@@ -1032,6 +1033,7 @@
             currentAuthUser = user;
             isAdminViewing = false; // Reset admin view on auth change
             document.getElementById('back-to-admin-btn').classList.add('hidden');
+            document.getElementById('back-to-home-btn').classList.add('hidden');
 
             if (user && !user.isAnonymous) {
                 const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -1467,6 +1469,22 @@
             isAdminViewing = false;
             viewedUserData = currentUserData;
             document.getElementById('back-to-admin-btn').classList.add('hidden');
+            document.getElementById('back-to-home-btn').classList.add('hidden');
+            showDashboard(currentUserData.role);
+        });
+        document.getElementById('back-to-admin-btn').addEventListener('click', () => {
+            isAdminViewing = false;
+            viewedUserData = currentUserData;
+            document.getElementById('back-to-admin-btn').classList.add('hidden');
+            document.getElementById('back-to-home-btn').classList.add('hidden');
+            switchView('admin');
+            loadAdminData();
+        });
+        document.getElementById('back-to-home-btn').addEventListener('click', () => {
+            isAdminViewing = false;
+            viewedUserData = currentUserData;
+            document.getElementById('back-to-admin-btn').classList.add('hidden');
+            document.getElementById('back-to-home-btn').classList.add('hidden');
             showDashboard(currentUserData.role);
         });
         document.getElementById('logout-btn').addEventListener('click', () => {
@@ -1476,6 +1494,8 @@
             currentUserData = null;
             viewedUserData = null;
             isAdminViewing = false;
+            document.getElementById('back-to-admin-btn').classList.add('hidden');
+            document.getElementById('back-to-home-btn').classList.add('hidden');
             switchView('login');
             if (stockUpdateInterval) clearInterval(stockUpdateInterval);
         });
@@ -1875,6 +1895,7 @@
             isAdminViewing = true;
             viewedUserData = { id: studentDoc.id, ...studentDoc.data() };
             document.getElementById('back-to-admin-btn').classList.remove('hidden');
+            document.getElementById('back-to-home-btn').classList.remove('hidden');
             showDashboard('student');
         }
 
