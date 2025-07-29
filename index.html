@@ -2346,7 +2346,19 @@
                 for (const sid of studentIds) {
                     try {
                         const sd = await getDoc(doc(db, 'users', sid));
-                        if (sd.exists()) listHtml += `<li>${sd.data().name}</li>`;
+                        if (sd.exists()) {
+                            const s = sd.data();
+                            listHtml += `
+                                <li class="flex justify-between items-center">
+                                    <span>${s.name}</span>
+                                    <div class="space-x-1">
+                                        <button data-sid="${sid}" class="class-hw-btn btn bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 text-xs">숙제</button>
+                                        <button data-sid="${sid}" class="class-lr-btn btn bg-green-500 hover:bg-green-600 text-white px-2 py-1 text-xs">생활규칙</button>
+                                        <button data-sid="${sid}" class="class-view-btn btn bg-sky-500 hover:bg-sky-600 text-white px-2 py-1 text-xs">조회</button>
+                                        <button data-sid="${sid}" class="class-adjust-btn btn btn-secondary px-2 py-1 text-xs">조정</button>
+                                    </div>
+                                </li>`;
+                        }
                     } catch (err) {
                         listHtml += `<li class="text-red-500">오류: ${err.message}</li>`;
                     }
@@ -2359,6 +2371,10 @@
                     <ul class="list-disc list-inside space-y-1">${listHtml || '<li class="text-sm text-gray-500">학생 없음</li>'}</ul>
                 `;
                 document.getElementById('add-class-student-btn').onclick = () => openAddStudentsModal();
+                container.querySelectorAll('.class-hw-btn').forEach(btn => btn.addEventListener('click', e => openBulkAssignment('homework', null, e.target.dataset.sid)));
+                container.querySelectorAll('.class-lr-btn').forEach(btn => btn.addEventListener('click', e => openBulkAssignment('lifeRule', null, e.target.dataset.sid)));
+                container.querySelectorAll('.class-view-btn').forEach(btn => btn.addEventListener('click', e => viewStudentDashboard(e.target.dataset.sid)));
+                container.querySelectorAll('.class-adjust-btn').forEach(btn => btn.addEventListener('click', e => openAdjustModal(e.target.dataset.sid)));
             } catch (error) {
                 container.innerHTML = '<p class="text-red-500 text-center">학급 정보를 불러오지 못했습니다.</p>';
                 showModal('오류', `학급 정보를 불러오는 중 오류가 발생했습니다: ${error.message}`);
@@ -4189,16 +4205,27 @@
         let bulkSelectedStudents = [];
         let bulkScheduleDate = null;
 
-        async function openBulkAssignment(type, date = null) {
+        async function openBulkAssignment(type, date = null, studentId = null) {
             bulkAssignmentType = type;
             bulkSelectedStudents = [];
             bulkScheduleDate = date;
-            document.getElementById('bulk-step1').classList.remove('hidden');
-            document.getElementById('bulk-step2').classList.add('hidden');
-            document.getElementById('bulk-assignment-title').textContent = type === 'homework' ? '숙제 배부하기 - 학생 선택' : '생활 규칙 배부하기 - 학생 선택';
+            const step1 = document.getElementById('bulk-step1');
+            const step2 = document.getElementById('bulk-step2');
+            const titleEl = document.getElementById('bulk-assignment-title');
             const list = document.getElementById('bulk-student-list');
-            list.innerHTML = '학생 목록 로딩 중...';
             document.getElementById('bulk-assignment-modal').style.display = 'flex';
+            if (studentId) {
+                bulkSelectedStudents = [studentId];
+                step1.classList.add('hidden');
+                step2.classList.remove('hidden');
+                titleEl.textContent = type === 'homework' ? '숙제 선택' : '생활 규칙 선택';
+                await loadBulkItems();
+                return;
+            }
+            step1.classList.remove('hidden');
+            step2.classList.add('hidden');
+            titleEl.textContent = type === 'homework' ? '숙제 배부하기 - 학생 선택' : '생활 규칙 배부하기 - 학생 선택';
+            list.innerHTML = '학생 목록 로딩 중...';
             const [usersSnapshot, classSnap] = await Promise.all([
                 getDocs(query(collection(db, 'users'), where('role', '==', 'student'))),
                 getDoc(doc(db, 'classes', currentUserData.id))
