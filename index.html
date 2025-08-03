@@ -84,6 +84,7 @@
                         <input type="password" id="teacher-password" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="••••••••">
                     </div>
                     <button id="teacher-login-btn" class="w-full py-2 rounded-md btn btn-primary">교사 로그인</button>
+                    <button id="teacher-google-login-btn" class="w-full py-2 mt-2 rounded-md btn btn-secondary"><i class="fab fa-google mr-2"></i>Google로 로그인</button>
                 </div>
                 <div class="mt-6 text-center">
                     <button id="show-student-register-btn" class="w-full text-center text-sm text-amber-600 hover:underline">처음이신가요? 학생 등록하기</button>
@@ -884,7 +885,7 @@
         // --- END COPY ---
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, runTransaction, updateDoc, increment, deleteField, serverTimestamp, Timestamp, orderBy, addDoc, deleteDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
@@ -1592,6 +1593,15 @@
                 await signInWithEmailAndPassword(auth, email, password);
             } catch (error) {
                 showModal('로그인 실패', '이메일 또는 비밀번호가 올바르지 않습니다.');
+            }
+        });
+
+        document.getElementById('teacher-google-login-btn').addEventListener('click', async () => {
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                showModal('로그인 실패', 'Google 로그인 중 오류가 발생했습니다.');
             }
         });
         
