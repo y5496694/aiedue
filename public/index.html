@@ -1441,11 +1441,9 @@
             const stockName = stockDataCache[stockId].name;
             const prompt = `초등학생을 위한 ${stockName}에 대한 짧고 재미있는 이야기를 만들어줘. 예를 들어, ${stockName}이 왜 오르거나 내릴 수 있는지, 또는 ${stockName}과 관련된 재미있는 상상을 덧붙여서 이야기해줘. 긍정적이고 희망찬 내용으로 작성해줘. 100자 이내로 짧게 부탁해.`;
             showAiModal("✨ AI가 열심히 생각하고 있어요...");
-            const apiKey = "AIzaSyC7_Gq4LIVVMv0hMD6qSwcTlGJcDSt-KgI";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
             const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
             try {
-                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const response = await fetch('/.netlify/functions/gemini-handler', { method: 'POST', body: JSON.stringify(payload) });
                 if (!response.ok) throw new Error(`API 요청 실패 (상태 코드: ${response.status})`);
                 const result = await response.json();
                 updateAiModalContent(result.candidates?.[0]?.content?.parts?.[0]?.text || 'AI 응답 생성 실패');
@@ -2592,15 +2590,13 @@
             const displayArea = document.getElementById('problem-display-area');
             displayArea.innerHTML = `<div class="flex items-center justify-center p-4"><div class="loading-spinner"></div><p class="ml-2">AI가 문제를 만들고 있습니다...</p></div>`;
 
-            const apiKey = "AIzaSyC7_Gq4LIVVMv0hMD6qSwcTlGJcDSt-KgI";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
             const payload = {
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 generationConfig: { responseMimeType: "application/json" }
             };
-            
+
             try {
-                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const response = await fetch('/.netlify/functions/gemini-handler', { method: 'POST', body: JSON.stringify(payload) });
                 if (!response.ok) throw new Error(`API 요청 실패 (상태 코드: ${response.status})`);
                 const result = await response.json();
                 const jsonString = result.candidates[0].content.parts[0].text;
@@ -3618,11 +3614,9 @@
         }
 
         async function callGemini(prompt, json = false) {
-            const apiKey = "AIzaSyCKm4OuGThasWYYuj6CdwprWeRzTv3rEfQ";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
             const payload = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: json ? { responseMimeType: 'application/json' } : {} };
             try {
-                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const response = await fetch('/.netlify/functions/gemini-handler', { method: 'POST', body: JSON.stringify(payload) });
                 const result = await response.json();
                 const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
                 if(json) return JSON.parse(text);
@@ -3775,15 +3769,13 @@
             document.getElementById('dictation-footer').style.display = 'flex';
 
 
-            const apiKey = "AIzaSyC7_Gq4LIVVMv0hMD6qSwcTlGJcDSt-KgI";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
             const payload = {
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 generationConfig: { responseMimeType: "application/json" }
             };
 
             try {
-                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const response = await fetch('/.netlify/functions/gemini-handler', { method: 'POST', body: JSON.stringify(payload) });
                 if (!response.ok) throw new Error(`API 요청 실패 (상태 코드: ${response.status})`);
                 const result = await response.json();
                 const jsonString = result.candidates[0].content.parts[0].text;
