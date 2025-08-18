@@ -4487,8 +4487,17 @@
 
         const sampleWords = ['사과','고양이','자동차','학교','사랑','경기','기차','바다','나라','라면'];
 
-        function generateStartWords(count) {
-            return Array.from({length: count}, () => sampleWords[Math.floor(Math.random()*sampleWords.length)]);
+        async function generateStartWords(count) {
+            const prompt = `끝말잇기 문제의 시작 단어 ${count}개를 JSON 배열로만 출력해줘. 예: ["기차","감자","사과"]`;
+            try {
+                const result = await callGemini(prompt, true);
+                if (Array.isArray(result) && result.every(w => typeof w === 'string')) {
+                    return result;
+                }
+            } catch (e) {
+                console.error('wordchain generation error', e);
+            }
+            return Array.from({ length: count }, () => sampleWords[Math.floor(Math.random() * sampleWords.length)]);
         }
 
         async function openWordChainHomeworkModal(assignmentId, problemId) {
@@ -4533,9 +4542,9 @@
                 return `
                 <div class="wordchain-item border-b py-4" data-result="pending">
                     <div class="flex items-center mb-2">
-                        <span class="wordchain-status-icon text-lg mr-2">${isReview ? (studentAnswer ? '⭕' : '⭐') : ''}</span>
-                        <span class="font-medium mr-2">문제 ${idx + 1}:</span>
-                        <span class="text-blue-600">${p.start}</span>
+                        <span class="font-medium mr-2">${idx + 1}.</span>
+                        <span class="text-blue-600 mr-2">${p.start}</span>
+                        <span class="wordchain-status-icon text-lg">${isReview ? (studentAnswer ? '⭕' : '⭐') : ''}</span>
                     </div>
                     <div class="flex items-center ml-10">
                         <input type="text" class="wordchain-answer-input w-full p-2 border rounded-md form-input" placeholder="이어지는 단어 입력" value="${studentAnswer}" ${isReview ? 'disabled' : ''}>
@@ -4619,7 +4628,8 @@
 
         generateWordchainBtn.addEventListener('click', async () => {
             if (!currentWordChainProblem) return;
-            const words = generateStartWords(currentWordChainProblem.count).map(w => ({ start: w }));
+            const startWords = await generateStartWords(currentWordChainProblem.count);
+            const words = startWords.map(w => ({ start: w }));
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
             await updateDoc(assignmentRef, { problems: words });
             renderWordChainHomework(words, [], false);
