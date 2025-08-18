@@ -224,6 +224,7 @@
                         <button id="add-manual-problem-btn" class="btn bg-gray-500 hover:bg-gray-600 text-white">+ 직접 문제 추가</button>
                         <button id="add-ai-dictation-problem-btn" class="btn bg-teal-500 hover:bg-teal-600 text-white">🎤 AI 받아쓰기 문제 만들기</button>
                         <button id="add-ai-math-problem-btn" class="btn bg-blue-500 hover:bg-blue-600 text-white">🤖 AI 수학 문제 만들기</button>
+                        <button id="add-wordchain-problem-btn" class="btn bg-yellow-500 hover:bg-yellow-600 text-white">🔗 끝말잇기 문제 만들기</button>
                     </div>
                 </div>
                 <div id="learning-problem-list" class="bg-white p-4 rounded-lg shadow">
@@ -425,6 +426,55 @@
                     <button type="submit" class="btn btn-primary">저장</button>
                 </div>
             </form>
+        </div>
+    </div>
+    <div id="wordchain-creation-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-wordchain-creation-modal-btn">&times;</span>
+            <h3 class="text-xl font-bold mb-4">🔗 끝말잇기 문제 만들기</h3>
+            <form id="wordchain-form" class="text-left space-y-3">
+                <div>
+                    <label for="wordchain-title" class="block text-sm font-medium">제목</label>
+                    <input type="text" id="wordchain-title" required class="w-full p-2 border rounded-md form-input">
+                </div>
+                <div>
+                    <label for="wordchain-level" class="block text-sm font-medium">난이도</label>
+                    <select id="wordchain-level" class="w-full p-2 border rounded-md form-input">
+                        <option value="상">상</option>
+                        <option value="중">중</option>
+                        <option value="하">하</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="wordchain-count" class="block text-sm font-medium">문제 수</label>
+                    <input type="number" id="wordchain-count" min="1" class="w-full p-2 border rounded-md form-input" required>
+                </div>
+                <div>
+                    <label for="wordchain-reward" class="block text-sm font-medium">완료 시 획득 금액 (원)</label>
+                    <input type="number" id="wordchain-reward" min="0" class="w-full p-2 border rounded-md form-input" required>
+                </div>
+                <div>
+                    <label for="wordchain-password" class="block text-sm font-medium">암호</label>
+                    <input type="text" id="wordchain-password" class="w-full p-2 border rounded-md form-input">
+                </div>
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="wordchain-homework-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-wordchain-homework-modal-btn">&times;</span>
+            <h3 id="wordchain-homework-title" class="text-xl font-bold mb-4"></h3>
+            <div id="wordchain-homework-content" class="text-left space-y-4 max-h-[70vh] overflow-y-auto"></div>
+            <div class="mt-6 flex justify-between items-center">
+                <div id="wordchain-score-display" class="text-lg font-bold"></div>
+                <div class="space-x-2">
+                    <button id="wordchain-grade-all-btn" class="btn btn-secondary">모두 채점</button>
+                    <button id="wordchain-complete-btn" class="btn btn-primary btn-disabled" disabled>숙제 완료</button>
+                </div>
+            </div>
         </div>
     </div>
     <div id="problem-creation-modal" class="modal-overlay hidden">
@@ -919,6 +969,7 @@
         let currentAssignmentType = null; // 'math', 'dictation', or 'lifeRule'
         let currentDictationTemplate = null; // For student dictation homework
         let currentMathTemplate = null;    // For student-generated math homework
+        let wordChainProblems = []; // 저장된 끝말잇기 문제들
 
         // --- DOM Elements ---
         const views = {
@@ -940,6 +991,8 @@
         let adjustStudentModal = document.getElementById('adjust-student-modal');
         const shopItemModal = document.getElementById('shop-item-modal');
         const lifeRuleModal = document.getElementById('life-rule-modal');
+        const wordchainCreationModal = document.getElementById('wordchain-creation-modal');
+        const wordchainHomeworkModal = document.getElementById('wordchain-homework-modal');
         const homeworkModal = document.getElementById('homework-modal');
         const problemCreationModal = document.getElementById('problem-creation-modal');
         const assignmentModal = document.getElementById('assignment-modal');
@@ -4346,8 +4399,102 @@
         });
 
         document.getElementById('close-bulk-assignment-modal-btn').addEventListener('click', () => {
-            document.getElementById('bulk-assignment-modal').style.display = 'none';
-            bulkScheduleDate = null;
+        document.getElementById('bulk-assignment-modal').style.display = 'none';
+        bulkScheduleDate = null;
+    });
+        // ----- Word Chain Problem Handling -----
+        const wordchainForm = document.getElementById('wordchain-form');
+        const wordchainListContainer = document.getElementById('learning-problem-list');
+
+        function renderWordChainProblems() {
+            if (wordChainProblems.length === 0) {
+                wordchainListContainer.innerHTML = '<p class="text-center text-gray-500">생성된 끝말잇기 문제가 없습니다.</p>';
+                return;
+            }
+            wordchainListContainer.innerHTML = wordChainProblems.map(p => `
+                <div class="border rounded-md p-4 mb-2">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-semibold">${p.title}</h4>
+                        <button class="btn btn-primary text-sm" onclick="openWordChainHomework(${p.id})">배부</button>
+                    </div>
+                    <p class="text-sm text-gray-600">난이도: ${p.level} | 문제 수: ${p.count} | 보상: ${p.reward}원</p>
+                </div>
+            `).join('');
+        }
+
+        document.getElementById('add-wordchain-problem-btn').addEventListener('click', () => {
+            wordchainForm.reset();
+            wordchainCreationModal.style.display = 'flex';
+        });
+
+        wordchainForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const problem = {
+                id: Date.now(),
+                title: document.getElementById('wordchain-title').value,
+                level: document.getElementById('wordchain-level').value,
+                count: parseInt(document.getElementById('wordchain-count').value, 10),
+                reward: parseInt(document.getElementById('wordchain-reward').value, 10),
+                password: document.getElementById('wordchain-password').value
+            };
+            wordChainProblems.push(problem);
+            renderWordChainProblems();
+            wordchainCreationModal.style.display = 'none';
+        });
+
+        renderWordChainProblems();
+
+        const sampleWords = ['사과','고양이','자동차','학교','사랑','경기','기차','바다','나라','라면'];
+
+        window.generateStartWord = function(index) {
+            const word = sampleWords[Math.floor(Math.random() * sampleWords.length)];
+            document.getElementById(`start-word-${index}`).textContent = word;
+        }
+
+        window.openWordChainHomework = function(id) {
+            const problem = wordChainProblems.find(p => p.id === id);
+            if (!problem) return;
+            document.getElementById('wordchain-homework-title').textContent = problem.title;
+            const container = document.getElementById('wordchain-homework-content');
+            container.innerHTML = '';
+            for (let i=0; i<problem.count; i++) {
+                const div = document.createElement('div');
+                div.className = 'space-y-2';
+                div.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <span class="font-medium">문제 ${i+1}:</span>
+                        <span id="start-word-${i}" class="text-blue-600"></span>
+                        <button type="button" class="btn btn-secondary text-xs" onclick="generateStartWord(${i})">끝말잇기 생성</button>
+                    </div>
+                    <input type="text" id="answer-${i}" class="w-full p-2 border rounded-md form-input" placeholder="이어지는 단어 입력">
+                    <select id="grade-${i}" class="w-full p-2 border rounded-md form-input">
+                        <option value="">채점</option>
+                        <option value="O">O</option>
+                        <option value="X">X</option>
+                    </select>
+                `;
+                container.appendChild(div);
+            }
+            document.getElementById('wordchain-score-display').textContent = '';
+            const completeBtn = document.getElementById('wordchain-complete-btn');
+            completeBtn.disabled = true;
+            completeBtn.classList.add('btn-disabled');
+            wordchainHomeworkModal.style.display = 'flex';
+        }
+
+        document.getElementById('wordchain-grade-all-btn').addEventListener('click', () => {
+            const selects = document.querySelectorAll('#wordchain-homework-content select');
+            let correct = 0;
+            selects.forEach(s => { if (s.value === 'O') correct++; });
+            document.getElementById('wordchain-score-display').textContent = `${correct} / ${selects.length}`;
+            const completeBtn = document.getElementById('wordchain-complete-btn');
+            completeBtn.disabled = false;
+            completeBtn.classList.remove('btn-disabled');
+        });
+
+        document.getElementById('wordchain-complete-btn').addEventListener('click', () => {
+            wordchainHomeworkModal.style.display = 'none';
+            showModal('완료', '숙제를 완료했습니다.');
         });
 
         // Close Modals
@@ -4359,6 +4506,8 @@
         document.getElementById('close-dictation-modal-btn').addEventListener('click', () => dictationModal.style.display = 'none');
         document.getElementById('close-manual-problem-creation-modal-btn').addEventListener('click', () => manualProblemCreationModal.style.display = 'none');
         document.getElementById('close-manual-problem-modal-btn').addEventListener('click', () => manualProblemModal.style.display = 'none');
+        document.getElementById('close-wordchain-creation-modal-btn').addEventListener('click', () => wordchainCreationModal.style.display = 'none');
+        document.getElementById('close-wordchain-homework-modal-btn').addEventListener('click', () => wordchainHomeworkModal.style.display = 'none');
 
 
         // --- Initial Load ---
