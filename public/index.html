@@ -433,6 +433,7 @@
             <span class="close-button" id="close-wordchain-creation-modal-btn">&times;</span>
             <h3 class="text-xl font-bold mb-4">🔗 끝말잇기 문제 만들기</h3>
             <form id="wordchain-form" class="text-left space-y-3">
+                <input type="hidden" id="wordchain-problem-id">
                 <div>
                     <label for="wordchain-title" class="block text-sm font-medium">제목</label>
                     <input type="text" id="wordchain-title" required class="w-full p-2 border rounded-md form-input">
@@ -454,6 +455,12 @@
                     <input type="number" id="wordchain-reward" min="0" class="w-full p-2 border rounded-md form-input" required>
                 </div>
                 <div>
+                    <label class="flex items-center space-x-2">
+                        <input type="checkbox" id="wordchain-use-password" class="form-checkbox">
+                        <span>암호 사용</span>
+                    </label>
+                </div>
+                <div id="wordchain-password-container" class="hidden">
                     <label for="wordchain-password" class="block text-sm font-medium">암호</label>
                     <input type="text" id="wordchain-password" class="w-full p-2 border rounded-md form-input">
                 </div>
@@ -467,12 +474,18 @@
         <div class="modal-content modal-content-lg">
             <span class="close-button" id="close-wordchain-homework-modal-btn">&times;</span>
             <h3 id="wordchain-homework-title" class="text-xl font-bold mb-4"></h3>
-            <div id="wordchain-homework-content" class="text-left space-y-4 max-h-[70vh] overflow-y-auto"></div>
-            <div class="mt-6 flex justify-between items-center">
-                <div id="wordchain-score-display" class="text-lg font-bold"></div>
-                <div class="space-x-2">
-                    <button id="wordchain-grade-all-btn" class="btn btn-secondary">모두 채점</button>
-                    <button id="wordchain-complete-btn" class="btn btn-primary btn-disabled" disabled>숙제 완료</button>
+            <div id="wordchain-homework-initial" class="hidden">
+                <p class="mb-4">문제 생성 버튼을 눌러 끝말잇기 문제를 받아보세요.</p>
+                <button id="generate-wordchain-btn" class="btn btn-primary">문제 생성</button>
+            </div>
+            <div id="wordchain-homework-main" class="hidden">
+                <div id="wordchain-homework-content" class="text-left space-y-4 max-h-[70vh] overflow-y-auto"></div>
+                <div class="mt-6 flex justify-between items-center">
+                    <div id="wordchain-score-display" class="text-lg font-bold"></div>
+                    <div class="space-x-2">
+                        <button id="wordchain-grade-all-btn" class="btn btn-secondary">모두 채점</button>
+                        <button id="wordchain-complete-btn" class="btn btn-primary btn-disabled" disabled>숙제 완료</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -969,7 +982,7 @@
         let currentAssignmentType = null; // 'math', 'dictation', or 'lifeRule'
         let currentDictationTemplate = null; // For student dictation homework
         let currentMathTemplate = null;    // For student-generated math homework
-        let wordChainProblems = []; // 저장된 끝말잇기 문제들
+        let currentWordChainProblem = null; // 현재 끝말잇기 문제 템플릿
 
         // --- DOM Elements ---
         const views = {
@@ -2763,10 +2776,12 @@
                         ${problemSets.map(problemSet => {
                             const isDictation = problemSet.type === 'dictation';
                             const isManual = problemSet.type === 'manual';
-                            const icon = isDictation ? '🎤' : (isManual ? '📝' : '🤖');
+                            const isWordchain = problemSet.type === 'wordchain';
+                            const icon = isDictation ? '🎤' : (isManual ? '📝' : (isWordchain ? '🔗' : '🤖'));
                             const topicText = isDictation ?
                                 `${problemSet.dictationType === 'word' ? '단어' : '문장'} ${problemSet.count}개` :
-                                isManual ? '직접 문제' : `${problemSet.topic} (${problemSet.problems ? problemSet.problems.length : problemSet.count || 0}문제${problemSet.problems ? '' : '·학생 생성'})`;
+                                isManual ? '직접 문제' :
+                                isWordchain ? `끝말잇기 ${problemSet.count}문제` : `${problemSet.topic} (${problemSet.problems ? problemSet.problems.length : problemSet.count || 0}문제${problemSet.problems ? '' : '·학생 생성'})`;
 
                             return `
                                 <div class="p-3 flex justify-between items-center">
@@ -2794,6 +2809,8 @@
                         openDictationCreationModal({id: problemDoc.id, ...problemDoc.data()});
                     } else if(problemType === 'manual') {
                         openManualProblemCreationModal({id: problemDoc.id, ...problemDoc.data()});
+                    } else if(problemType === 'wordchain') {
+                        openWordChainCreationModal({id: problemDoc.id, ...problemDoc.data()});
                     } else {
                         openProblemCreationModal({id: problemDoc.id, ...problemDoc.data()});
                     }
@@ -2951,7 +2968,7 @@
                 }
 
                 hwsToShow.forEach(hw => {
-                    const icon = hw.type === 'dictation' ? '🎤' : (hw.type === 'manual' ? '📝' : '🤖');
+                    const icon = hw.type === 'dictation' ? '🎤' : (hw.type === 'manual' ? '📝' : (hw.type === 'wordchain' ? '🔗' : '🤖'));
                     const isCompleted = hw.status === 'completed';
                     const assignedDate = hw.assignedAt ? hw.assignedAt.toDate().toLocaleDateString('ko-KR') : '';
                     const tr = document.createElement('tr');
@@ -2984,6 +3001,8 @@
                             openDictationModal(e.target.dataset.hwid, e.target.dataset.problemid);
                         } else if (hwType === 'manual') {
                             openManualProblemModal(e.target.dataset.hwid, e.target.dataset.problemid);
+                        } else if (hwType === 'wordchain') {
+                            openWordChainHomeworkModal(e.target.dataset.hwid, e.target.dataset.problemid);
                         } else {
                             openHomeworkModal(e.target.dataset.hwid, e.target.dataset.problemid);
                         }
@@ -4404,77 +4423,102 @@
     });
         // ----- Word Chain Problem Handling -----
         const wordchainForm = document.getElementById('wordchain-form');
-        const wordchainListContainer = document.getElementById('learning-problem-list');
+        const wordchainUsePassword = document.getElementById('wordchain-use-password');
+        const wordchainPasswordContainer = document.getElementById('wordchain-password-container');
+        const generateWordchainBtn = document.getElementById('generate-wordchain-btn');
+        const wordchainInitialView = document.getElementById('wordchain-homework-initial');
+        const wordchainMainView = document.getElementById('wordchain-homework-main');
 
-        function renderWordChainProblems() {
-            if (wordChainProblems.length === 0) {
-                wordchainListContainer.innerHTML = '<p class="text-center text-gray-500">생성된 끝말잇기 문제가 없습니다.</p>';
-                return;
+        function toggleWordchainPassword() {
+            wordchainPasswordContainer.classList.toggle('hidden', !wordchainUsePassword.checked);
+        }
+        wordchainUsePassword.addEventListener('change', toggleWordchainPassword);
+
+        function openWordChainCreationModal(problem = null) {
+            wordchainCreationModal.style.display = 'flex';
+            wordchainForm.reset();
+            document.getElementById('wordchain-problem-id').value = problem?.id || '';
+            wordchainUsePassword.checked = false;
+            toggleWordchainPassword();
+            if (problem) {
+                document.getElementById('wordchain-title').value = problem.title;
+                document.getElementById('wordchain-level').value = problem.level;
+                document.getElementById('wordchain-count').value = problem.count;
+                document.getElementById('wordchain-reward').value = problem.reward;
+                if (problem.password) {
+                    wordchainUsePassword.checked = true;
+                    toggleWordchainPassword();
+                    document.getElementById('wordchain-password').value = problem.password;
+                }
             }
-            wordchainListContainer.innerHTML = wordChainProblems.map(p => `
-                <div class="border rounded-md p-4 mb-2">
-                    <div class="flex justify-between items-center mb-2">
-                        <h4 class="font-semibold">${p.title}</h4>
-                        <button class="btn btn-primary text-sm" onclick="openWordChainHomework(${p.id})">배부</button>
-                    </div>
-                    <p class="text-sm text-gray-600">난이도: ${p.level} | 문제 수: ${p.count} | 보상: ${p.reward}원</p>
-                </div>
-            `).join('');
         }
 
-        document.getElementById('add-wordchain-problem-btn').addEventListener('click', () => {
-            wordchainForm.reset();
-            wordchainCreationModal.style.display = 'flex';
-        });
+        document.getElementById('add-wordchain-problem-btn').addEventListener('click', () => openWordChainCreationModal());
 
-        wordchainForm.addEventListener('submit', (e) => {
+        wordchainForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const problem = {
-                id: Date.now(),
+            const problemId = document.getElementById('wordchain-problem-id').value;
+            const data = {
+                type: 'wordchain',
                 title: document.getElementById('wordchain-title').value,
                 level: document.getElementById('wordchain-level').value,
                 count: parseInt(document.getElementById('wordchain-count').value, 10),
                 reward: parseInt(document.getElementById('wordchain-reward').value, 10),
-                password: document.getElementById('wordchain-password').value
+                password: wordchainUsePassword.checked ? document.getElementById('wordchain-password').value : '',
+                teacherId: currentAuthUser.uid,
+                createdAt: serverTimestamp()
             };
-            wordChainProblems.push(problem);
-            renderWordChainProblems();
-            wordchainCreationModal.style.display = 'none';
+            if (!data.title || !data.count || data.reward === '') {
+                showModal('입력 오류', '모든 필드를 채워주세요.');
+                return;
+            }
+            try {
+                if (problemId) {
+                    await setDoc(doc(db, 'learningProblems', problemId), data, { merge: true });
+                } else {
+                    await addDoc(collection(db, 'learningProblems'), data);
+                }
+                wordchainCreationModal.style.display = 'none';
+                loadLearningProblems();
+            } catch (error) {
+                showModal('저장 실패', `오류: ${error.message}`);
+            }
         });
-
-        renderWordChainProblems();
 
         const sampleWords = ['사과','고양이','자동차','학교','사랑','경기','기차','바다','나라','라면'];
 
-        window.generateStartWord = function(index) {
-            const word = sampleWords[Math.floor(Math.random() * sampleWords.length)];
-            document.getElementById(`start-word-${index}`).textContent = word;
+        function generateStartWords(count) {
+            return Array.from({length: count}, () => sampleWords[Math.floor(Math.random()*sampleWords.length)]);
         }
 
-        window.openWordChainHomework = function(id) {
-            const problem = wordChainProblems.find(p => p.id === id);
-            if (!problem) return;
-            document.getElementById('wordchain-homework-title').textContent = problem.title;
-            const container = document.getElementById('wordchain-homework-content');
-            container.innerHTML = '';
-            for (let i=0; i<problem.count; i++) {
-                const div = document.createElement('div');
-                div.className = 'space-y-2';
-                div.innerHTML = `
-                    <div class="flex items-center space-x-2">
-                        <span class="font-medium">문제 ${i+1}:</span>
-                        <span id="start-word-${i}" class="text-blue-600"></span>
-                        <button type="button" class="btn btn-secondary text-xs" onclick="generateStartWord(${i})">끝말잇기 생성</button>
-                    </div>
-                    <input type="text" id="answer-${i}" class="w-full p-2 border rounded-md form-input" placeholder="이어지는 단어 입력">
-                    <select id="grade-${i}" class="w-full p-2 border rounded-md form-input">
-                        <option value="">채점</option>
-                        <option value="O">O</option>
-                        <option value="X">X</option>
-                    </select>
-                `;
-                container.appendChild(div);
+        async function openWordChainHomeworkModal(assignmentId, problemId) {
+            currentAssignmentId = assignmentId;
+            const dataToShow = viewedUserData;
+            const assignmentRef = doc(db, `users/${dataToShow.id}/assignedHomework`, assignmentId);
+            const assignmentDoc = await getDoc(assignmentRef);
+            const problemDoc = await getDoc(doc(db, 'learningProblems', problemId));
+            if (!assignmentDoc.exists() || !problemDoc.exists()) {
+                showModal('오류', '숙제 문제를 불러올 수 없습니다.');
+                return;
             }
+            const assignmentData = assignmentDoc.data();
+            currentWordChainProblem = problemDoc.data();
+            const isCompleted = assignmentData.status === 'completed';
+            document.getElementById('wordchain-homework-title').textContent = currentWordChainProblem.title;
+
+            if (isCompleted) {
+                wordchainInitialView.style.display = 'none';
+                wordchainMainView.style.display = 'block';
+                renderWordChainHomework(assignmentData.problems || [], assignmentData.studentAnswers || [], true);
+            } else if (assignmentData.problems) {
+                wordchainInitialView.style.display = 'none';
+                wordchainMainView.style.display = 'block';
+                renderWordChainHomework(assignmentData.problems, assignmentData.studentAnswers || [], false);
+            } else {
+                wordchainInitialView.style.display = 'block';
+                wordchainMainView.style.display = 'none';
+            }
+
             document.getElementById('wordchain-score-display').textContent = '';
             const completeBtn = document.getElementById('wordchain-complete-btn');
             completeBtn.disabled = true;
@@ -4482,19 +4526,105 @@
             wordchainHomeworkModal.style.display = 'flex';
         }
 
-        document.getElementById('wordchain-grade-all-btn').addEventListener('click', () => {
-            const selects = document.querySelectorAll('#wordchain-homework-content select');
+        function renderWordChainHomework(problems, studentAnswers = [], isReview = false) {
+            const container = document.getElementById('wordchain-homework-content');
+            container.innerHTML = problems.map((p, idx) => {
+                const studentAnswer = studentAnswers[idx] || '';
+                return `
+                <div class="wordchain-item border-b py-4" data-result="pending">
+                    <div class="flex items-center mb-2">
+                        <span class="wordchain-status-icon text-lg mr-2">${isReview ? (studentAnswer ? '⭕' : '⭐') : ''}</span>
+                        <span class="font-medium mr-2">문제 ${idx + 1}:</span>
+                        <span class="text-blue-600">${p.start}</span>
+                    </div>
+                    <div class="flex items-center ml-10">
+                        <input type="text" class="wordchain-answer-input w-full p-2 border rounded-md form-input" placeholder="이어지는 단어 입력" value="${studentAnswer}" ${isReview ? 'disabled' : ''}>
+                        ${!isReview ? '<button class="wordchain-grade-btn btn btn-secondary text-xs px-3 py-2 ml-2 whitespace-nowrap">채점</button>' : ''}
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            if (!isReview) {
+                container.querySelectorAll('.wordchain-grade-btn').forEach((btn, idx) => {
+                    btn.addEventListener('click', () => gradeWordChainItem(idx));
+                });
+            }
+        }
+
+        function gradeWordChainItem(index) {
+            const item = document.querySelectorAll('#wordchain-homework-content .wordchain-item')[index];
+            const inputEl = item.querySelector('.wordchain-answer-input');
+            const iconEl = item.querySelector('.wordchain-status-icon');
+            const answer = inputEl.value.trim();
+            if (answer) {
+                iconEl.innerHTML = '⭕';
+                iconEl.classList.remove('text-yellow-400');
+                iconEl.classList.add('text-red-500');
+                item.dataset.result = 'correct';
+            } else {
+                iconEl.innerHTML = '⭐';
+                iconEl.classList.remove('text-red-500');
+                iconEl.classList.add('text-yellow-400');
+                item.dataset.result = 'wrong';
+            }
+            updateWordChainScore();
+        }
+
+        function updateWordChainScore() {
+            const items = document.querySelectorAll('#wordchain-homework-content .wordchain-item');
             let correct = 0;
-            selects.forEach(s => { if (s.value === 'O') correct++; });
-            document.getElementById('wordchain-score-display').textContent = `${correct} / ${selects.length}`;
+            items.forEach(item => { if (item.dataset.result === 'correct') correct++; });
+            const score = items.length ? Math.round((correct / items.length) * 100) : 0;
+            document.getElementById('wordchain-score-display').textContent = `점수: ${score} / 100`;
             const completeBtn = document.getElementById('wordchain-complete-btn');
-            completeBtn.disabled = false;
-            completeBtn.classList.remove('btn-disabled');
+            if (score === 100) {
+                completeBtn.disabled = false;
+                completeBtn.classList.remove('btn-disabled');
+            } else {
+                completeBtn.disabled = true;
+                completeBtn.classList.add('btn-disabled');
+            }
+        }
+
+        document.getElementById('wordchain-grade-all-btn').addEventListener('click', () => {
+            document.querySelectorAll('#wordchain-homework-content .wordchain-item').forEach((_, idx) => gradeWordChainItem(idx));
         });
 
-        document.getElementById('wordchain-complete-btn').addEventListener('click', () => {
-            wordchainHomeworkModal.style.display = 'none';
-            showModal('완료', '숙제를 완료했습니다.');
+        document.getElementById('wordchain-complete-btn').addEventListener('click', async () => {
+            if (!currentAssignmentId || isAdminViewing) return;
+            const answers = Array.from(document.querySelectorAll('#wordchain-homework-content .wordchain-answer-input')).map(i => i.value);
+            const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
+            const userRef = doc(db, 'users', currentUserData.id);
+            try {
+                const assignmentDoc = await getDoc(assignmentRef);
+                const reward = assignmentDoc.data().reward || 0;
+                await updateDoc(assignmentRef, {
+                    status: 'completed',
+                    studentAnswers: answers,
+                    completedAt: serverTimestamp()
+                });
+                await updateDoc(userRef, { balance: increment(reward) });
+                const userDoc = await getDoc(userRef);
+                currentUserData = { id: userDoc.id, ...userDoc.data() };
+                viewedUserData = currentUserData;
+                wordchainHomeworkModal.style.display = 'none';
+                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을(를) 획득했습니다!`);
+                updateDashboardDisplay();
+                renderHomework();
+            } catch (error) {
+                showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
+            }
+        });
+
+        generateWordchainBtn.addEventListener('click', async () => {
+            if (!currentWordChainProblem) return;
+            const words = generateStartWords(currentWordChainProblem.count).map(w => ({ start: w }));
+            const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
+            await updateDoc(assignmentRef, { problems: words });
+            renderWordChainHomework(words, [], false);
+            wordchainInitialView.style.display = 'none';
+            wordchainMainView.style.display = 'block';
         });
 
         // Close Modals
