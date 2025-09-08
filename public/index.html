@@ -123,6 +123,8 @@
                     <button data-tab="homework" id="homework-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">오늘의 숙제</button>
                     <button data-tab="life-rules-management" id="life-rules-management-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">생활 규칙 관리</button>
                     <button data-tab="learning-problems" id="learning-problems-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">학습 문제 관리</button>
+                    <button data-tab="library" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">에이두 도서관</button>
+                    <button data-tab="reading-log" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">에이두 독서기록장</button>
                 </nav>
             </div>
 
@@ -131,10 +133,14 @@
                     <div class="lg:col-span-2 space-y-6">
                         <div id="wallet-section" class="bg-white p-6 rounded-lg shadow-md">
                             <h2 id="wallet-title" class="text-xl font-bold mb-4">💰 내 지갑 현황</h2>
-                            <div id="wallet-financial-info" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div id="wallet-financial-info" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                                 <div>
                                     <p class="text-sm text-gray-500">현재 잔액</p>
                                     <p id="currentBalance" class="text-3xl font-bold text-sky-600">0 원</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">에이두 토큰</p>
+                                    <p id="currentTokens" class="text-3xl font-bold text-violet-600">0 토큰</p>
                                 </div>
                                 <div>
                                     <p class="text-sm text-gray-500">총 자산 가치</p>
@@ -241,8 +247,16 @@
                     <!-- Life rules will be rendered here -->
                 </div>
             </div>
+            <div id="library-tab-content" class="tab-content">
+                <h2 class="text-2xl font-bold mb-4">📚 에이두 도서관</h2>
+                <p>준비중입니다.</p>
+            </div>
+            <div id="reading-log-tab-content" class="tab-content">
+                <h2 class="text-2xl font-bold mb-4">📖 에이두 독서기록장</h2>
+                <p>준비중입니다.</p>
+            </div>
         </div>
-        
+
         <!-- Admin View -->
         <div id="admin-view" class="view">
             <header class="flex justify-between items-center mb-8">
@@ -336,6 +350,13 @@
                     <div class="flex items-center space-x-2 mt-1">
                         <input type="number" id="won-adjustment-amount" class="w-full p-2 border rounded-md form-input" placeholder="조정할 금액 (예: 500, -500)">
                         <button id="adjust-won-btn" class="btn btn-primary px-4 py-2 whitespace-nowrap">금액 조정</button>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="font-bold text-lg border-b pb-1 mb-2">🪙 토큰 조정</h4>
+                    <div class="flex items-center space-x-2 mt-1">
+                        <input type="number" id="token-adjustment-amount" class="w-full p-2 border rounded-md form-input" placeholder="조정할 토큰 (예: 5, -5)">
+                        <button id="adjust-token-btn" class="btn btn-primary px-4 py-2 whitespace-nowrap">토큰 조정</button>
                     </div>
                 </div>
                 <div>
@@ -946,6 +967,7 @@
 
         // --- Utility & Modal Functions ---
         const formatCurrency = (amount) => new Intl.NumberFormat('ko-KR').format(amount) + ' 원';
+        const formatTokens = (amount) => new Intl.NumberFormat('ko-KR').format(amount) + ' 토큰';
         
         function showModal(title, message, onConfirm = null) {
             modalTitle.textContent = title;
@@ -1141,7 +1163,9 @@
             const dataToShow = viewedUserData;
             if (!dataToShow) return;
             const balance = dataToShow.balance || dataToShow.coins || 0;
+            const tokens = dataToShow.tokens || 0;
             document.getElementById('currentBalance').textContent = formatCurrency(balance);
+            document.getElementById('currentTokens').textContent = formatTokens(tokens);
             let stockValue = 0;
             if (dataToShow.portfolio) {
                 for (const stockId in dataToShow.portfolio) {
@@ -1519,6 +1543,7 @@
                     role: 'student',
                     coins: 0,
                     balance: 0,
+                    tokens: 0,
                     portfolio: {},
                     createdAt: serverTimestamp()
                 });
@@ -1992,6 +2017,16 @@
                 document.getElementById('won-adjustment-amount').value = '';
             });
 
+            document.getElementById('adjust-token-btn').addEventListener('click', async () => {
+                const amount = Number(document.getElementById('token-adjustment-amount').value);
+                if (isNaN(amount) || amount === 0) {
+                    showModal('오류', '정확한 토큰 수량을 입력하세요.'); return;
+                }
+                await updateDoc(doc(db, "users", studentToAdjustId), { tokens: increment(amount) });
+                showModal('성공', '토큰 조정이 완료되었습니다.');
+                document.getElementById('token-adjustment-amount').value = '';
+            });
+
             document.querySelectorAll('.reset-stock-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                 const stockIdToReset = e.target.dataset.stockid;
                 await updateDoc(doc(db, "users", studentToAdjustId), { [`portfolio.${stockIdToReset}`]: deleteField() });
@@ -2002,7 +2037,7 @@
                 const hwId = e.target.dataset.hwid;
                 const reward = Number(e.target.dataset.reward);
                 await updateDoc(doc(db, `users/${studentToAdjustId}/assignedHomework`, hwId), { status: 'completed' });
-                await updateDoc(doc(db, "users", studentToAdjustId), { balance: increment(reward) });
+                await updateDoc(doc(db, "users", studentToAdjustId), { balance: increment(reward), tokens: increment(reward) });
                 openAdjustModal(studentToAdjustId); // Refresh modal
             }));
 
@@ -2292,13 +2327,13 @@
                     const userRef = doc(db, "users", currentUserData.id);
                     const ruleRef = doc(db, `users/${currentUserData.id}/assignedLifeRules`, ruleId);
 
-                    await updateDoc(userRef, { balance: increment(reward) });
+                    await updateDoc(userRef, { balance: increment(reward), tokens: increment(reward) });
                     await updateDoc(ruleRef, { lastCompletedAt: serverTimestamp() });
 
                     const userDoc = await getDoc(userRef);
                     currentUserData = { id: userDoc.id, ...userDoc.data() };
                     viewedUserData = currentUserData;
-                    showModal('참 잘했어요!', `${formatCurrency(reward)}을(를) 획득했습니다!`);
+                    showModal('참 잘했어요!', `${formatCurrency(reward)}과 ${reward} 토큰을 획득했습니다!`);
                     updateDashboardDisplay();
                     renderLifeRulesForStudent();
                 });
@@ -3075,19 +3110,19 @@
                 const assignmentDoc = await getDoc(assignmentRef);
                 const reward = assignmentDoc.data().reward || 0;
 
-                await updateDoc(assignmentRef, { 
+                await updateDoc(assignmentRef, {
                     status: 'completed',
                     studentAnswers: studentAnswers,
                     completedAt: serverTimestamp()
                 });
-                await updateDoc(userRef, { balance: increment(reward) });
+                await updateDoc(userRef, { balance: increment(reward), tokens: increment(reward) });
 
                 const userDoc = await getDoc(userRef);
                 currentUserData = { id: userDoc.id, ...userDoc.data() };
                 viewedUserData = currentUserData;
                 
                 homeworkModal.style.display = 'none';
-                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을(를) 획득했습니다!`);
+                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}과 ${reward} 토큰을 획득했습니다!`);
                 updateDashboardDisplay();
                 renderHomework();
 
@@ -3628,19 +3663,19 @@
             
             try {
                 const reward = currentDictationTemplate.reward || 0;
-                await updateDoc(assignmentRef, { 
+                await updateDoc(assignmentRef, {
                     status: 'completed',
                     studentAnswers: studentAnswers,
                     completedAt: serverTimestamp()
                 });
-                await updateDoc(userRef, { balance: increment(reward) });
+                await updateDoc(userRef, { balance: increment(reward), tokens: increment(reward) });
 
                 const userDoc = await getDoc(userRef);
                 currentUserData = { id: userDoc.id, ...userDoc.data() };
                 viewedUserData = currentUserData;
 
                 dictationModal.style.display = 'none';
-                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을(를) 획득했습니다!`);
+                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}과 ${reward} 토큰을 획득했습니다!`);
                 updateDashboardDisplay();
                 renderHomework();
             } catch (error) {
@@ -3852,12 +3887,12 @@
                 const reward = assignmentDoc.data().reward || 0;
                 const userRef = doc(db, 'users', currentUserData.id);
                 await updateDoc(assignmentRef, { status: 'completed', studentAnswers: [...inputAnswers, answer], completedAt: serverTimestamp() });
-                await updateDoc(userRef, { balance: increment(reward) });
+                await updateDoc(userRef, { balance: increment(reward), tokens: increment(reward) });
                 const userDoc = await getDoc(userRef);
                 currentUserData = { id: userDoc.id, ...userDoc.data() };
                 viewedUserData = currentUserData;
                 manualProblemModal.style.display = 'none';
-                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을(를) 획득했습니다!`);
+                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}과 ${reward} 토큰을 획득했습니다!`);
                 updateDashboardDisplay();
                 renderHomework();
             } catch (error) {
@@ -4322,12 +4357,12 @@
                     studentAnswers: answers,
                     completedAt: serverTimestamp()
                 });
-                await updateDoc(userRef, { balance: increment(reward) });
+                await updateDoc(userRef, { balance: increment(reward), tokens: increment(reward) });
                 const userDoc = await getDoc(userRef);
                 currentUserData = { id: userDoc.id, ...userDoc.data() };
                 viewedUserData = currentUserData;
                 wordchainHomeworkModal.style.display = 'none';
-                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을(를) 획득했습니다!`);
+                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}과 ${reward} 토큰을 획득했습니다!`);
                 updateDashboardDisplay();
                 renderHomework();
             } catch (error) {
