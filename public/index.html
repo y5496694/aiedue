@@ -82,6 +82,30 @@
             height: 100%;
             background: #e5e7eb;
         }
+        .modal-content-full {
+            max-width: 95%;
+            width: 95%;
+            height: 90vh;
+        }
+        .book-editor-container {
+            position: relative;
+            width: 100%;
+            height: 80vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .page-nav-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            font-size: 2rem;
+            opacity: 0.5;
+        }
+        .page-nav-btn:hover {
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body class="text-gray-800">
@@ -803,7 +827,7 @@
         </div>
     </div>
     <div id="book-activity-modal" class="modal-overlay hidden">
-        <div class="modal-content modal-content-xl">
+        <div class="modal-content modal-content-full">
             <span class="close-button" id="close-book-activity-modal-btn">&times;</span>
             <div class="flex justify-between items-center mb-4">
                 <h3 id="book-activity-modal-title" class="text-xl font-bold"></h3>
@@ -813,7 +837,11 @@
                     <button id="complete-book-activity-btn" class="btn btn-primary">책 완성하기</button>
                 </div>
             </div>
-            <div id="book-editor" class="book-editor max-h-[60vh] overflow-y-auto"></div>
+            <div id="book-editor-container" class="book-editor-container">
+                <button id="prev-page-btn" class="page-nav-btn left-2">&#9664;</button>
+                <div id="book-editor" class="book-editor"></div>
+                <button id="next-page-btn" class="page-nav-btn right-2">&#9654;</button>
+            </div>
         </div>
     </div>
     <div id="reading-log-entry-modal" class="modal-overlay hidden">
@@ -1109,6 +1137,10 @@
         const bookActivityModal = document.getElementById('book-activity-modal');
         const bookEditor = document.getElementById('book-editor');
         const bookEditorControls = document.getElementById('book-editor-controls');
+        const prevPageBtn = document.getElementById('prev-page-btn');
+        const nextPageBtn = document.getElementById('next-page-btn');
+        let bookSpreads = [];
+        let currentSpreadIndex = 0;
         const readingLogEntryModal = document.getElementById('reading-log-entry-modal');
         const editInfoModal = document.getElementById('edit-info-modal');
         let studentToAdjustId = null;
@@ -4714,21 +4746,44 @@
                    </div>
                 `;
             }
+            bookSpreads = Array.from(bookEditor.querySelectorAll('.book-spread'));
+            bookSpreads.forEach((spread, idx) => {
+                spread.classList.add('hidden');
+                if (idx === 0) spread.classList.remove('hidden');
+            });
+            currentSpreadIndex = 0;
+            updatePageNavButtons();
         }
 
         function addBookPage() {
             const spread = document.createElement('div');
-            spread.className = 'book-spread';
+            spread.className = 'book-spread hidden';
             spread.innerHTML = `
                 <div class="book-page"><div class="image-placeholder"></div></div>
                 <div class="book-page"><textarea class="text-box" placeholder="책 내용을 입력하세요"></textarea></div>
             `;
             bookEditor.appendChild(spread);
-            bookEditor.scrollTop = bookEditor.scrollHeight;
+            bookSpreads.push(spread);
+            showSpread(bookSpreads.length - 1);
+        }
+
+        function showSpread(index) {
+            if (index < 0 || index >= bookSpreads.length) return;
+            bookSpreads[currentSpreadIndex].classList.add('hidden');
+            currentSpreadIndex = index;
+            bookSpreads[currentSpreadIndex].classList.remove('hidden');
+            updatePageNavButtons();
+        }
+
+        function updatePageNavButtons() {
+            prevPageBtn.style.display = currentSpreadIndex === 0 ? 'none' : 'block';
+            nextPageBtn.style.display = currentSpreadIndex === bookSpreads.length - 1 ? 'none' : 'block';
         }
 
         function serializeBook() {
-            return bookEditor.innerHTML;
+            const clone = bookEditor.cloneNode(true);
+            clone.querySelectorAll('.book-spread').forEach(spread => spread.classList.remove('hidden'));
+            return clone.innerHTML;
         }
 
         function openBookActivityCreationModal(problem = null) {
@@ -4819,6 +4874,8 @@
         });
 
         document.getElementById('add-book-page-btn').addEventListener('click', () => addBookPage());
+        prevPageBtn.addEventListener('click', () => showSpread(currentSpreadIndex - 1));
+        nextPageBtn.addEventListener('click', () => showSpread(currentSpreadIndex + 1));
 
         document.getElementById('save-book-draft-btn').addEventListener('click', async () => {
             if (!currentAssignmentId || isAdminViewing) return;
