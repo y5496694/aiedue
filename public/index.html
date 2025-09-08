@@ -183,7 +183,7 @@
                         <div id="student-info-panel" class="bg-white p-6 rounded-lg shadow-md">
                             <div class="flex items-center justify-between mb-4">
                                 <h2 class="text-xl font-bold">내 정보</h2>
-                                <button id="edit-student-info-btn" class="text-2xl leading-none">⚙️</button>
+                                <button id="edit-student-info-btn" class="edit-info-btn text-2xl leading-none">⚙️</button>
                             </div>
                             <p>고유 코드: <strong id="dashboard-code" class="text-lg"></strong></p>
                         </div>
@@ -193,6 +193,20 @@
                             <button id="assign-homework-start-btn" class="w-full py-2 mb-2 rounded-md btn bg-amber-500 hover:bg-amber-600 text-white">숙제 배부하기</button>
                             <button id="assign-life-rule-start-btn" class="w-full py-2 mb-2 rounded-md btn bg-green-500 hover:bg-green-600 text-white">생활 규칙 배부하기</button>
                             <button id="admin-page-btn" class="w-full py-2 rounded-md btn bg-red-500 hover:bg-red-600 text-white">관리자 페이지로 이동</button>
+                            <div id="teacher-info-panel" class="mt-6 border-t pt-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h3 class="text-lg font-bold">내 정보</h3>
+                                    <button id="edit-teacher-info-btn" class="edit-info-btn text-2xl leading-none">⚙️</button>
+                                </div>
+                                <table class="w-full text-sm">
+                                    <tbody>
+                                        <tr>
+                                            <td class="py-1 font-medium">이메일</td>
+                                            <td id="dashboard-teacher-email" class="py-1"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1108,7 +1122,9 @@
             const todayHomeworkSection = document.getElementById('today-homework-section');
             const classSection = document.getElementById('my-class-section');
             const calendarEl = document.getElementById('aedu-calendar');
-            const editInfoBtn = document.getElementById('edit-student-info-btn');
+            const editStudentInfoBtn = document.getElementById('edit-student-info-btn');
+            const editTeacherInfoBtn = document.getElementById('edit-teacher-info-btn');
+            const teacherEmailEl = document.getElementById('dashboard-teacher-email');
 
             const walletInfo = document.getElementById('wallet-financial-info');
             const walletTitle = document.getElementById('wallet-title');
@@ -1135,8 +1151,11 @@
                 renderTodayHomework();
             }
 
-            if (editInfoBtn) {
-                editInfoBtn.classList.toggle('hidden', role !== 'student' || isAdminViewing || !currentUserData || currentUserData.id !== dataToShow.id);
+            if (editStudentInfoBtn) {
+                editStudentInfoBtn.classList.toggle('hidden', role !== 'student' || isAdminViewing || !currentUserData || currentUserData.id !== dataToShow.id);
+            }
+            if (editTeacherInfoBtn) {
+                editTeacherInfoBtn.classList.toggle('hidden', role !== 'teacher' || isAdminViewing || !currentUserData || currentUserData.id !== dataToShow.id);
             }
 
             // Show/hide tabs based on the *actual logged-in user's role*
@@ -1154,6 +1173,9 @@
                 titleEl.textContent = `${dataToShow.name || '교사'} 대시보드`;
                 studentPanel.classList.add('hidden');
                 teacherPanel.classList.remove('hidden');
+                if (teacherEmailEl) {
+                    teacherEmailEl.textContent = dataToShow.email || '';
+                }
             } else { // Student
                 titleEl.textContent = `${dataToShow.name} 학생`;
                 if(isAdminViewing) {
@@ -4403,10 +4425,12 @@
             wordchainMainView.style.display = 'block';
         });
 
-        document.getElementById('edit-student-info-btn').addEventListener('click', () => {
-            if (!currentUserData || viewedUserData.id !== currentUserData.id || isAdminViewing) return;
-            document.getElementById('edit-user-name').value = currentUserData.name || '';
-            editInfoModal.style.display = 'flex';
+        document.querySelectorAll('.edit-info-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (!currentUserData || viewedUserData.id !== currentUserData.id || isAdminViewing) return;
+                document.getElementById('edit-user-name').value = currentUserData.name || '';
+                editInfoModal.style.display = 'flex';
+            });
         });
 
         document.getElementById('edit-info-form').addEventListener('submit', async (e) => {
