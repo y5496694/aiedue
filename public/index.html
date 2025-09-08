@@ -268,7 +268,7 @@
             </div>
             <div id="reading-log-tab-content" class="tab-content">
                 <h2 class="text-2xl font-bold mb-4">📖 에이두 독서기록장</h2>
-                <ul id="reading-log-list" class="space-y-2"></ul>
+                <ul id="reading-log-list" class="space-y-4"></ul>
             </div>
         </div>
 
@@ -779,7 +779,8 @@
     <div id="reading-log-entry-modal" class="modal-overlay hidden">
         <div class="modal-content modal-content-lg">
             <span class="close-button" id="close-reading-log-entry-modal-btn">&times;</span>
-            <h3 id="reading-log-entry-title" class="text-xl font-bold mb-4"></h3>
+            <h3 id="reading-log-entry-title" class="text-xl font-bold"></h3>
+            <p id="reading-log-entry-date" class="text-sm text-gray-500 mb-4"></p>
             <div id="reading-log-entry-content" class="text-left space-y-4 max-h-[60vh] overflow-y-auto"></div>
         </div>
     </div>
@@ -4743,16 +4744,30 @@
                 qSnap.forEach(docSnap => {
                     const entry = { id: docSnap.id, ...docSnap.data() };
                     const li = document.createElement('li');
-                    li.className = 'flex justify-between items-center bg-white p-2 rounded shadow';
+                    li.className = 'flex justify-between items-center bg-white p-3 rounded-lg shadow border border-gray-200';
                     const btn = document.createElement('button');
                     btn.className = 'flex-grow text-left hover:underline';
                     btn.textContent = `책 이름: ${entry.bookTitle}`;
                     btn.addEventListener('click', () => openReadingLogEntry(entry));
-                    const span = document.createElement('span');
-                    span.className = 'ml-2 text-sm text-gray-500';
-                    span.textContent = entry.userName;
+
+                    const info = document.createElement('div');
+                    info.className = 'ml-2 text-right';
+
+                    const nameSpan = document.createElement('div');
+                    nameSpan.className = 'text-sm text-gray-500';
+                    nameSpan.textContent = entry.userName;
+
+                    const dateSpan = document.createElement('div');
+                    dateSpan.className = 'text-xs text-gray-400';
+                    if (entry.createdAt && typeof entry.createdAt.toDate === 'function') {
+                        dateSpan.textContent = entry.createdAt.toDate().toLocaleDateString();
+                    }
+
+                    info.appendChild(nameSpan);
+                    info.appendChild(dateSpan);
+
                     li.appendChild(btn);
-                    li.appendChild(span);
+                    li.appendChild(info);
                     list.appendChild(li);
                 });
             } catch (error) {
@@ -4762,6 +4777,12 @@
 
         function openReadingLogEntry(entry) {
             document.getElementById('reading-log-entry-title').textContent = entry.bookTitle;
+            const dateEl = document.getElementById('reading-log-entry-date');
+            if (dateEl) {
+                dateEl.textContent = entry.createdAt && typeof entry.createdAt.toDate === 'function'
+                    ? entry.createdAt.toDate().toLocaleDateString()
+                    : '';
+            }
             const content = document.getElementById('reading-log-entry-content');
             content.innerHTML = '';
             entry.questions.forEach((q, idx) => {
