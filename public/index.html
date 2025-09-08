@@ -41,6 +41,47 @@
         .chart-container { position: relative; width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; height: 300px; max-height: 400px; }
         .problem-type-fields { display: none; }
         .btn-disabled { background-color: #D1D5DB; cursor: not-allowed; }
+        .modal-content-xl {
+            max-width: 95%;
+            width: 1000px;
+        }
+        .book-editor { display: flex; flex-direction: column; align-items: center; }
+        .book-spread { display: flex; margin-bottom: 1rem; }
+        .book-page {
+            width: 300px;
+            height: 400px;
+            border: 1px solid #000;
+            margin: 0 0.5rem;
+            position: relative;
+            background: #fff;
+        }
+        .book-cover { background-size: cover; background-position: center; }
+        .book-page .text-box {
+            position: absolute;
+            width: 80%;
+            height: 80%;
+            top: 10%;
+            left: 10%;
+            border: 1px solid #000;
+            background: #fff;
+            resize: none;
+            padding: 0.5rem;
+        }
+        .book-page .text-box.center {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .book-page .text-box.top-right {
+            top: 10%;
+            left: auto;
+            right: 10%;
+        }
+        .image-placeholder {
+            width: 100%;
+            height: 100%;
+            background: #e5e7eb;
+        }
     </style>
 </head>
 <body class="text-gray-800">
@@ -766,14 +807,18 @@
         </div>
     </div>
     <div id="book-activity-modal" class="modal-overlay hidden">
-        <div class="modal-content modal-content-lg">
+        <div class="modal-content modal-content-xl">
             <span class="close-button" id="close-book-activity-modal-btn">&times;</span>
-            <h3 id="book-activity-modal-title" class="text-xl font-bold mb-4"></h3>
-            <p id="book-activity-description-display" class="mb-4"></p>
-            <textarea id="book-activity-student-content" class="w-full p-2 border rounded-md form-input mb-4" placeholder="책 내용을 입력하세요"></textarea>
-            <div id="book-activity-footer" class="text-right">
-                <button id="complete-book-activity-btn" class="btn btn-primary">숙제 완료하기</button>
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="book-activity-modal-title" class="text-xl font-bold"></h3>
+                <div id="book-editor-controls" class="space-x-2">
+                    <button id="add-book-page-btn" class="btn btn-secondary">+ 페이지 추가</button>
+                    <button id="save-book-draft-btn" class="btn btn-secondary">저장</button>
+                    <button id="complete-book-activity-btn" class="btn btn-primary">책 완성하기</button>
+                </div>
             </div>
+            <p id="book-activity-description-display" class="mb-4"></p>
+            <div id="book-editor" class="book-editor max-h-[60vh] overflow-y-auto"></div>
         </div>
     </div>
     <div id="reading-log-entry-modal" class="modal-overlay hidden">
@@ -1067,6 +1112,8 @@
         const readingJournalModal = document.getElementById('reading-journal-modal');
         const bookActivityCreationModal = document.getElementById('book-activity-creation-modal');
         const bookActivityModal = document.getElementById('book-activity-modal');
+        const bookEditor = document.getElementById('book-editor');
+        const bookEditorControls = document.getElementById('book-editor-controls');
         const readingLogEntryModal = document.getElementById('reading-log-entry-modal');
         const editInfoModal = document.getElementById('edit-info-modal');
         let studentToAdjustId = null;
@@ -4643,6 +4690,52 @@
         });
 
         // ----- Book Activity Handling -----
+        function initializeBookEditor(existing = '') {
+            if (existing) {
+                bookEditor.innerHTML = existing;
+            } else {
+                bookEditor.innerHTML = `
+                   <div class="book-spread">
+                       <div class="book-page">
+                           <textarea class="text-box center" placeholder="제목을 입력하세요"></textarea>
+                       </div>
+                       <div class="book-page book-cover">
+                           <textarea class="text-box top-right" placeholder="제목"></textarea>
+                       </div>
+                   </div>
+                   <div class="book-spread">
+                       <div class="book-page">
+                           <textarea class="text-box" placeholder="등장인물1 이름과 설명"></textarea>
+                       </div>
+                       <div class="book-page">
+                           <textarea class="text-box" placeholder="등장인물2 이름과 설명"></textarea>
+                       </div>
+                   </div>
+                   <div class="book-spread">
+                       <div class="book-page"><div class="image-placeholder"></div></div>
+                       <div class="book-page">
+                           <textarea class="text-box" placeholder="책 내용1"></textarea>
+                       </div>
+                   </div>
+                `;
+            }
+        }
+
+        function addBookPage() {
+            const spread = document.createElement('div');
+            spread.className = 'book-spread';
+            spread.innerHTML = `
+                <div class="book-page"><div class="image-placeholder"></div></div>
+                <div class="book-page"><textarea class="text-box" placeholder="책 내용을 입력하세요"></textarea></div>
+            `;
+            bookEditor.appendChild(spread);
+            bookEditor.scrollTop = bookEditor.scrollHeight;
+        }
+
+        function serializeBook() {
+            return bookEditor.innerHTML;
+        }
+
         function openBookActivityCreationModal(problem = null) {
             bookActivityCreationModal.style.display = 'flex';
             const form = document.getElementById('book-activity-form');
@@ -4697,22 +4790,20 @@
             const problem = problemDoc.data();
             document.getElementById('book-activity-modal-title').textContent = assignmentData.title;
             document.getElementById('book-activity-description-display').textContent = problem.description || '';
-            const textarea = document.getElementById('book-activity-student-content');
+            initializeBookEditor(assignmentData.studentAnswer || '');
             if (assignmentData.status === 'completed') {
-                textarea.value = assignmentData.studentAnswer || '';
-                textarea.disabled = true;
-                document.getElementById('book-activity-footer').style.display = 'none';
+                bookEditor.querySelectorAll('textarea').forEach(el => el.disabled = true);
+                bookEditorControls.style.display = 'none';
             } else {
-                textarea.value = assignmentData.studentAnswer || '';
-                textarea.disabled = false;
-                document.getElementById('book-activity-footer').style.display = 'block';
+                bookEditor.querySelectorAll('textarea').forEach(el => el.disabled = false);
+                bookEditorControls.style.display = 'block';
             }
             bookActivityModal.style.display = 'flex';
         }
 
         document.getElementById('complete-book-activity-btn').addEventListener('click', async () => {
             if (!currentAssignmentId || isAdminViewing) return;
-            const content = document.getElementById('book-activity-student-content').value.trim();
+            const content = serializeBook();
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
             const userRef = doc(db, 'users', currentUserData.id);
             try {
@@ -4729,6 +4820,20 @@
                   renderHomework();
             } catch (error) {
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
+            }
+        });
+
+        document.getElementById('add-book-page-btn').addEventListener('click', () => addBookPage());
+
+        document.getElementById('save-book-draft-btn').addEventListener('click', async () => {
+            if (!currentAssignmentId || isAdminViewing) return;
+            const content = serializeBook();
+            const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
+            try {
+                await updateDoc(assignmentRef, { studentAnswer: content });
+                showModal('저장 완료', '책이 저장되었습니다.');
+            } catch (error) {
+                showModal('오류', `저장 실패: ${error.message}`);
             }
         });
 
