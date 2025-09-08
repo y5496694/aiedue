@@ -181,7 +181,10 @@
                             <div class="chart-container h-64"><canvas id="assetAllocationChart"></canvas></div>
                         </div>
                         <div id="student-info-panel" class="bg-white p-6 rounded-lg shadow-md">
-                            <h2 class="text-xl font-bold mb-4">내 정보</h2>
+                            <div class="flex items-center justify-between mb-4">
+                                <h2 class="text-xl font-bold">내 정보</h2>
+                                <button id="edit-student-info-btn" class="text-2xl leading-none">⚙️</button>
+                            </div>
                             <p>고유 코드: <strong id="dashboard-code" class="text-lg"></strong></p>
                         </div>
                         <div id="my-class-section" class="hidden bg-white p-6 rounded-lg shadow-md"></div>
@@ -389,6 +392,19 @@
                     <button id="save-new-code-btn" class="btn btn-primary">저장</button>
                 </div>
             </div>
+        </div>
+    </div>
+    <div id="edit-info-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-edit-info-modal-btn">&times;</span>
+            <h3 class="text-xl font-bold mb-4">내 정보 수정</h3>
+            <form id="edit-info-form" class="space-y-4">
+                <div>
+                    <label for="edit-user-name" class="block text-sm font-medium">이름</label>
+                    <input type="text" id="edit-user-name" class="w-full p-2 border rounded-md form-input">
+                </div>
+                <button type="submit" class="w-full py-2 rounded-md btn btn-primary">저장</button>
+            </form>
         </div>
     </div>
     <div id="shop-item-modal" class="modal-overlay hidden">
@@ -962,6 +978,7 @@
         const dictationModal = document.getElementById('dictation-modal');
         const manualProblemCreationModal = document.getElementById('manual-problem-creation-modal');
         const manualProblemModal = document.getElementById('manual-problem-modal');
+        const editInfoModal = document.getElementById('edit-info-modal');
         let studentToAdjustId = null;
 
 
@@ -1091,6 +1108,7 @@
             const todayHomeworkSection = document.getElementById('today-homework-section');
             const classSection = document.getElementById('my-class-section');
             const calendarEl = document.getElementById('aedu-calendar');
+            const editInfoBtn = document.getElementById('edit-student-info-btn');
 
             const walletInfo = document.getElementById('wallet-financial-info');
             const walletTitle = document.getElementById('wallet-title');
@@ -1116,7 +1134,11 @@
                 calendarEl.classList.add('hidden');
                 renderTodayHomework();
             }
-            
+
+            if (editInfoBtn) {
+                editInfoBtn.classList.toggle('hidden', role !== 'student' || isAdminViewing || !currentUserData || currentUserData.id !== dataToShow.id);
+            }
+
             // Show/hide tabs based on the *actual logged-in user's role*
             document.getElementById('homework-dashboard-tab').style.display = dataToShow.role === 'student' ? 'inline-block' : 'none';
             document.getElementById('learning-problems-dashboard-tab').style.display = currentUserData.role === 'teacher' ? 'inline-block' : 'none';
@@ -4381,6 +4403,31 @@
             wordchainMainView.style.display = 'block';
         });
 
+        document.getElementById('edit-student-info-btn').addEventListener('click', () => {
+            if (!currentUserData || viewedUserData.id !== currentUserData.id || isAdminViewing) return;
+            document.getElementById('edit-user-name').value = currentUserData.name || '';
+            editInfoModal.style.display = 'flex';
+        });
+
+        document.getElementById('edit-info-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUserData) return;
+            const newName = document.getElementById('edit-user-name').value.trim();
+            if (!newName) {
+                showModal('오류', '이름을 입력해주세요.');
+                return;
+            }
+            try {
+                await updateDoc(doc(db, 'users', currentUserData.id), { name: newName });
+                currentUserData.name = newName;
+                viewedUserData = currentUserData;
+                showDashboard(currentUserData.role);
+                editInfoModal.style.display = 'none';
+            } catch (error) {
+                showModal('오류', `정보 수정 실패: ${error.message}`);
+            }
+        });
+
         // Close Modals
         document.getElementById('close-homework-modal-btn').addEventListener('click', () => homeworkModal.style.display = 'none');
         document.getElementById('close-problem-creation-modal-btn').addEventListener('click', () => problemCreationModal.style.display = 'none');
@@ -4392,6 +4439,7 @@
         document.getElementById('close-manual-problem-modal-btn').addEventListener('click', () => manualProblemModal.style.display = 'none');
         document.getElementById('close-wordchain-creation-modal-btn').addEventListener('click', () => wordchainCreationModal.style.display = 'none');
         document.getElementById('close-wordchain-homework-modal-btn').addEventListener('click', () => wordchainHomeworkModal.style.display = 'none');
+        document.getElementById('close-edit-info-modal-btn').addEventListener('click', () => editInfoModal.style.display = 'none');
 
 
         // --- Initial Load ---
