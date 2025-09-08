@@ -793,10 +793,6 @@
                     <input type="text" id="book-activity-title" required class="w-full p-2 border rounded-md form-input">
                 </div>
                 <div>
-                    <label for="book-activity-description" class="block text-sm font-medium">활동 안내</label>
-                    <textarea id="book-activity-description" class="w-full p-2 border rounded-md form-input"></textarea>
-                </div>
-                <div>
                     <label for="book-activity-reward" class="block text-sm font-medium">완료 시 획득 금액 (원)</label>
                     <input type="number" id="book-activity-reward" required min="0" class="w-full p-2 border rounded-md form-input">
                 </div>
@@ -817,7 +813,6 @@
                     <button id="complete-book-activity-btn" class="btn btn-primary">책 완성하기</button>
                 </div>
             </div>
-            <p id="book-activity-description-display" class="mb-4"></p>
             <div id="book-editor" class="book-editor max-h-[60vh] overflow-y-auto"></div>
         </div>
     </div>
@@ -4743,7 +4738,6 @@
             document.getElementById('book-activity-problem-id').value = problem?.id || '';
             if (problem) {
                 document.getElementById('book-activity-title').value = problem.title;
-                document.getElementById('book-activity-description').value = problem.description || '';
                 document.getElementById('book-activity-reward').value = problem.reward;
             }
         }
@@ -4754,11 +4748,13 @@
             const data = {
                 type: 'bookActivity',
                 title: document.getElementById('book-activity-title').value,
-                description: document.getElementById('book-activity-description').value,
                 reward: Number(document.getElementById('book-activity-reward').value),
                 teacherId: currentAuthUser.uid,
                 createdAt: serverTimestamp()
             };
+            if (problemId) {
+                data.description = deleteField();
+            }
             if (!data.title || data.reward === '') {
                 showModal('입력 오류', '모든 필드를 채워주세요.');
                 return;
@@ -4789,7 +4785,6 @@
             const assignmentData = assignmentDoc.data();
             const problem = problemDoc.data();
             document.getElementById('book-activity-modal-title').textContent = assignmentData.title;
-            document.getElementById('book-activity-description-display').textContent = problem.description || '';
             initializeBookEditor(assignmentData.studentAnswer || '');
             if (assignmentData.status === 'completed') {
                 bookEditor.querySelectorAll('textarea').forEach(el => el.disabled = true);
