@@ -247,6 +247,8 @@
                         <button id="add-ai-dictation-problem-btn" class="btn bg-teal-500 hover:bg-teal-600 text-white">🎤 AI 받아쓰기 문제 만들기</button>
                         <button id="add-ai-math-problem-btn" class="btn bg-blue-500 hover:bg-blue-600 text-white">🤖 AI 수학 문제 만들기</button>
                         <button id="add-wordchain-problem-btn" class="btn bg-yellow-500 hover:bg-yellow-600 text-white">🔗 끝말잇기 문제 만들기</button>
+                        <button id="add-reading-journal-problem-btn" class="btn bg-purple-500 hover:bg-purple-600 text-white">📚 독서기록장 문제 추가</button>
+                        <button id="add-book-activity-problem-btn" class="btn bg-pink-500 hover:bg-pink-600 text-white">📘 책 만들기 활동 추가</button>
                     </div>
                 </div>
                 <div id="learning-problem-list" class="bg-white p-4 rounded-lg shadow">
@@ -270,7 +272,7 @@
             </div>
             <div id="reading-log-tab-content" class="tab-content">
                 <h2 class="text-2xl font-bold mb-4">📖 에이두 독서기록장</h2>
-                <p>준비중입니다.</p>
+                <ul id="reading-log-list" class="space-y-2"></ul>
             </div>
         </div>
 
@@ -713,6 +715,85 @@
             </div>
         </div>
     </div>
+    <div id="reading-journal-creation-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-reading-journal-creation-modal-btn">&times;</span>
+            <h3 class="text-xl font-bold mb-4">📚 독서기록장 문제 추가</h3>
+            <form id="reading-journal-form" class="text-left space-y-4">
+                <input type="hidden" id="reading-journal-problem-id">
+                <div>
+                    <label for="reading-journal-title" class="block text-sm font-medium">제목</label>
+                    <input type="text" id="reading-journal-title" required class="w-full p-2 border rounded-md form-input">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">문항</label>
+                    <ol id="reading-journal-question-list" class="space-y-2">
+                        <li class="flex items-center"><span class="mr-2">1.</span><span>읽은 책의 제목은 무엇인가요?</span></li>
+                    </ol>
+                    <div class="mt-2"><button type="button" id="add-reading-journal-question-btn" class="btn btn-secondary">+ 문항 추가</button></div>
+                </div>
+                <div>
+                    <label for="reading-journal-reward" class="block text-sm font-medium">완료 시 획득 금액 (원)</label>
+                    <input type="number" id="reading-journal-reward" required min="0" class="w-full p-2 border rounded-md form-input">
+                </div>
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="reading-journal-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-reading-journal-modal-btn">&times;</span>
+            <h3 id="reading-journal-modal-title" class="text-xl font-bold mb-4"></h3>
+            <div id="reading-journal-content" class="text-left mb-4 space-y-4 max-h-[60vh] overflow-y-auto"></div>
+            <div id="reading-journal-footer" class="text-right">
+                <button id="complete-reading-journal-btn" class="btn btn-primary">숙제 완료하기</button>
+            </div>
+        </div>
+    </div>
+    <div id="book-activity-creation-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-book-activity-creation-modal-btn">&times;</span>
+            <h3 class="text-xl font-bold mb-4">📘 책 만들기 활동 추가</h3>
+            <form id="book-activity-form" class="text-left space-y-4">
+                <input type="hidden" id="book-activity-problem-id">
+                <div>
+                    <label for="book-activity-title" class="block text-sm font-medium">제목</label>
+                    <input type="text" id="book-activity-title" required class="w-full p-2 border rounded-md form-input">
+                </div>
+                <div>
+                    <label for="book-activity-description" class="block text-sm font-medium">활동 안내</label>
+                    <textarea id="book-activity-description" class="w-full p-2 border rounded-md form-input"></textarea>
+                </div>
+                <div>
+                    <label for="book-activity-reward" class="block text-sm font-medium">완료 시 획득 금액 (원)</label>
+                    <input type="number" id="book-activity-reward" required min="0" class="w-full p-2 border rounded-md form-input">
+                </div>
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="book-activity-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-book-activity-modal-btn">&times;</span>
+            <h3 id="book-activity-modal-title" class="text-xl font-bold mb-4"></h3>
+            <p id="book-activity-description-display" class="mb-4"></p>
+            <textarea id="book-activity-student-content" class="w-full p-2 border rounded-md form-input mb-4" placeholder="책 내용을 입력하세요"></textarea>
+            <div id="book-activity-footer" class="text-right">
+                <button id="complete-book-activity-btn" class="btn btn-primary">숙제 완료하기</button>
+            </div>
+        </div>
+    </div>
+    <div id="reading-log-entry-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-reading-log-entry-modal-btn">&times;</span>
+            <h3 id="reading-log-entry-title" class="text-xl font-bold mb-4"></h3>
+            <div id="reading-log-entry-content" class="text-left space-y-4 max-h-[60vh] overflow-y-auto"></div>
+        </div>
+    </div>
     <div id="quick-link-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <span class="close-button" id="close-quick-link-modal-btn">&times;</span>
@@ -992,6 +1073,11 @@
         const dictationModal = document.getElementById('dictation-modal');
         const manualProblemCreationModal = document.getElementById('manual-problem-creation-modal');
         const manualProblemModal = document.getElementById('manual-problem-modal');
+        const readingJournalCreationModal = document.getElementById('reading-journal-creation-modal');
+        const readingJournalModal = document.getElementById('reading-journal-modal');
+        const bookActivityCreationModal = document.getElementById('book-activity-creation-modal');
+        const bookActivityModal = document.getElementById('book-activity-modal');
+        const readingLogEntryModal = document.getElementById('reading-log-entry-modal');
         const editInfoModal = document.getElementById('edit-info-modal');
         let studentToAdjustId = null;
 
@@ -1067,7 +1153,12 @@
         }
 
         document.querySelectorAll('.dashboard-tab').forEach(tab => {
-            tab.addEventListener('click', () => switchTab('dashboard', tab.dataset.tab));
+            tab.addEventListener('click', () => {
+                switchTab('dashboard', tab.dataset.tab);
+                if (tab.dataset.tab === 'reading-log') {
+                    renderReadingLog();
+                }
+            });
         });
         document.querySelectorAll('.admin-tab').forEach(tab => {
             tab.addEventListener('click', () => switchTab('admin', tab.dataset.tab));
@@ -2589,6 +2680,12 @@
                     openDictationModal(hw.id, hw.problemId);
                 } else if (hw.type === 'manual') {
                     openManualProblemModal(hw.id, hw.problemId);
+                } else if (hw.type === 'wordchain') {
+                    openWordChainHomeworkModal(hw.id, hw.problemId);
+                } else if (hw.type === 'readingJournal') {
+                    openReadingJournalModal(hw.id, hw.problemId);
+                } else if (hw.type === 'bookActivity') {
+                    openBookActivityModal(hw.id, hw.problemId);
                 } else {
                     openHomeworkModal(hw.id, hw.problemId);
                 }
@@ -2618,6 +2715,8 @@
         document.getElementById('add-ai-dictation-problem-btn').addEventListener('click', () => openDictationCreationModal());
         // Teacher: Open Manual Problem Creator
         document.getElementById('add-manual-problem-btn').addEventListener('click', () => openManualProblemCreationModal());
+        document.getElementById('add-reading-journal-problem-btn').addEventListener('click', () => openReadingJournalCreationModal());
+        document.getElementById('add-book-activity-problem-btn').addEventListener('click', () => openBookActivityCreationModal());
 
         // Teacher: Open Math Problem Modal (new or for editing)
         function openProblemCreationModal(problemSet = null) {
@@ -2780,11 +2879,15 @@
                             const isDictation = problemSet.type === 'dictation';
                             const isManual = problemSet.type === 'manual';
                             const isWordchain = problemSet.type === 'wordchain';
-                            const icon = isDictation ? '🎤' : (isManual ? '📝' : (isWordchain ? '🔗' : '🤖'));
+                            const isReading = problemSet.type === 'readingJournal';
+                            const isBook = problemSet.type === 'bookActivity';
+                            const icon = isDictation ? '🎤' : (isManual ? '📝' : (isWordchain ? '🔗' : (isReading ? '📚' : (isBook ? '📘' : '🤖'))));
                             const topicText = isDictation ?
                                 `${problemSet.dictationType === 'word' ? '단어' : '문장'} ${problemSet.count}개` :
                                 isManual ? '직접 문제' :
-                                isWordchain ? `끝말잇기 ${problemSet.count}문제` : `${problemSet.topic} (${problemSet.problems ? problemSet.problems.length : problemSet.count || 0}문제${problemSet.problems ? '' : '·학생 생성'})`;
+                                isWordchain ? `끝말잇기 ${problemSet.count}문제` :
+                                isReading ? `독서기록장 ${problemSet.questions ? problemSet.questions.length : 0}문항` :
+                                isBook ? '책 만들기 활동' : `${problemSet.topic} (${problemSet.problems ? problemSet.problems.length : problemSet.count || 0}문제${problemSet.problems ? '' : '·학생 생성'})`;
 
                             return `
                                 <div class="p-3 flex justify-between items-center">
@@ -2814,6 +2917,10 @@
                         openManualProblemCreationModal({id: problemDoc.id, ...problemDoc.data()});
                     } else if(problemType === 'wordchain') {
                         openWordChainCreationModal({id: problemDoc.id, ...problemDoc.data()});
+                    } else if(problemType === 'readingJournal') {
+                        openReadingJournalCreationModal({id: problemDoc.id, ...problemDoc.data()});
+                    } else if(problemType === 'bookActivity') {
+                        openBookActivityCreationModal({id: problemDoc.id, ...problemDoc.data()});
                     } else {
                         openProblemCreationModal({id: problemDoc.id, ...problemDoc.data()});
                     }
@@ -2971,7 +3078,7 @@
                 }
 
                 hwsToShow.forEach(hw => {
-                    const icon = hw.type === 'dictation' ? '🎤' : (hw.type === 'manual' ? '📝' : (hw.type === 'wordchain' ? '🔗' : '🤖'));
+                    const icon = hw.type === 'dictation' ? '🎤' : (hw.type === 'manual' ? '📝' : (hw.type === 'wordchain' ? '🔗' : (hw.type === 'readingJournal' ? '📚' : (hw.type === 'bookActivity' ? '📘' : '🤖'))));
                     const isCompleted = hw.status === 'completed';
                     const assignedDate = hw.assignedAt ? hw.assignedAt.toDate().toLocaleDateString('ko-KR') : '';
                     const tr = document.createElement('tr');
@@ -3006,6 +3113,10 @@
                             openManualProblemModal(e.target.dataset.hwid, e.target.dataset.problemid);
                         } else if (hwType === 'wordchain') {
                             openWordChainHomeworkModal(e.target.dataset.hwid, e.target.dataset.problemid);
+                        } else if (hwType === 'readingJournal') {
+                            openReadingJournalModal(e.target.dataset.hwid, e.target.dataset.problemid);
+                        } else if (hwType === 'bookActivity') {
+                            openBookActivityModal(e.target.dataset.hwid, e.target.dataset.problemid);
                         } else {
                             openHomeworkModal(e.target.dataset.hwid, e.target.dataset.problemid);
                         }
@@ -4424,6 +4535,267 @@
             wordchainInitialView.style.display = 'none';
             wordchainMainView.style.display = 'block';
         });
+        // ----- Reading Journal Problem Handling -----
+        function openReadingJournalCreationModal(problem = null) {
+            readingJournalCreationModal.style.display = 'flex';
+            const form = document.getElementById('reading-journal-form');
+            form.reset();
+            document.getElementById('reading-journal-problem-id').value = problem?.id || '';
+            const list = document.getElementById('reading-journal-question-list');
+            list.innerHTML = '<li class="flex items-center"><span class="mr-2">1.</span><span>읽은 책의 제목은 무엇인가요?</span></li>';
+            if (problem) {
+                document.getElementById('reading-journal-title').value = problem.title;
+                document.getElementById('reading-journal-reward').value = problem.reward;
+                if (problem.questions && problem.questions.length > 1) {
+                    problem.questions.slice(1).forEach(q => addReadingJournalQuestionItem(q));
+                }
+            }
+        }
+
+        function addReadingJournalQuestionItem(value = '') {
+            const list = document.getElementById('reading-journal-question-list');
+            const li = document.createElement('li');
+            li.className = 'flex items-center space-x-2';
+            const idx = list.querySelectorAll('li').length + 1;
+            li.innerHTML = `<span>${idx}.</span><input type="text" class="flex-grow p-2 border rounded-md form-input" value="${value}"><button type="button" class="text-red-500 remove-reading-question">삭제</button>`;
+            list.appendChild(li);
+            li.querySelector('.remove-reading-question').addEventListener('click', () => { li.remove(); renumberReadingJournalQuestions(); });
+        }
+
+        function renumberReadingJournalQuestions() {
+            const list = document.getElementById('reading-journal-question-list');
+            list.querySelectorAll('li').forEach((li, i) => {
+                li.querySelector('span').textContent = `${i + 1}.`;
+            });
+        }
+
+        document.getElementById('add-reading-journal-question-btn').addEventListener('click', () => addReadingJournalQuestionItem());
+
+        document.getElementById('reading-journal-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const problemId = document.getElementById('reading-journal-problem-id').value;
+            const extraQuestions = Array.from(document.querySelectorAll('#reading-journal-question-list input')).map(i => i.value.trim()).filter(q => q);
+            const questions = ['읽은 책의 제목은 무엇인가요?', ...extraQuestions];
+            const data = {
+                type: 'readingJournal',
+                title: document.getElementById('reading-journal-title').value,
+                questions,
+                reward: Number(document.getElementById('reading-journal-reward').value),
+                teacherId: currentAuthUser.uid,
+                createdAt: serverTimestamp()
+            };
+            if (!data.title || data.reward === '') {
+                showModal('입력 오류', '모든 필드를 채워주세요.');
+                return;
+            }
+            try {
+                if (problemId) {
+                    await setDoc(doc(db, 'learningProblems', problemId), data, { merge: true });
+                } else {
+                    await addDoc(collection(db, 'learningProblems'), data);
+                }
+                readingJournalCreationModal.style.display = 'none';
+                loadLearningProblems();
+            } catch (error) {
+                showModal('저장 실패', `오류: ${error.message}`);
+            }
+        });
+
+        async function openReadingJournalModal(assignmentId, problemId) {
+            currentAssignmentId = assignmentId;
+            const dataToShow = viewedUserData;
+            const assignmentRef = doc(db, `users/${dataToShow.id}/assignedHomework`, assignmentId);
+            const assignmentDoc = await getDoc(assignmentRef);
+            const problemDoc = await getDoc(doc(db, 'learningProblems', problemId));
+            if (!assignmentDoc.exists() || !problemDoc.exists()) {
+                showModal('오류', '숙제 문제를 불러올 수 없습니다.');
+                return;
+            }
+            const assignmentData = assignmentDoc.data();
+            const problem = problemDoc.data();
+            document.getElementById('reading-journal-modal-title').textContent = assignmentData.title;
+            const content = document.getElementById('reading-journal-content');
+            content.innerHTML = '';
+            if (assignmentData.status === 'completed') {
+                problem.questions.forEach((q, idx) => {
+                    const div = document.createElement('div');
+                    div.innerHTML = `<p class="font-semibold mb-1">${idx + 1}. ${q}</p><p class="pl-4">${assignmentData.studentAnswers[idx] || ''}</p>`;
+                    content.appendChild(div);
+                });
+                document.getElementById('reading-journal-footer').style.display = 'none';
+            } else {
+                problem.questions.forEach((q, idx) => {
+                    const div = document.createElement('div');
+                    div.innerHTML = `<label class="block text-sm font-medium">${idx + 1}. ${q}</label><textarea class="w-full p-2 border rounded-md form-input" data-index="${idx}"></textarea>`;
+                    content.appendChild(div);
+                });
+                document.getElementById('reading-journal-footer').style.display = 'block';
+            }
+            readingJournalModal.dataset.questions = JSON.stringify(problem.questions);
+            readingJournalModal.style.display = 'flex';
+        }
+
+        document.getElementById('complete-reading-journal-btn').addEventListener('click', async () => {
+            if (!currentAssignmentId || isAdminViewing) return;
+            const answers = Array.from(document.querySelectorAll('#reading-journal-content textarea')).map(t => t.value.trim());
+            const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
+            const userRef = doc(db, 'users', currentUserData.id);
+            try {
+                const assignmentDoc = await getDoc(assignmentRef);
+                const reward = assignmentDoc.data().reward || 0;
+                await updateDoc(assignmentRef, { status: 'completed', studentAnswers: answers, completedAt: serverTimestamp() });
+                await updateDoc(userRef, { balance: increment(reward), tokens: increment(reward) });
+                await addDoc(collection(db, 'readingLogs'), {
+                    userId: currentUserData.id,
+                    userName: currentUserData.name || '',
+                    bookTitle: answers[0],
+                    questions: JSON.parse(readingJournalModal.dataset.questions || '[]'),
+                    answers,
+                    createdAt: serverTimestamp()
+                });
+                const userDoc = await getDoc(userRef);
+                currentUserData = { id: userDoc.id, ...userDoc.data() };
+                viewedUserData = currentUserData;
+                readingJournalModal.style.display = 'none';
+                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}과 ${reward} 토큰을 획득했습니다!`);
+                updateDashboardDisplay();
+                renderHomework();
+                renderReadingLog();
+            } catch (error) {
+                showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
+            }
+        });
+
+        // ----- Book Activity Handling -----
+        function openBookActivityCreationModal(problem = null) {
+            bookActivityCreationModal.style.display = 'flex';
+            const form = document.getElementById('book-activity-form');
+            form.reset();
+            document.getElementById('book-activity-problem-id').value = problem?.id || '';
+            if (problem) {
+                document.getElementById('book-activity-title').value = problem.title;
+                document.getElementById('book-activity-description').value = problem.description || '';
+                document.getElementById('book-activity-reward').value = problem.reward;
+            }
+        }
+
+        document.getElementById('book-activity-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const problemId = document.getElementById('book-activity-problem-id').value;
+            const data = {
+                type: 'bookActivity',
+                title: document.getElementById('book-activity-title').value,
+                description: document.getElementById('book-activity-description').value,
+                reward: Number(document.getElementById('book-activity-reward').value),
+                teacherId: currentAuthUser.uid,
+                createdAt: serverTimestamp()
+            };
+            if (!data.title || data.reward === '') {
+                showModal('입력 오류', '모든 필드를 채워주세요.');
+                return;
+            }
+            try {
+                if (problemId) {
+                    await setDoc(doc(db, 'learningProblems', problemId), data, { merge: true });
+                } else {
+                    await addDoc(collection(db, 'learningProblems'), data);
+                }
+                bookActivityCreationModal.style.display = 'none';
+                loadLearningProblems();
+            } catch (error) {
+                showModal('저장 실패', `오류: ${error.message}`);
+            }
+        });
+
+        async function openBookActivityModal(assignmentId, problemId) {
+            currentAssignmentId = assignmentId;
+            const dataToShow = viewedUserData;
+            const assignmentRef = doc(db, `users/${dataToShow.id}/assignedHomework`, assignmentId);
+            const assignmentDoc = await getDoc(assignmentRef);
+            const problemDoc = await getDoc(doc(db, 'learningProblems', problemId));
+            if (!assignmentDoc.exists() || !problemDoc.exists()) {
+                showModal('오류', '활동을 불러올 수 없습니다.');
+                return;
+            }
+            const assignmentData = assignmentDoc.data();
+            const problem = problemDoc.data();
+            document.getElementById('book-activity-modal-title').textContent = assignmentData.title;
+            document.getElementById('book-activity-description-display').textContent = problem.description || '';
+            const textarea = document.getElementById('book-activity-student-content');
+            if (assignmentData.status === 'completed') {
+                textarea.value = assignmentData.studentAnswer || '';
+                textarea.disabled = true;
+                document.getElementById('book-activity-footer').style.display = 'none';
+            } else {
+                textarea.value = assignmentData.studentAnswer || '';
+                textarea.disabled = false;
+                document.getElementById('book-activity-footer').style.display = 'block';
+            }
+            bookActivityModal.style.display = 'flex';
+        }
+
+        document.getElementById('complete-book-activity-btn').addEventListener('click', async () => {
+            if (!currentAssignmentId || isAdminViewing) return;
+            const content = document.getElementById('book-activity-student-content').value.trim();
+            const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
+            const userRef = doc(db, 'users', currentUserData.id);
+            try {
+                const assignmentDoc = await getDoc(assignmentRef);
+                const reward = assignmentDoc.data().reward || 0;
+                await updateDoc(assignmentRef, { status: 'completed', studentAnswer: content, completedAt: serverTimestamp() });
+                await updateDoc(userRef, { balance: increment(reward), tokens: increment(reward) });
+                const userDoc = await getDoc(userRef);
+                currentUserData = { id: userDoc.id, ...userDoc.data() };
+                viewedUserData = currentUserData;
+                bookActivityModal.style.display = 'none';
+                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}과 ${reward} 토큰을 획득했습니다!`);
+                updateDashboardDisplay();
+                renderHomework();
+            } catch (error) {
+                showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
+            }
+        });
+
+        // ----- Reading Log Rendering -----
+        async function renderReadingLog() {
+            const list = document.getElementById('reading-log-list');
+            if (!list) return;
+            list.innerHTML = '<li class="text-sm text-gray-500">불러오는 중...</li>';
+            try {
+                const qSnap = await getDocs(query(collection(db, 'readingLogs'), orderBy('createdAt', 'desc')));
+                if (qSnap.empty) { list.innerHTML = '<li class="text-sm text-gray-500">기록이 없습니다.</li>'; return; }
+                list.innerHTML = '';
+                qSnap.forEach(docSnap => {
+                    const entry = { id: docSnap.id, ...docSnap.data() };
+                    const li = document.createElement('li');
+                    li.className = 'flex justify-between items-center bg-white p-2 rounded shadow';
+                    const btn = document.createElement('button');
+                    btn.className = 'flex-grow text-left hover:underline';
+                    btn.textContent = `책 이름: ${entry.bookTitle}`;
+                    btn.addEventListener('click', () => openReadingLogEntry(entry));
+                    const span = document.createElement('span');
+                    span.className = 'ml-2 text-sm text-gray-500';
+                    span.textContent = entry.userName;
+                    li.appendChild(btn);
+                    li.appendChild(span);
+                    list.appendChild(li);
+                });
+            } catch (error) {
+                list.innerHTML = '<li class="text-sm text-red-500">기록을 불러오지 못했습니다.</li>';
+            }
+        }
+
+        function openReadingLogEntry(entry) {
+            document.getElementById('reading-log-entry-title').textContent = entry.bookTitle;
+            const content = document.getElementById('reading-log-entry-content');
+            content.innerHTML = '';
+            entry.questions.forEach((q, idx) => {
+                const div = document.createElement('div');
+                div.innerHTML = `<p class="font-semibold mb-1">${idx + 1}. ${q}</p><p class="pl-4">${entry.answers[idx] || ''}</p>`;
+                content.appendChild(div);
+            });
+            readingLogEntryModal.style.display = 'flex';
+        }
 
         document.querySelectorAll('.edit-info-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -4463,6 +4835,11 @@
         document.getElementById('close-manual-problem-modal-btn').addEventListener('click', () => manualProblemModal.style.display = 'none');
         document.getElementById('close-wordchain-creation-modal-btn').addEventListener('click', () => wordchainCreationModal.style.display = 'none');
         document.getElementById('close-wordchain-homework-modal-btn').addEventListener('click', () => wordchainHomeworkModal.style.display = 'none');
+        document.getElementById('close-reading-journal-creation-modal-btn').addEventListener('click', () => readingJournalCreationModal.style.display = 'none');
+        document.getElementById('close-reading-journal-modal-btn').addEventListener('click', () => readingJournalModal.style.display = 'none');
+        document.getElementById('close-book-activity-creation-modal-btn').addEventListener('click', () => bookActivityCreationModal.style.display = 'none');
+        document.getElementById('close-book-activity-modal-btn').addEventListener('click', () => bookActivityModal.style.display = 'none');
+        document.getElementById('close-reading-log-entry-modal-btn').addEventListener('click', () => readingLogEntryModal.style.display = 'none');
         document.getElementById('close-edit-info-modal-btn').addEventListener('click', () => editInfoModal.style.display = 'none');
 
 
