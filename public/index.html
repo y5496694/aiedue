@@ -133,21 +133,17 @@
                     <div class="lg:col-span-2 space-y-6">
                         <div id="wallet-section" class="bg-white p-6 rounded-lg shadow-md">
                             <h2 id="wallet-title" class="text-xl font-bold mb-4">💰 내 지갑 현황</h2>
-                            <div id="wallet-financial-info" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                <div>
-                                    <p class="text-sm text-gray-500">현재 잔액</p>
-                                    <p id="currentBalance" class="text-3xl font-bold text-sky-600">0 원</p>
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-500">에이두 토큰</p>
-                                    <p id="currentTokens" class="text-3xl font-bold text-violet-600">0 토큰</p>
-                                </div>
-                                <div>
-                                    <p class="text-sm text-gray-500">총 자산 가치</p>
-                                    <p id="totalAssetValue" class="text-3xl font-bold text-emerald-600">0 원</p>
-                                    <p class="text-xs text-stone-500">(현금 + 주식 평가액)</p>
-                                </div>
-                            </div>
+                              <div id="wallet-financial-info" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                  <div>
+                                      <p class="text-sm text-gray-500">현재 잔액</p>
+                                      <p id="currentBalance" class="text-3xl font-bold text-sky-600">0 원</p>
+                                  </div>
+                                  <div>
+                                      <p class="text-sm text-gray-500">총 자산 가치</p>
+                                      <p id="totalAssetValue" class="text-3xl font-bold text-emerald-600">0 원</p>
+                                      <p class="text-xs text-stone-500">(현금 + 주식 평가액)</p>
+                                  </div>
+                              </div>
                             <hr class="my-4">
                             <div id="main-dashboard-bottom-content">
                                 <div id="life-rules-container" class="space-y-2 hidden"></div>
@@ -369,13 +365,6 @@
                     <div class="flex items-center space-x-2 mt-1">
                         <input type="number" id="won-adjustment-amount" class="w-full p-2 border rounded-md form-input" placeholder="조정할 금액 (예: 500, -500)">
                         <button id="adjust-won-btn" class="btn btn-primary px-4 py-2 whitespace-nowrap">금액 조정</button>
-                    </div>
-                </div>
-                <div>
-                    <h4 class="font-bold text-lg border-b pb-1 mb-2">🪙 토큰 조정</h4>
-                    <div class="flex items-center space-x-2 mt-1">
-                        <input type="number" id="token-adjustment-amount" class="w-full p-2 border rounded-md form-input" placeholder="조정할 토큰 (예: 5, -5)">
-                        <button id="adjust-token-btn" class="btn btn-primary px-4 py-2 whitespace-nowrap">토큰 조정</button>
                     </div>
                 </div>
                 <div>
@@ -1084,7 +1073,6 @@
 
         // --- Utility & Modal Functions ---
         const formatCurrency = (amount) => new Intl.NumberFormat('ko-KR').format(amount) + ' 원';
-        const formatTokens = (amount) => new Intl.NumberFormat('ko-KR').format(amount) + ' 토큰';
         
         function showModal(title, message, onConfirm = null) {
             modalTitle.textContent = title;
@@ -1297,10 +1285,8 @@
         function updateDashboardDisplay() {
             const dataToShow = viewedUserData;
             if (!dataToShow) return;
-            const balance = dataToShow.balance || dataToShow.coins || 0;
-            const tokens = dataToShow.tokens || 0;
-            document.getElementById('currentBalance').textContent = formatCurrency(balance);
-            document.getElementById('currentTokens').textContent = formatTokens(tokens);
+              const balance = dataToShow.balance || dataToShow.coins || 0;
+              document.getElementById('currentBalance').textContent = formatCurrency(balance);
             let stockValue = 0;
             if (dataToShow.portfolio) {
                 for (const stockId in dataToShow.portfolio) {
@@ -1676,10 +1662,9 @@
                     email: email,
                     userCode: newCode,
                     role: 'student',
-                    coins: 0,
-                    balance: 0,
-                    tokens: 0,
-                    portfolio: {},
+                      coins: 0,
+                      balance: 0,
+                      portfolio: {},
                     createdAt: serverTimestamp()
                 });
 
@@ -2152,16 +2137,6 @@
                 document.getElementById('won-adjustment-amount').value = '';
             });
 
-            document.getElementById('adjust-token-btn').addEventListener('click', async () => {
-                const amount = Number(document.getElementById('token-adjustment-amount').value);
-                if (isNaN(amount) || amount === 0) {
-                    showModal('오류', '정확한 토큰 수량을 입력하세요.'); return;
-                }
-                await updateDoc(doc(db, "users", studentToAdjustId), { tokens: increment(amount) });
-                showModal('성공', '토큰 조정이 완료되었습니다.');
-                document.getElementById('token-adjustment-amount').value = '';
-            });
-
             document.querySelectorAll('.reset-stock-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                 const stockIdToReset = e.target.dataset.stockid;
                 await updateDoc(doc(db, "users", studentToAdjustId), { [`portfolio.${stockIdToReset}`]: deleteField() });
@@ -2171,8 +2146,8 @@
             document.querySelectorAll('.force-complete-hw-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                 const hwId = e.target.dataset.hwid;
                 const reward = Number(e.target.dataset.reward);
-                await updateDoc(doc(db, `users/${studentToAdjustId}/assignedHomework`, hwId), { status: 'completed' });
-                await updateDoc(doc(db, "users", studentToAdjustId), { balance: increment(reward), tokens: increment(reward) });
+                  await updateDoc(doc(db, `users/${studentToAdjustId}/assignedHomework`, hwId), { status: 'completed' });
+                  await updateDoc(doc(db, "users", studentToAdjustId), { balance: increment(reward) });
                 openAdjustModal(studentToAdjustId); // Refresh modal
             }));
 
@@ -2462,15 +2437,15 @@
                     const userRef = doc(db, "users", currentUserData.id);
                     const ruleRef = doc(db, `users/${currentUserData.id}/assignedLifeRules`, ruleId);
 
-                    await updateDoc(userRef, { balance: increment(reward), tokens: increment(reward) });
-                    await updateDoc(ruleRef, { lastCompletedAt: serverTimestamp() });
+                      await updateDoc(userRef, { balance: increment(reward) });
+                      await updateDoc(ruleRef, { lastCompletedAt: serverTimestamp() });
 
-                    const userDoc = await getDoc(userRef);
-                    currentUserData = { id: userDoc.id, ...userDoc.data() };
-                    viewedUserData = currentUserData;
-                    showModal('참 잘했어요!', `${formatCurrency(reward)}과 ${reward} 토큰을 획득했습니다!`);
-                    updateDashboardDisplay();
-                    renderLifeRulesForStudent();
+                      const userDoc = await getDoc(userRef);
+                      currentUserData = { id: userDoc.id, ...userDoc.data() };
+                      viewedUserData = currentUserData;
+                      showModal('참 잘했어요!', `${formatCurrency(reward)}을 획득했습니다!`);
+                      updateDashboardDisplay();
+                      renderLifeRulesForStudent();
                 });
             });
 
@@ -3265,21 +3240,21 @@
                 const assignmentDoc = await getDoc(assignmentRef);
                 const reward = assignmentDoc.data().reward || 0;
 
-                await updateDoc(assignmentRef, {
-                    status: 'completed',
-                    studentAnswers: studentAnswers,
-                    completedAt: serverTimestamp()
-                });
-                await updateDoc(userRef, { balance: increment(reward), tokens: increment(reward) });
+                  await updateDoc(assignmentRef, {
+                      status: 'completed',
+                      studentAnswers: studentAnswers,
+                      completedAt: serverTimestamp()
+                  });
+                  await updateDoc(userRef, { balance: increment(reward) });
 
                 const userDoc = await getDoc(userRef);
                 currentUserData = { id: userDoc.id, ...userDoc.data() };
                 viewedUserData = currentUserData;
                 
-                homeworkModal.style.display = 'none';
-                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}과 ${reward} 토큰을 획득했습니다!`);
-                updateDashboardDisplay();
-                renderHomework();
+                  homeworkModal.style.display = 'none';
+                  showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을 획득했습니다!`);
+                  updateDashboardDisplay();
+                  renderHomework();
 
             } catch (error) {
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
@@ -3818,21 +3793,21 @@
             
             try {
                 const reward = currentDictationTemplate.reward || 0;
-                await updateDoc(assignmentRef, {
-                    status: 'completed',
-                    studentAnswers: studentAnswers,
-                    completedAt: serverTimestamp()
-                });
-                await updateDoc(userRef, { balance: increment(reward), tokens: increment(reward) });
+                  await updateDoc(assignmentRef, {
+                      status: 'completed',
+                      studentAnswers: studentAnswers,
+                      completedAt: serverTimestamp()
+                  });
+                  await updateDoc(userRef, { balance: increment(reward) });
 
                 const userDoc = await getDoc(userRef);
                 currentUserData = { id: userDoc.id, ...userDoc.data() };
                 viewedUserData = currentUserData;
 
-                dictationModal.style.display = 'none';
-                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}과 ${reward} 토큰을 획득했습니다!`);
-                updateDashboardDisplay();
-                renderHomework();
+                  dictationModal.style.display = 'none';
+                  showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을 획득했습니다!`);
+                  updateDashboardDisplay();
+                  renderHomework();
             } catch (error) {
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
             }
@@ -4041,15 +4016,15 @@
             try {
                 const reward = assignmentDoc.data().reward || 0;
                 const userRef = doc(db, 'users', currentUserData.id);
-                await updateDoc(assignmentRef, { status: 'completed', studentAnswers: [...inputAnswers, answer], completedAt: serverTimestamp() });
-                await updateDoc(userRef, { balance: increment(reward), tokens: increment(reward) });
+                  await updateDoc(assignmentRef, { status: 'completed', studentAnswers: [...inputAnswers, answer], completedAt: serverTimestamp() });
+                  await updateDoc(userRef, { balance: increment(reward) });
                 const userDoc = await getDoc(userRef);
                 currentUserData = { id: userDoc.id, ...userDoc.data() };
                 viewedUserData = currentUserData;
-                manualProblemModal.style.display = 'none';
-                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}과 ${reward} 토큰을 획득했습니다!`);
-                updateDashboardDisplay();
-                renderHomework();
+                  manualProblemModal.style.display = 'none';
+                  showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을 획득했습니다!`);
+                  updateDashboardDisplay();
+                  renderHomework();
             } catch (error) {
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
             }
@@ -4505,21 +4480,21 @@
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
             const userRef = doc(db, 'users', currentUserData.id);
             try {
-                const assignmentDoc = await getDoc(assignmentRef);
-                const reward = assignmentDoc.data().reward || 0;
-                await updateDoc(assignmentRef, {
-                    status: 'completed',
-                    studentAnswers: answers,
-                    completedAt: serverTimestamp()
-                });
-                await updateDoc(userRef, { balance: increment(reward), tokens: increment(reward) });
+                  const assignmentDoc = await getDoc(assignmentRef);
+                  const reward = assignmentDoc.data().reward || 0;
+                  await updateDoc(assignmentRef, {
+                      status: 'completed',
+                      studentAnswers: answers,
+                      completedAt: serverTimestamp()
+                  });
+                  await updateDoc(userRef, { balance: increment(reward) });
                 const userDoc = await getDoc(userRef);
                 currentUserData = { id: userDoc.id, ...userDoc.data() };
                 viewedUserData = currentUserData;
-                wordchainHomeworkModal.style.display = 'none';
-                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}과 ${reward} 토큰을 획득했습니다!`);
-                updateDashboardDisplay();
-                renderHomework();
+                  wordchainHomeworkModal.style.display = 'none';
+                  showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을 획득했습니다!`);
+                  updateDashboardDisplay();
+                  renderHomework();
             } catch (error) {
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
             }
@@ -4641,10 +4616,10 @@
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
             const userRef = doc(db, 'users', currentUserData.id);
             try {
-                const assignmentDoc = await getDoc(assignmentRef);
-                const reward = assignmentDoc.data().reward || 0;
-                await updateDoc(assignmentRef, { status: 'completed', studentAnswers: answers, completedAt: serverTimestamp() });
-                await updateDoc(userRef, { balance: increment(reward), tokens: increment(reward) });
+                  const assignmentDoc = await getDoc(assignmentRef);
+                  const reward = assignmentDoc.data().reward || 0;
+                  await updateDoc(assignmentRef, { status: 'completed', studentAnswers: answers, completedAt: serverTimestamp() });
+                  await updateDoc(userRef, { balance: increment(reward) });
                 await addDoc(collection(db, 'readingLogs'), {
                     userId: currentUserData.id,
                     userName: currentUserData.name || '',
@@ -4655,12 +4630,12 @@
                 });
                 const userDoc = await getDoc(userRef);
                 currentUserData = { id: userDoc.id, ...userDoc.data() };
-                viewedUserData = currentUserData;
-                readingJournalModal.style.display = 'none';
-                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}과 ${reward} 토큰을 획득했습니다!`);
-                updateDashboardDisplay();
-                renderHomework();
-                renderReadingLog();
+                  viewedUserData = currentUserData;
+                  readingJournalModal.style.display = 'none';
+                  showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을 획득했습니다!`);
+                  updateDashboardDisplay();
+                  renderHomework();
+                  renderReadingLog();
             } catch (error) {
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
             }
@@ -4740,17 +4715,17 @@
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
             const userRef = doc(db, 'users', currentUserData.id);
             try {
-                const assignmentDoc = await getDoc(assignmentRef);
-                const reward = assignmentDoc.data().reward || 0;
-                await updateDoc(assignmentRef, { status: 'completed', studentAnswer: content, completedAt: serverTimestamp() });
-                await updateDoc(userRef, { balance: increment(reward), tokens: increment(reward) });
+                  const assignmentDoc = await getDoc(assignmentRef);
+                  const reward = assignmentDoc.data().reward || 0;
+                  await updateDoc(assignmentRef, { status: 'completed', studentAnswer: content, completedAt: serverTimestamp() });
+                  await updateDoc(userRef, { balance: increment(reward) });
                 const userDoc = await getDoc(userRef);
                 currentUserData = { id: userDoc.id, ...userDoc.data() };
-                viewedUserData = currentUserData;
-                bookActivityModal.style.display = 'none';
-                showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}과 ${reward} 토큰을 획득했습니다!`);
-                updateDashboardDisplay();
-                renderHomework();
+                  viewedUserData = currentUserData;
+                  bookActivityModal.style.display = 'none';
+                  showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을 획득했습니다!`);
+                  updateDashboardDisplay();
+                  renderHomework();
             } catch (error) {
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
             }
