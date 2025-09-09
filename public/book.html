@@ -377,46 +377,92 @@
             btn.disabled = true;
             btn.textContent = '저장 중...';
             try {
-                const pages = document.querySelectorAll('#book-viewer .book-page');
-                const images = {};
-                const texts = {};
+                const data = {
+                    title: document.querySelector('#spread-0 .book-title-sync')?.textContent.trim() || '',
+                    author: window.authorName || '',
+                    updatedAt: serverTimestamp(),
+                    totalSpreads: document.querySelectorAll('#book-viewer .book-spread').length,
+                    characterSpreadCount: document.querySelectorAll('#book-viewer .book-spread[data-page-type="character"]').length,
+                    storySpreadCount: document.querySelectorAll('#book-viewer .book-spread[data-page-type="story"]').length,
+                };
+
                 const uploads = [];
 
-                pages.forEach((page, idx) => {
-                    const bg = page.style.backgroundImage;
+                // 표지 이미지 (1장 오른쪽 배경)
+                const coverPage = document.querySelector('#spread-0 .book-page:nth-child(2)');
+                if (coverPage) {
+                    const bg = coverPage.style.backgroundImage;
                     const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
                     if (match) {
-                        if (!page.dataset.imageName) {
-                            page.dataset.imageName = `page-${idx}-${Date.now()}.png`;
+                        if (!coverPage.dataset.imageName) {
+                            coverPage.dataset.imageName = `cover-${Date.now()}.png`;
                         }
-                        const imgRef = storageRef(storage, `users/${auth.currentUser.uid}/bookDrafts/${bookCode}/${page.dataset.imageName}`);
+                        const imgRef = storageRef(storage, `Book/${bookCode}/${coverPage.dataset.imageName}`);
                         uploads.push(uploadString(imgRef, match[1], 'data_url'));
-                        images[idx] = page.dataset.imageName;
-                    } else if (page.dataset.imageName) {
-                        images[idx] = page.dataset.imageName;
+                        data.coverImage = coverPage.dataset.imageName;
+                    } else if (coverPage.dataset.imageName) {
+                        data.coverImage = coverPage.dataset.imageName;
+                    }
+                }
+
+                // 등장인물 정보 저장
+                const characterPages = document.querySelectorAll('.book-spread[data-page-type="character"] .book-page');
+                characterPages.forEach((page, idx) => {
+                    const charIndex = idx + 1;
+                    const imgBox = page.querySelector('.character-image-box');
+                    if (imgBox) {
+                        const bg = imgBox.style.backgroundImage;
+                        const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
+                        if (match) {
+                            if (!imgBox.dataset.imageName) {
+                                imgBox.dataset.imageName = `character-${charIndex}-${Date.now()}.png`;
+                            }
+                            const imgRef = storageRef(storage, `Book/${bookCode}/${imgBox.dataset.imageName}`);
+                            uploads.push(uploadString(imgRef, match[1], 'data_url'));
+                            data[`character${charIndex}Image`] = imgBox.dataset.imageName;
+                        } else if (imgBox.dataset.imageName) {
+                            data[`character${charIndex}Image`] = imgBox.dataset.imageName;
+                        }
                     }
 
-                    const textarea = page.querySelector('.manual-text-area');
-                    if (textarea) {
-                        texts[idx] = textarea.value;
-                    } else {
-                        const textBox = page.querySelector('.text-box');
-                        if (textBox) texts[idx] = textBox.textContent.trim();
+                    const nameEl = page.querySelector('.editable-text');
+                    if (nameEl) {
+                        data[`character${charIndex}Name`] = nameEl.textContent.trim();
+                    }
+                    const descEl = page.querySelector('textarea.manual-text-area');
+                    if (descEl) {
+                        data[`character${charIndex}Desc`] = descEl.value;
+                    }
+                });
+
+                // 줄거리 저장
+                const storySpreads = document.querySelectorAll('.book-spread[data-page-type="story"]');
+                storySpreads.forEach((spread, idx) => {
+                    const storyIndex = idx + 1;
+                    const imagePage = spread.querySelector('.book-page:first-child');
+                    if (imagePage) {
+                        const bg = imagePage.style.backgroundImage;
+                        const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
+                        if (match) {
+                            if (!imagePage.dataset.imageName) {
+                                imagePage.dataset.imageName = `story-${storyIndex}-${Date.now()}.png`;
+                            }
+                            const imgRef = storageRef(storage, `Book/${bookCode}/${imagePage.dataset.imageName}`);
+                            uploads.push(uploadString(imgRef, match[1], 'data_url'));
+                            data[`story${storyIndex}Image`] = imagePage.dataset.imageName;
+                        } else if (imagePage.dataset.imageName) {
+                            data[`story${storyIndex}Image`] = imagePage.dataset.imageName;
+                        }
+                    }
+                    const textPage = spread.querySelector('.book-page:last-child textarea.manual-text-area');
+                    if (textPage) {
+                        data[`story${storyIndex}Text`] = textPage.value;
                     }
                 });
 
                 await Promise.all(uploads);
 
-                const viewerHtml = document.getElementById('book-viewer').innerHTML;
-                const context = document.getElementById('manual-book-context').value;
-
-                await setDoc(doc(db, 'users', auth.currentUser.uid, 'bookDrafts', bookCode), {
-                    viewerHtml,
-                    context,
-                    images,
-                    texts,
-                    updatedAt: serverTimestamp()
-                }, { merge: true });
+                await setDoc(doc(db, 'Book', bookCode), data, { merge: true });
 
                 showNotification('저장되었습니다!');
             } catch (err) {
@@ -634,46 +680,74 @@
                 const params = new URLSearchParams(window.location.search);
                 bookCode = params.get('code');
                 if (bookCode) {
-                    const draftRef = doc(db, 'users', user.uid, 'bookDrafts', bookCode);
-                    const draftSnap = await getDoc(draftRef);
-                    if (draftSnap.exists()) {
-                        const data = draftSnap.data();
-                        document.getElementById('book-viewer').innerHTML = data.viewerHtml || '';
-                        document.getElementById('manual-book-context').value = data.context || '';
-                        totalBookSpreads = document.querySelectorAll('#book-viewer .book-spread').length;
-                        const spreads = Array.from(document.querySelectorAll('#book-viewer .book-spread'));
-                        const activeIdx = spreads.findIndex(s => s.classList.contains('active'));
-                        bookCurrentPage = activeIdx >= 0 ? activeIdx : 0;
+                    const bookRef = doc(db, 'Book', bookCode);
+                    const bookSnap = await getDoc(bookRef);
+                    if (bookSnap.exists()) {
+                        const data = bookSnap.data();
 
-                        // 텍스트 복원
-                        if (data.texts) {
-                            const pages = document.querySelectorAll('#book-viewer .book-page');
-                            Object.entries(data.texts).forEach(([idx, text]) => {
-                                const page = pages[idx];
-                                if (!page) return;
-                                const textarea = page.querySelector('.manual-text-area');
-                                if (textarea) {
-                                    textarea.value = text;
-                                } else {
-                                    const textBox = page.querySelector('.text-box');
-                                    if (textBox) textBox.textContent = text;
-                                }
-                            });
+                        buildBookViewer();
+
+                        const charSpreadCount = data.characterSpreadCount || 1;
+                        for (let i = 1; i < charSpreadCount; i++) addCharacterPage();
+                        const storySpreadCount = data.storySpreadCount || 1;
+                        for (let i = 1; i < storySpreadCount; i++) addManualPage();
+                        updatePageNumbersAndIDs();
+
+                        document.querySelectorAll('.book-title-sync').forEach(el => el.textContent = data.title || '');
+                        if (data.author) {
+                            window.authorName = data.author;
+                            window.syncBookAuthor();
                         }
 
-                        // 이미지 복원
-                        if (data.images) {
-                            const pages = document.querySelectorAll('#book-viewer .book-page');
-                            await Promise.all(Object.entries(data.images).map(async ([idx, name]) => {
-                                const page = pages[idx];
-                                if (!page) return;
-                                page.dataset.imageName = name;
-                                const imgRef = storageRef(storage, `users/${user.uid}/bookDrafts/${bookCode}/${name}`);
+                        if (data.coverImage) {
+                            const coverPage = document.querySelector('#spread-0 .book-page:nth-child(2)');
+                            if (coverPage) {
+                                coverPage.dataset.imageName = data.coverImage;
+                                const imgRef = storageRef(storage, `Book/${bookCode}/${data.coverImage}`);
                                 const url = await getDownloadURL(imgRef);
-                                page.style.backgroundImage = `url('${url}')`;
-                            }));
+                                coverPage.style.backgroundImage = `url('${url}')`;
+                            }
                         }
 
+                        const characterPages = document.querySelectorAll('.book-spread[data-page-type="character"] .book-page');
+                        for (let i = 0; i < characterPages.length; i++) {
+                            const page = characterPages[i];
+                            const idx = i + 1;
+                            const name = data[`character${idx}Name`];
+                            const desc = data[`character${idx}Desc`];
+                            const imgName = data[`character${idx}Image`];
+                            if (name) page.querySelector('.editable-text').textContent = name;
+                            if (desc !== undefined) page.querySelector('textarea.manual-text-area').value = desc;
+                            if (imgName) {
+                                const imgBox = page.querySelector('.character-image-box');
+                                imgBox.dataset.imageName = imgName;
+                                const imgRef = storageRef(storage, `Book/${bookCode}/${imgName}`);
+                                const url = await getDownloadURL(imgRef);
+                                imgBox.style.backgroundImage = `url('${url}')`;
+                                imgBox.textContent = '';
+                            }
+                        }
+
+                        const storySpreads = document.querySelectorAll('.book-spread[data-page-type="story"]');
+                        for (let i = 0; i < storySpreads.length; i++) {
+                            const spread = storySpreads[i];
+                            const imgName = data[`story${i + 1}Image`];
+                            const text = data[`story${i + 1}Text`];
+                            if (text !== undefined) {
+                                const textarea = spread.querySelector('textarea.manual-text-area');
+                                if (textarea) textarea.value = text;
+                            }
+                            if (imgName) {
+                                const imagePage = spread.querySelector('.book-page:first-child');
+                                imagePage.dataset.imageName = imgName;
+                                const imgRef = storageRef(storage, `Book/${bookCode}/${imgName}`);
+                                const url = await getDownloadURL(imgRef);
+                                imagePage.style.backgroundImage = `url('${url}')`;
+                            }
+                        }
+
+                        totalBookSpreads = document.querySelectorAll('#book-viewer .book-spread').length;
+                        bookCurrentPage = 0;
                         updateBookView();
                         window.syncBookAuthor();
                     } else {
