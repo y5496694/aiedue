@@ -99,7 +99,17 @@
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ prompt })
+                body: JSON.stringify({
+                    type: 'stability',
+                    payload: {
+                        text_prompts: [{ text: prompt }],
+                        cfg_scale: 7,
+                        height: 1024,
+                        width: 1024,
+                        samples: 1,
+                        steps: 30
+                    }
+                })
             });
 
             let data;

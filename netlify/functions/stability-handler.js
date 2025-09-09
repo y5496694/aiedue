@@ -2,7 +2,7 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
 
   try {
@@ -25,7 +25,7 @@ exports.handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify(data) };
     }
 
-    return { statusCode: 400, body: 'Invalid request type. Only "stability" type is supported for image generation.' };
+    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request type. Only "stability" type is supported for image generation.' }) };
 
   } catch (error) {
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
