@@ -65,6 +65,11 @@
         // 전역 변수
         let bookCurrentPage = 0;
         let totalBookSpreads = 0;
+        // 로그인한 사용자 이름을 저장하고 책의 저자 영역을 동기화합니다.
+        window.authorName = '';
+        window.syncBookAuthor = function() {
+            document.querySelectorAll('.book-author-sync').forEach(el => el.textContent = window.authorName);
+        };
 
         // TTS 함수
         function speak(text) {
@@ -198,10 +203,12 @@
             `;
 
             viewer.innerHTML = spread0 + spread1 + spread2 + navButtons;
-            
+
             bookCurrentPage = 0;
             document.getElementById('spread-0').classList.add('active'); // 첫 페이지 활성화
             updateBookView();
+            // 빌드 후 로그인한 사용자의 이름을 저자 영역에 반영합니다.
+            window.syncBookAuthor();
         }
         
         // ID 및 페이지 번호 재정렬
@@ -545,10 +552,8 @@
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 const userDoc = await getDoc(doc(db, 'users', user.uid));
-                const name = userDoc.data()?.name || '';
-                document.addEventListener('DOMContentLoaded', () => {
-                    document.querySelectorAll('.book-author-sync').forEach(el => el.textContent = name);
-                });
+                window.authorName = userDoc.data()?.name || '';
+                window.syncBookAuthor();
             } else {
                 window.location.href = 'index.html';
             }
