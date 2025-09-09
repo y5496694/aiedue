@@ -38,6 +38,7 @@
                 </div>
                 <div id="viewer-controls" class="flex flex-wrap justify-center items-center gap-2">
                     <button id="generate-images-btn" onclick="completeManualBook()" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed">그림 생성하기</button>
+                    <button id="save-book-btn" onclick="saveBookDraft()" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed">저장하기</button>
                     <button id="save-book-pdf-btn" onclick="downloadBookAsPDF()" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 hidden">PDF 저장</button>
                     <button id="register-library-btn" onclick="registerToLibrary()" class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed hidden" disabled>도서관 등록하기</button>
                 </div>
@@ -61,6 +62,9 @@
         // 전역 변수
         let bookCurrentPage = 0;
         let totalBookSpreads = 0;
+        let bookCode = null;
+        let auth;
+        let db;
         // 로그인한 사용자 이름을 저장하고 책의 저자 영역을 동기화합니다.
         window.authorName = '';
         window.syncBookAuthor = function() {
@@ -357,6 +361,33 @@
             showNotification("페이지가 삭제되었습니다.");
         }
 
+        // 책 초안 저장
+        async function saveBookDraft() {
+            if (!bookCode || !auth?.currentUser) {
+                showNotification("코드가 없어 저장할 수 없습니다.");
+                return;
+            }
+            const btn = document.getElementById('save-book-btn');
+            btn.disabled = true;
+            btn.textContent = '저장 중...';
+            try {
+                const viewerHtml = document.getElementById('book-viewer').innerHTML;
+                const context = document.getElementById('manual-book-context').value;
+                await setDoc(doc(db, 'users', auth.currentUser.uid, 'bookDrafts', bookCode), {
+                    viewerHtml,
+                    context,
+                    updatedAt: serverTimestamp()
+                }, { merge: true });
+                showNotification('저장되었습니다!');
+            } catch (err) {
+                console.error(err);
+                showNotification('저장 실패: ' + err.message);
+            } finally {
+                btn.textContent = '저장하기';
+                btn.disabled = false;
+            }
+        }
+
         // 도서관 등록 (구현 예정)
         function registerToLibrary() {
             showNotification("도서관에 등록되었습니다! (구현 예정)");
@@ -531,8 +562,7 @@
             }
         });
 
-        // 페이지 로드 시 초기화
-        document.addEventListener('DOMContentLoaded', startManualBookCreation);
+        // 페이지 로드 시 초기화는 인증 후 처리됩니다.
         
         // 단어 클릭 시 TTS 이벤트 리스너
         document.addEventListener("click", e => {
@@ -544,7 +574,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDCeJPDQUNi-KmJ9DhkTRIu-9t2PGZCpt0",
@@ -556,14 +586,36 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        auth = getAuth(app);
+        db = getFirestore(app);
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 const userDoc = await getDoc(doc(db, 'users', user.uid));
                 window.authorName = userDoc.data()?.name || '';
                 window.syncBookAuthor();
+
+                const params = new URLSearchParams(window.location.search);
+                bookCode = params.get('code');
+                if (bookCode) {
+                    const draftRef = doc(db, 'users', user.uid, 'bookDrafts', bookCode);
+                    const draftSnap = await getDoc(draftRef);
+                    if (draftSnap.exists()) {
+                        const data = draftSnap.data();
+                        document.getElementById('book-viewer').innerHTML = data.viewerHtml || '';
+                        document.getElementById('manual-book-context').value = data.context || '';
+                        totalBookSpreads = document.querySelectorAll('#book-viewer .book-spread').length;
+                        const spreads = Array.from(document.querySelectorAll('#book-viewer .book-spread'));
+                        const activeIdx = spreads.findIndex(s => s.classList.contains('active'));
+                        bookCurrentPage = activeIdx >= 0 ? activeIdx : 0;
+                        updateBookView();
+                        window.syncBookAuthor();
+                    } else {
+                        startManualBookCreation();
+                    }
+                } else {
+                    startManualBookCreation();
+                }
             } else {
                 window.location.href = 'index.html';
             }

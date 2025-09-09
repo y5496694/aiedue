@@ -2749,7 +2749,7 @@
                 } else if (hw.type === 'readingJournal') {
                     openReadingJournalModal(hw.id, hw.problemId);
                 } else if (hw.type === 'bookActivity') {
-                    window.location.href = 'book.html';
+                    window.location.href = `book.html?code=${hw.id}`;
                 } else {
                     openHomeworkModal(hw.id, hw.problemId);
                 }
@@ -3180,7 +3180,7 @@
                         } else if (hwType === 'readingJournal') {
                             openReadingJournalModal(e.target.dataset.hwid, e.target.dataset.problemid);
                         } else if (hwType === 'bookActivity') {
-                            window.location.href = 'book.html';
+                            window.location.href = `book.html?code=${e.target.dataset.hwid}`;
                         } else {
                             openHomeworkModal(e.target.dataset.hwid, e.target.dataset.problemid);
                         }
