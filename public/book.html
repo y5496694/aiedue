@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 책 만들기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap');
+        body { font-family: 'Gowun Dodum', sans-serif; }
+        .loader { border: 8px solid #f3f3f3; border-radius: 50%; width: 60px; height: 60px; animation: spin 2s linear infinite; border-top: 8px solid #10b981; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .book-viewer { aspect-ratio: 2 / 1.414; width: 100%; display: flex; }
+        .book-page { position: relative; width: 50%; height: 100%; background-size: cover; background-position: center; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 2rem; box-sizing: border-box; }
+        .book-spread { display: none; }
+        .book-spread.active { display: flex; }
+        .text-box { background-color: rgba(255, 255, 255, 0.85); border: 2px solid black; padding: 1rem; text-align: center; }
+        .page-nav { position: absolute; top: 50%; transform: translateY(-50%); background-color: rgba(0,0,0,0.5); color: white; border: none; border-radius: 9999px; width: 3rem; height: 3rem; font-size: 2rem; cursor: pointer; z-index: 10; }
+        .page-number { position: absolute; bottom: 0.5rem; font-size: 0.875rem; color: #374151; }
+        .manual-text-area { width: 100%; height: 80%; background: transparent; border: 2px dashed #ccc; border-radius: 8px; padding: 1rem; text-align: left; overflow-y: auto; font-size: 1.125rem; }
+        .tts-word { cursor: pointer; transition: color 0.2s; }
+        .tts-word:hover { color: #3b82f6; }
+        #notification { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background-color: #2c3e50; color: white; padding: 1rem 2rem; border-radius: 8px; z-index: 1000; transition: opacity 0.5s, transform 0.5s; opacity: 0; pointer-events: none; }
+        #notification.show { opacity: 1; transform: translate(-50%, 10px); }
+    </style>
+</head>
+<body class="p-2 md:p-8 bg-gray-100">
+
+    <div id="book-viewer-page" class="page-content max-w-7xl mx-auto">
+        <div class="bg-white rounded-2xl shadow-lg p-4 md:p-6">
+            <header class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+                <h1 class="text-2xl md:text-4xl font-bold text-emerald-800">AI 책 만들기</h1>
+                <div id="viewer-controls" class="flex flex-wrap justify-center items-center gap-2">
+                    <button onclick="addManualPage()" class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-cyan-600">+ 페이지 추가</button>
+                    <button onclick="deleteCurrentPage()" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">페이지 삭제</button>
+                    <button onclick="addCharacterPage()" class="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">+ 등장인물 추가</button>
+                    <button onclick="toggleBookEdit(this)" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600">글 편집</button>
+                    <button id="generate-images-btn" onclick="completeManualBook()" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed">그림 생성하기</button>
+                    <button id="save-book-pdf-btn" onclick="downloadBookAsPDF()" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 hidden">PDF 저장</button>
+                    <button id="register-library-btn" onclick="registerToLibrary()" class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed hidden" disabled>도서관 등록하기</button>
+                </div>
+            </header>
+
+            <div id="book-viewer" class="relative bg-gray-50 rounded-lg border-2 border-dashed mb-4">
+                <!-- 책 뷰어가 여기에 생성됩니다. -->
+            </div>
+
+            <div id="manual-book-context-wrapper" class="mt-4">
+                <label for="manual-book-context" class="block text-lg font-semibold text-gray-700 mb-2">🎨 그림 생성 AI에게 알려줄 내용</label>
+                <textarea id="manual-book-context" class="w-full p-3 border border-gray-300 rounded-lg" rows="3" placeholder="예: 주인공 토끼는 항상 빨간색 나비넥타이를 매고 있어."></textarea>
+            </div>
+        </div>
+    </div>
+    
+    <div id="notification"></div>
+
+
+    <script>
+        // 전역 변수
+        let bookCurrentPage = 0;
+        let totalBookSpreads = 0;
+
+        // TTS 함수
+        function speak(text) {
+            if (window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(text);
+                u.lang = 'ko-KR';
+                u.rate = 0.9;
+                window.speechSynthesis.speak(u);
+            }
+        }
+
+        // 알림 함수
+        function showNotification(message, duration = 3000) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, duration);
+        }
+
+        /**
+         * 이미지 생성 API를 모방하는 함수입니다.
+         * 실제로는 서버에 요청을 보내야 하지만, 여기서는 플레이스홀더 이미지 URL을 반환합니다.
+         */
+        async function generateImageForParagraph(text, context = "") {
+            console.log(`이미지 생성 요청: "${text}" (컨텍스트: "${context}")`);
+            // AI가 이미지를 생성하는 것처럼 보이도록 약간의 딜레이를 줍니다.
+            await new Promise(resolve => setTimeout(resolve, 1000)); 
+            const placeholderText = `"${text.substring(0, 20)}..."`;
+            return `https://placehold.co/1024x1024/d1fae5/10b981?text=${encodeURIComponent(placeholderText)}`;
+        }
+
+        // 수동 책 만들기 시작
+        function startManualBookCreation() {
+            buildBookViewer();
+        }
+
+        // 책 뷰어 UI 구성
+        function buildBookViewer() {
+            const viewer = document.getElementById("book-viewer");
+            viewer.innerHTML = ""; // 기존 내용 초기화
+
+            totalBookSpreads = 3; // 기본 3장 (표지, 등장인물, 이야기 시작)
+            
+            // 0. 표지 페이지
+            const spread0 = `
+                <div id="spread-0" class="book-spread book-viewer" data-page-type="cover">
+                    <div class="book-page bg-white border-r border-gray-300">
+                        <div style="width: 80%; text-align: center;">
+                            <div class="text-box mb-4">
+                                <h1 class="text-3xl font-bold editable-text book-title-sync" contenteditable="false">제목을 입력하세요</h1>
+                            </div>
+                            <div class="text-box inline-block">
+                                <p class="editable-text book-author-sync" contenteditable="false">글쓴이</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="book-page bg-gray-200">
+                        <div class="absolute top-6 left-6">
+                            <div class="text-sm font-semibold mb-1 text-gray-600">제목</div>
+                            <div class="text-xl p-2 bg-white bg-opacity-80 rounded shadow editable-text book-title-sync" contenteditable="false">제목을 입력하세요</div>
+                        </div>
+                        <div class="absolute bottom-4 right-4 text-box">
+                            <p class="editable-text book-author-sync" contenteditable="false">글쓴이</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 1. 등장인물 소개 페이지
+            const spread1 = `
+                <div id="spread-1" class="book-spread book-viewer" data-page-type="character">
+                    <!-- 왼쪽 페이지 (1) -->
+                    <div class="book-page bg-white border-r border-gray-300">
+                        <h2 class="absolute top-6 text-2xl font-bold text-gray-700">등장인물 소개</h2>
+                        <div class="w-full h-full flex flex-col items-center justify-center pt-16">
+                           <div class="w-full h-1/2 bg-gray-200 mb-4 rounded flex items-center justify-center text-gray-400 character-image-box" style="background-size: cover; background-position: center;">그림 1</div>
+                           <div class="editable-text text-xl font-bold" contenteditable="false">이름 1</div>
+                           <textarea class="manual-text-area mt-2 h-1/4 text-sm" placeholder="어떤 인물인지 설명해주세요."></textarea>
+                        </div>
+                        <div class="page-number" style="left: 0.5rem;">1</div>
+                    </div>
+                    <!-- 오른쪽 페이지 (2) -->
+                    <div class="book-page bg-white">
+                         <h2 class="absolute top-6 text-2xl font-bold text-gray-700 opacity-0">등장인물 소개</h2>
+                         <div class="w-full h-full flex flex-col items-center justify-center pt-16">
+                           <div class="w-full h-1/2 bg-gray-200 mb-4 rounded flex items-center justify-center text-gray-400 character-image-box" style="background-size: cover; background-position: center;">그림 2</div>
+                           <div class="editable-text text-xl font-bold" contenteditable="false">이름 2</div>
+                           <textarea class="manual-text-area mt-2 h-1/4 text-sm" placeholder="어떤 인물인지 설명해주세요."></textarea>
+                        </div>
+                        <div class="page-number" style="right: 0.5rem;">2</div>
+                    </div>
+                </div>
+            `;
+            
+            // 2. 이야기 시작 페이지
+            const spread2 = `
+                 <div id="spread-2" class="book-spread book-viewer" data-page-type="story">
+                    <!-- 왼쪽 페이지 (3) -->
+                    <div class="book-page bg-gray-200 border-r border-gray-300 flex items-center justify-center">
+                        <span class="text-gray-400">그림이 생성될 곳</span>
+                        <div class="page-number" style="left: 0.5rem;">3</div>
+                    </div>
+                    <!-- 오른쪽 페이지 (4) -->
+                    <div class="book-page bg-white">
+                        <textarea class="manual-text-area" placeholder="여기에 이야기를 입력하세요..."></textarea>
+                        <div class="page-number" style="right: 0.5rem;">4</div>
+                    </div>
+                </div>
+            `;
+
+            // 네비게이션 버튼 및 읽기 버튼
+            const navButtons = `
+                <button id="prev-page-btn" onclick="changeBookPage(-1)" class="page-nav left-2">‹</button>
+                <button id="next-page-btn" onclick="changeBookPage(1)" class="page-nav right-2">›</button>
+                <button id="read-aloud-btn" onclick="readCurrentPage()" class="absolute top-4 right-4 bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center text-xl z-10">🔊</button>
+            `;
+
+            viewer.innerHTML = spread0 + spread1 + spread2 + navButtons;
+            
+            bookCurrentPage = 0;
+            document.getElementById('spread-0').classList.add('active'); // 첫 페이지 활성화
+            updateBookView();
+        }
+        
+        // ID 및 페이지 번호 재정렬
+        function updatePageNumbersAndIDs() {
+            const spreads = document.querySelectorAll("#book-viewer .book-spread");
+            spreads.forEach((spread, index) => {
+                spread.id = `spread-${index}`;
+
+                // 표지(index 0)에는 페이지 번호 없음
+                if (index > 0) {
+                    const leftPageNumEl = spread.querySelector('.page-number[style*="left"]');
+                    const rightPageNumEl = spread.querySelector('.page-number[style*="right"]');
+
+                    if (leftPageNumEl) {
+                        leftPageNumEl.textContent = (index - 1) * 2 + 1;
+                    }
+                    if (rightPageNumEl) {
+                        rightPageNumEl.textContent = (index - 1) * 2 + 2;
+                    }
+                }
+            });
+        }
+        
+        // 등장인물 페이지 추가
+        function addCharacterPage() {
+            const viewer = document.getElementById("book-viewer");
+            const characterSpreads = viewer.querySelectorAll('.book-spread[data-page-type="character"]');
+            const lastCharacterSpread = characterSpreads[characterSpreads.length - 1];
+            
+            if (!lastCharacterSpread) {
+                showNotification("오류: 마지막 등장인물 페이지를 찾을 수 없습니다.");
+                return;
+            }
+
+            const existingCharacters = viewer.querySelectorAll('.character-image-box').length;
+            const charNum1 = existingCharacters + 1;
+            const charNum2 = existingCharacters + 2;
+
+            const newSpread = document.createElement("div");
+            newSpread.className = "book-spread book-viewer";
+            newSpread.dataset.pageType = "character";
+
+            newSpread.innerHTML = `
+                <div class="book-page bg-white border-r border-gray-300">
+                    <h2 class="absolute top-6 text-2xl font-bold text-gray-700">등장인물 소개</h2>
+                    <div class="w-full h-full flex flex-col items-center justify-center pt-16">
+                       <div class="w-full h-1/2 bg-gray-200 mb-4 rounded flex items-center justify-center text-gray-400 character-image-box" style="background-size: cover; background-position: center;">그림 ${charNum1}</div>
+                       <div class="editable-text text-xl font-bold" contenteditable="false">이름 ${charNum1}</div>
+                       <textarea class="manual-text-area mt-2 h-1/4 text-sm" placeholder="어떤 인물인지 설명해주세요."></textarea>
+                    </div>
+                    <div class="page-number" style="left: 0.5rem;"></div>
+                </div>
+                <div class="book-page bg-white">
+                     <h2 class="absolute top-6 text-2xl font-bold text-gray-700 opacity-0">등장인물 소개</h2>
+                     <div class="w-full h-full flex flex-col items-center justify-center pt-16">
+                       <div class="w-full h-1/2 bg-gray-200 mb-4 rounded flex items-center justify-center text-gray-400 character-image-box" style="background-size: cover; background-position: center;">그림 ${charNum2}</div>
+                       <div class="editable-text text-xl font-bold" contenteditable="false">이름 ${charNum2}</div>
+                       <textarea class="manual-text-area mt-2 h-1/4 text-sm" placeholder="어떤 인물인지 설명해주세요."></textarea>
+                    </div>
+                    <div class="page-number" style="right: 0.5rem;"></div>
+                </div>
+            `;
+
+            lastCharacterSpread.after(newSpread);
+            totalBookSpreads++;
+            
+            updatePageNumbersAndIDs();
+            
+            const newPageIndex = Array.from(viewer.querySelectorAll('.book-spread')).indexOf(newSpread);
+            bookCurrentPage = newPageIndex;
+            updateBookView();
+        }
+
+        // 이야기 페이지 추가
+        function addManualPage() {
+            const viewer = document.getElementById("book-viewer");
+            const newSpread = document.createElement("div");
+            newSpread.className = "book-spread book-viewer";
+            newSpread.dataset.pageType = 'story';
+            
+            newSpread.innerHTML = `
+                <div class="book-page bg-gray-200 border-r border-gray-300 flex items-center justify-center">
+                    <span class="text-gray-400">그림이 생성될 곳</span>
+                    <div class="page-number" style="left: 0.5rem;"></div>
+                </div>
+                <div class="book-page bg-white">
+                    <textarea class="manual-text-area" placeholder="여기에 이야기를 입력하세요..."></textarea>
+                    <div class="page-number" style="right: 0.5rem;"></div>
+                </div>
+            `;
+            
+            const prevButton = document.getElementById('prev-page-btn');
+            viewer.insertBefore(newSpread, prevButton);
+
+            totalBookSpreads++;
+            updatePageNumbersAndIDs();
+            
+            bookCurrentPage = totalBookSpreads - 1;
+            updateBookView();
+        }
+
+        // 현재 페이지 삭제
+        function deleteCurrentPage() {
+            if (bookCurrentPage === 0) {
+                showNotification("표지는 삭제할 수 없습니다.");
+                return;
+            }
+             if (totalBookSpreads <= 3) {
+                showNotification("책의 기본 구조(표지, 등장인물, 이야기)는 삭제할 수 없습니다.");
+                return;
+            }
+
+            const spreadToDelete = document.getElementById(`spread-${bookCurrentPage}`);
+            if (spreadToDelete) {
+                spreadToDelete.remove();
+                totalBookSpreads--;
+                bookCurrentPage = Math.max(0, bookCurrentPage - 1);
+                updatePageNumbersAndIDs();
+                updateBookView();
+                showNotification("페이지가 삭제되었습니다.");
+            }
+        }
+
+        // 도서관 등록 (구현 예정)
+        function registerToLibrary() {
+            showNotification("도서관에 등록되었습니다! (구현 예정)");
+            // 실제 구현 시, 이 곳에서 도서관 사이트로 데이터를 전송하거나
+            // 미니 뷰어를 여는 로직이 들어갑니다.
+            // 예: window.open(`https://mylibrary.com/viewer?bookId=SOME_UNIQUE_ID`);
+        }
+
+        // 책 완성 (그림 생성)
+        async function completeManualBook() {
+            const generateBtn = document.getElementById("generate-images-btn");
+            const registerBtn = document.getElementById('register-library-btn');
+            const savePdfBtn = document.getElementById('save-book-pdf-btn');
+            
+            const originalGenerateText = "그림 생성하기";
+
+            generateBtn.textContent = "생성 중...";
+            generateBtn.disabled = true;
+
+            const context = document.getElementById("manual-book-context").value;
+
+            try {
+                // 표지 이미지 생성
+                const titleText = document.querySelector("#spread-0 .book-title-sync").textContent;
+                const coverImage = await generateImageForParagraph(titleText, context);
+                document.querySelector("#spread-0 .book-page:last-child").style.backgroundImage = `url('${coverImage}')`;
+                
+                // 등장인물 이미지 생성
+                const charSpreads = document.querySelectorAll('.book-spread[data-page-type="character"]');
+                for(const charSpread of charSpreads) {
+                    const charDescriptions = charSpread.querySelectorAll('textarea');
+                    const charImageBoxes = charSpread.querySelectorAll('.character-image-box');
+                    const charNames = charSpread.querySelectorAll('.editable-text');
+                    
+                    if (charDescriptions[0] && (charDescriptions[0].value || charNames[0].textContent)) {
+                        const char1Text = charNames[0].textContent + ", " + charDescriptions[0].value;
+                        const char1Image = await generateImageForParagraph(char1Text, context);
+                        charImageBoxes[0].style.backgroundImage = `url('${char1Image}')`;
+                        charImageBoxes[0].textContent = '';
+                    }
+                    if (charDescriptions[1] && (charDescriptions[1].value || charNames[1].textContent)) {
+                        const char2Text = charNames[1].textContent + ", " + charDescriptions[1].value;
+                        const char2Image = await generateImageForParagraph(char2Text, context);
+                        charImageBoxes[1].style.backgroundImage = `url('${char2Image}')`;
+                        charImageBoxes[1].textContent = '';
+                    }
+                }
+
+                // 각 이야기 페이지 이미지 생성
+                const storySpreads = document.querySelectorAll('.book-spread[data-page-type="story"]');
+                for (const spread of storySpreads) {
+                    const text = spread.querySelector("textarea").value;
+                    if (text) {
+                        const imageUrl = await generateImageForParagraph(text, context);
+                        const imagePage = spread.querySelector(".book-page:first-child");
+                        const pageNumHTML = imagePage.querySelector('.page-number')?.outerHTML || '';
+                        imagePage.style.backgroundImage = `url('${imageUrl}')`;
+                        imagePage.innerHTML = pageNumHTML;
+                    }
+                }
+                showNotification("책이 완성되었습니다! 이제 도서관에 등록할 수 있습니다.");
+                
+                // 그림 생성 버튼은 영구적으로 비활성화
+                generateBtn.disabled = true;
+                
+                // PDF 저장 및 도서관 등록 버튼 보이기 및 활성화
+                if(savePdfBtn) {
+                    savePdfBtn.classList.remove('hidden');
+                }
+                if(registerBtn) {
+                    registerBtn.classList.remove('hidden');
+                    registerBtn.disabled = false;
+                }
+
+            } catch (error) {
+                console.error("수동 책 완성 오류:", error);
+                showNotification(`그림 생성 중 오류가 발생했습니다: ${error.message}`);
+                
+                // 실패 시 그림 생성 버튼 원상 복구
+                generateBtn.textContent = originalGenerateText;
+                generateBtn.disabled = false;
+            }
+        }
+        
+        // 페이지 넘기기
+        function changeBookPage(direction) {
+            bookCurrentPage = Math.max(0, Math.min(bookCurrentPage + direction, totalBookSpreads - 1));
+            updateBookView();
+        }
+
+        // 현재 페이지에 맞게 뷰 업데이트
+        function updateBookView() {
+            document.querySelectorAll(".book-spread").forEach((spread, index) => {
+                spread.classList.toggle("active", index === bookCurrentPage);
+            });
+            document.getElementById("prev-page-btn").style.display = bookCurrentPage === 0 ? "none" : "block";
+            document.getElementById("next-page-btn").style.display = bookCurrentPage >= totalBookSpreads - 1 ? "none" : "block";
+        }
+
+        // 현재 페이지 내용 읽어주기
+        function readCurrentPage() {
+            const currentSpread = document.getElementById(`spread-${bookCurrentPage}`);
+            if (currentSpread) {
+                let textToRead = '';
+                if (bookCurrentPage === 0) { // 표지
+                    textToRead = Array.from(currentSpread.querySelectorAll('.editable-text')).map(el => el.textContent).join('. ');
+                } else { // 등장인물 또는 이야기 페이지
+                     const textareas = currentSpread.querySelectorAll('textarea');
+                     const editables = currentSpread.querySelectorAll('.editable-text');
+                     let content = [];
+                     editables.forEach(el => content.push(el.textContent));
+                     textareas.forEach(ta => content.push(ta.value));
+                     textToRead = content.join('. ');
+                }
+                speak(textToRead.trim());
+            }
+        }
+
+        // 글 편집 모드 토글
+        function toggleBookEdit(button) {
+            const isEditing = button.textContent === "편집 완료";
+            document.querySelectorAll("#book-viewer .editable-text, #book-viewer .manual-text-area").forEach(el => {
+                el.contentEditable = !isEditing;
+                el.classList.toggle("outline-blue-500", !isEditing);
+                el.classList.toggle("outline-2", !isEditing);
+                el.classList.toggle("outline", !isEditing);
+                 if (el.tagName.toLowerCase() !== 'textarea') {
+                    el.style.cursor = isEditing ? 'default' : 'text';
+                }
+            });
+            button.textContent = isEditing ? "글 편집" : "편집 완료";
+            button.classList.toggle("bg-blue-500", isEditing);
+            button.classList.toggle("hover:bg-blue-600", isEditing);
+            button.classList.toggle("bg-red-500", !isEditing);
+            button.classList.toggle("hover:bg-red-600", !isEditing);
+        }
+
+        // PDF로 다운로드
+        async function downloadBookAsPDF() {
+            const button = document.getElementById('save-book-pdf-btn');
+            button.textContent = "PDF 생성 중...";
+            button.disabled = true;
+
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+            const spreads = document.querySelectorAll(".book-spread");
+            const originalPage = bookCurrentPage;
+
+            for (let i = 0; i < spreads.length; i++) {
+                if (i > 0) pdf.addPage("a4", "l");
+                
+                // 현재 페이지만 보이게 설정
+                document.querySelectorAll(".book-spread").forEach(s => s.classList.remove("active"));
+                spreads[i].classList.add("active");
+                
+                // 렌더링 시간 확보
+                await new Promise(res => setTimeout(res, 100));
+
+                const canvas = await html2canvas(spreads[i], {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: "#ffffff"
+                });
+                pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, 297, 210);
+            }
+
+            pdf.save("나만의_동화책.pdf");
+            
+            // 원래 페이지로 복구
+            document.querySelectorAll(".book-spread").forEach(s => s.classList.remove("active"));
+            if (spreads[originalPage]) spreads[originalPage].classList.add("active");
+            
+            button.textContent = "PDF 저장";
+            button.disabled = false;
+        }
+
+        // 제목 및 글쓴이 동기화 이벤트 리스너
+        document.addEventListener('input', e => {
+            const target = e.target;
+            if (target.classList.contains('book-title-sync')) {
+                const newContent = target.textContent;
+                document.querySelectorAll('.book-title-sync').forEach(el => {
+                    if (el !== target) {
+                        el.textContent = newContent;
+                    }
+                });
+            } else if (target.classList.contains('book-author-sync')) {
+                const newContent = target.textContent;
+                document.querySelectorAll('.book-author-sync').forEach(el => {
+                    if (el !== target) {
+                        el.textContent = newContent;
+                    }
+                });
+            }
+        });
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', startManualBookCreation);
+        
+        // 단어 클릭 시 TTS 이벤트 리스너
+        document.addEventListener("click", e => {
+            if (e.target.classList.contains("tts-word")) {
+                speak(e.target.textContent.trim());
+            }
+        });
+    </script>
+</body>
+</html>
+
+
