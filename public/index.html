@@ -4776,6 +4776,18 @@
             }
             bookCodeDisplay.textContent = bookCode;
             openBookPageLink.href = `book.html?code=${encodeURIComponent(bookCode)}`;
+
+            const bookRef = doc(db, 'Book', bookCode);
+            const bookSnap = await getDoc(bookRef);
+            if (!bookSnap.exists()) {
+                await setDoc(bookRef, {
+                    createdAt: serverTimestamp(),
+                    owner: dataToShow.id,
+                    assignmentId,
+                    title: assignmentData.title || ''
+                });
+            }
+
             bookActivityModal.style.display = 'flex';
         }
 
