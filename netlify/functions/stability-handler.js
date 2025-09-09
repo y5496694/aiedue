@@ -1,4 +1,4 @@
-const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -6,42 +6,28 @@ exports.handler = async (event) => {
   }
 
   try {
+    const { type, payload } = JSON.parse(event.body);
+    // 환경 변수 이름을 'Stability_api_key'로 수정했습니다.
     const { Stability_api_key } = process.env;
-    const { prompt } = JSON.parse(event.body || '{}');
 
-    const response = await fetch('https://api.stability.ai/v2beta/stable-image/generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'image/png',
-        'Authorization': `Bearer ${Stability_api_key}`
-      },
-      body: JSON.stringify({
-        text_prompts: [{ text: prompt }]
-      })
-    });
-
-    const arrayBuffer = await response.arrayBuffer();
-    if (!response.ok) {
-      let errorMessage = 'Stability API Error';
-      try {
-        const errorData = JSON.parse(Buffer.from(arrayBuffer).toString('utf8'));
-        errorMessage = errorData.error?.message || errorData.error || errorMessage;
-      } catch (_) {}
-      throw new Error(errorMessage);
+    if (type === 'stability') {
+      const response = await fetch("https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // 사용하는 변수명도 'Stability_api_key'로 수정했습니다.
+          'Authorization': `Bearer ${Stability_api_key}`,
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Stability AI Error');
+      return { statusCode: 200, body: JSON.stringify(data) };
     }
 
-    const base64 = Buffer.from(arrayBuffer).toString('base64');
-    const result = { artifacts: [{ base64 }] };
+    return { statusCode: 400, body: 'Invalid request type. Only "stability" type is supported for image generation.' };
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify(result)
-    };
   } catch (error) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message })
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };
