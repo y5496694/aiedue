@@ -332,7 +332,10 @@
                 <p>준비중입니다.</p>
             </div>
             <div id="reading-log-tab-content" class="tab-content">
-                <h2 class="text-2xl font-bold mb-4">📖 에이두 독서기록장</h2>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">📖 에이두 독서기록장</h2>
+                    <button id="reading-log-filter-btn" class="btn btn-secondary hidden">내 반만 보기</button>
+                </div>
                 <ul id="reading-log-list" class="space-y-4"></ul>
             </div>
         </div>
@@ -1096,6 +1099,8 @@
         let currentProblemSet = null; // For AI problem creation
         let currentAssignmentId = null; // For student homework completion
         let currentAssignmentItemId = null; // For teacher assignment (homework or life rule)
+        let showOnlyMyClassReadingLogs = false; // Toggle for reading log filter
+        let myClassStudentIds = [];
         let currentAssignmentType = null; // 'math', 'dictation', or 'lifeRule'
         let currentDictationTemplate = null; // For student dictation homework
         let currentMathTemplate = null;    // For student-generated math homework
@@ -1317,7 +1322,16 @@
             document.getElementById('learning-problems-dashboard-tab').style.display = currentUserData.role === 'teacher' ? 'inline-block' : 'none';
             document.getElementById('life-rules-management-dashboard-tab').style.display = currentUserData.role === 'teacher' ? 'inline-block' : 'none';
             document.getElementById('teacher-admin-panel').style.display = currentUserData.role === 'teacher' ? 'block' : 'none';
-            
+
+            const readingLogFilterBtn = document.getElementById('reading-log-filter-btn');
+            if (readingLogFilterBtn) {
+                readingLogFilterBtn.classList.toggle('hidden', role !== 'teacher');
+                if (role !== 'teacher') {
+                    showOnlyMyClassReadingLogs = false;
+                    readingLogFilterBtn.textContent = '내 반만 보기';
+                }
+            }
+
             // Disable interactive elements if admin is viewing
             const isReadOnly = isAdminViewing;
             document.querySelectorAll('.buy-item-btn, #main-dashboard-bottom-content button').forEach(el => el.disabled = isReadOnly);
@@ -4896,10 +4910,23 @@
             list.innerHTML = '<li class="text-sm text-gray-500">불러오는 중...</li>';
             try {
                 const qSnap = await getDocs(query(collection(db, 'readingLogs'), orderBy('createdAt', 'desc')));
-                if (qSnap.empty) { list.innerHTML = '<li class="text-sm text-gray-500">기록이 없습니다.</li>'; return; }
+                let entries = qSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+
+                if (showOnlyMyClassReadingLogs && currentUserData?.role === 'teacher') {
+                    if (!myClassStudentIds.length) {
+                        const classSnap = await getDoc(doc(db, 'classes', currentUserData.id));
+                        myClassStudentIds = classSnap.exists() ? classSnap.data().students || [] : [];
+                    }
+                    entries = entries.filter(e => myClassStudentIds.includes(e.userId));
+                }
+
+                if (!entries.length) {
+                    list.innerHTML = '<li class="text-sm text-gray-500">기록이 없습니다.</li>';
+                    return;
+                }
+
                 list.innerHTML = '';
-                qSnap.forEach(docSnap => {
-                    const entry = { id: docSnap.id, ...docSnap.data() };
+                entries.forEach(entry => {
                     const li = document.createElement('li');
                     li.className = 'flex justify-between items-center bg-white p-3 rounded-lg shadow border border-gray-200';
                     const btn = document.createElement('button');
@@ -4908,7 +4935,7 @@
                     btn.addEventListener('click', () => openReadingLogEntry(entry));
 
                     const info = document.createElement('div');
-                    info.className = 'ml-2 text-right';
+                    info.className = 'text-right';
 
                     const nameSpan = document.createElement('div');
                     nameSpan.className = 'text-sm text-gray-500';
@@ -4923,13 +4950,40 @@
                     info.appendChild(nameSpan);
                     info.appendChild(dateSpan);
 
+                    const rightContainer = document.createElement('div');
+                    rightContainer.className = 'flex items-center ml-2 space-x-2';
+                    rightContainer.appendChild(info);
+
+                    if (currentUserData?.role === 'teacher') {
+                        const delBtn = document.createElement('button');
+                        delBtn.textContent = '삭제';
+                        delBtn.className = 'text-red-500 text-sm';
+                        delBtn.addEventListener('click', async (e) => {
+                            e.stopPropagation();
+                            if (confirm('정말 삭제하시겠습니까?')) {
+                                await deleteDoc(doc(db, 'readingLogs', entry.id));
+                                renderReadingLog();
+                            }
+                        });
+                        rightContainer.appendChild(delBtn);
+                    }
+
                     li.appendChild(btn);
-                    li.appendChild(info);
+                    li.appendChild(rightContainer);
                     list.appendChild(li);
                 });
             } catch (error) {
                 list.innerHTML = '<li class="text-sm text-red-500">기록을 불러오지 못했습니다.</li>';
             }
+        }
+
+        const readingLogFilterBtn = document.getElementById('reading-log-filter-btn');
+        if (readingLogFilterBtn) {
+            readingLogFilterBtn.addEventListener('click', () => {
+                showOnlyMyClassReadingLogs = !showOnlyMyClassReadingLogs;
+                readingLogFilterBtn.textContent = showOnlyMyClassReadingLogs ? '전체 보기' : '내 반만 보기';
+                renderReadingLog();
+            });
         }
 
         function openReadingLogEntry(entry) {
