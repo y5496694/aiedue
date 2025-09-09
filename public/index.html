@@ -830,21 +830,11 @@
         </div>
     </div>
     <div id="book-activity-modal" class="modal-overlay hidden">
-        <div class="modal-content modal-content-full">
+        <div class="modal-content">
             <span class="close-button" id="close-book-activity-modal-btn">&times;</span>
-            <div class="flex justify-between items-center mb-4">
-                <h3 id="book-activity-modal-title" class="text-xl font-bold"></h3>
-                <div id="book-editor-controls" class="space-x-2">
-                    <button id="add-book-page-btn" class="btn btn-secondary">+ 페이지 추가</button>
-                    <button id="save-book-draft-btn" class="btn btn-secondary">저장</button>
-                    <button id="complete-book-activity-btn" class="btn btn-primary">책 완성하기</button>
-                </div>
-            </div>
-            <div id="book-editor-container" class="book-editor-container">
-                <button id="prev-page-btn" class="page-nav-btn left-2">&#9664;</button>
-                <div id="book-editor" class="book-editor"></div>
-                <button id="next-page-btn" class="page-nav-btn right-2">&#9654;</button>
-            </div>
+            <h3 id="book-activity-modal-title" class="text-xl font-bold mb-4"></h3>
+            <p class="mb-4">책 고유 코드: <span id="book-code-display"></span></p>
+            <a id="open-book-page-link" class="btn btn-primary" target="_blank">책 만들기 페이지 열기</a>
         </div>
     </div>
     <div id="reading-log-entry-modal" class="modal-overlay hidden">
@@ -1140,12 +1130,8 @@
         const readingJournalModal = document.getElementById('reading-journal-modal');
         const bookActivityCreationModal = document.getElementById('book-activity-creation-modal');
         const bookActivityModal = document.getElementById('book-activity-modal');
-        const bookEditor = document.getElementById('book-editor');
-        const bookEditorControls = document.getElementById('book-editor-controls');
-        const prevPageBtn = document.getElementById('prev-page-btn');
-        const nextPageBtn = document.getElementById('next-page-btn');
-        let bookSpreads = [];
-        let currentSpreadIndex = 0;
+        const bookCodeDisplay = document.getElementById('book-code-display');
+        const openBookPageLink = document.getElementById('open-book-page-link');
         const readingLogEntryModal = document.getElementById('reading-log-entry-modal');
         const editInfoModal = document.getElementById('edit-info-modal');
         let studentToAdjustId = null;
@@ -4731,75 +4717,6 @@
         });
 
         // ----- Book Activity Handling -----
-        function initializeBookEditor(existing = '') {
-            if (existing) {
-                bookEditor.innerHTML = existing;
-            } else {
-                bookEditor.innerHTML = `
-                   <div class="book-spread">
-                       <div class="book-page">
-                           <textarea class="text-box center" placeholder="제목을 입력하세요"></textarea>
-                       </div>
-                       <div class="book-page book-cover">
-                           <textarea class="text-box top-right" placeholder="제목"></textarea>
-                       </div>
-                   </div>
-                   <div class="book-spread">
-                       <div class="book-page">
-                           <textarea class="text-box" placeholder="등장인물1 이름과 설명"></textarea>
-                       </div>
-                       <div class="book-page">
-                           <textarea class="text-box" placeholder="등장인물2 이름과 설명"></textarea>
-                       </div>
-                   </div>
-                   <div class="book-spread">
-                       <div class="book-page"><div class="image-placeholder"></div></div>
-                       <div class="book-page">
-                           <textarea class="text-box" placeholder="책 내용1"></textarea>
-                       </div>
-                   </div>
-                `;
-            }
-            bookSpreads = Array.from(bookEditor.querySelectorAll('.book-spread'));
-            bookSpreads.forEach((spread, idx) => {
-                spread.classList.add('hidden');
-                if (idx === 0) spread.classList.remove('hidden');
-            });
-            currentSpreadIndex = 0;
-            updatePageNavButtons();
-        }
-
-        function addBookPage() {
-            const spread = document.createElement('div');
-            spread.className = 'book-spread hidden';
-            spread.innerHTML = `
-                <div class="book-page"><div class="image-placeholder"></div></div>
-                <div class="book-page"><textarea class="text-box" placeholder="책 내용을 입력하세요"></textarea></div>
-            `;
-            bookEditor.appendChild(spread);
-            bookSpreads.push(spread);
-            showSpread(bookSpreads.length - 1);
-        }
-
-        function showSpread(index) {
-            if (index < 0 || index >= bookSpreads.length) return;
-            bookSpreads[currentSpreadIndex].classList.add('hidden');
-            currentSpreadIndex = index;
-            bookSpreads[currentSpreadIndex].classList.remove('hidden');
-            updatePageNavButtons();
-        }
-
-        function updatePageNavButtons() {
-            prevPageBtn.style.display = currentSpreadIndex === 0 ? 'none' : 'block';
-            nextPageBtn.style.display = currentSpreadIndex === bookSpreads.length - 1 ? 'none' : 'block';
-        }
-
-        function serializeBook() {
-            const clone = bookEditor.cloneNode(true);
-            clone.querySelectorAll('.book-spread').forEach(spread => spread.classList.remove('hidden'));
-            return clone.innerHTML;
-        }
-
         function openBookActivityCreationModal(problem = null) {
             bookActivityCreationModal.style.display = 'flex';
             const form = document.getElementById('book-activity-form');
@@ -4846,62 +4763,21 @@
             const dataToShow = viewedUserData;
             const assignmentRef = doc(db, `users/${dataToShow.id}/assignedHomework`, assignmentId);
             const assignmentDoc = await getDoc(assignmentRef);
-            const problemDoc = await getDoc(doc(db, 'learningProblems', problemId));
-            if (!assignmentDoc.exists() || !problemDoc.exists()) {
+            if (!assignmentDoc.exists()) {
                 showModal('오류', '활동을 불러올 수 없습니다.');
                 return;
             }
             const assignmentData = assignmentDoc.data();
-            const problem = problemDoc.data();
             document.getElementById('book-activity-modal-title').textContent = assignmentData.title;
-            initializeBookEditor(assignmentData.studentAnswer || '');
-            if (assignmentData.status === 'completed') {
-                bookEditor.querySelectorAll('textarea').forEach(el => el.disabled = true);
-                bookEditorControls.style.display = 'none';
-            } else {
-                bookEditor.querySelectorAll('textarea').forEach(el => el.disabled = false);
-                bookEditorControls.style.display = 'block';
+            let bookCode = assignmentData.bookCode;
+            if (!bookCode) {
+                bookCode = `book${Date.now()}`;
+                await updateDoc(assignmentRef, { bookCode });
             }
+            bookCodeDisplay.textContent = bookCode;
+            openBookPageLink.href = `book.html?code=${encodeURIComponent(bookCode)}`;
             bookActivityModal.style.display = 'flex';
         }
-
-        document.getElementById('complete-book-activity-btn').addEventListener('click', async () => {
-            if (!currentAssignmentId || isAdminViewing) return;
-            const content = serializeBook();
-            const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
-            const userRef = doc(db, 'users', currentUserData.id);
-            try {
-                  const assignmentDoc = await getDoc(assignmentRef);
-                  const reward = assignmentDoc.data().reward || 0;
-                  await updateDoc(assignmentRef, { status: 'completed', studentAnswer: content, completedAt: serverTimestamp() });
-                  await updateDoc(userRef, { balance: increment(reward) });
-                const userDoc = await getDoc(userRef);
-                currentUserData = { id: userDoc.id, ...userDoc.data() };
-                  viewedUserData = currentUserData;
-                  bookActivityModal.style.display = 'none';
-                  showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을 획득했습니다!`);
-                  updateDashboardDisplay();
-                  renderHomework();
-            } catch (error) {
-                showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
-            }
-        });
-
-        document.getElementById('add-book-page-btn').addEventListener('click', () => addBookPage());
-        prevPageBtn.addEventListener('click', () => showSpread(currentSpreadIndex - 1));
-        nextPageBtn.addEventListener('click', () => showSpread(currentSpreadIndex + 1));
-
-        document.getElementById('save-book-draft-btn').addEventListener('click', async () => {
-            if (!currentAssignmentId || isAdminViewing) return;
-            const content = serializeBook();
-            const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
-            try {
-                await updateDoc(assignmentRef, { studentAnswer: content });
-                showModal('저장 완료', '책이 저장되었습니다.');
-            } catch (error) {
-                showModal('오류', `저장 실패: ${error.message}`);
-            }
-        });
 
         // ----- Reading Log Rendering -----
         async function renderReadingLog() {
