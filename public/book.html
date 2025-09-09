@@ -132,7 +132,7 @@
                                 <h1 class="text-3xl font-bold editable-text book-title-sync" contenteditable="false">제목을 입력하세요</h1>
                             </div>
                             <div class="text-box inline-block">
-                                <p class="editable-text book-author-sync" contenteditable="false">글쓴이</p>
+                                <p class="book-author-sync" contenteditable="false">글쓴이</p>
                             </div>
                         </div>
                     </div>
@@ -142,7 +142,7 @@
                             <div class="text-xl p-2 bg-white bg-opacity-80 rounded shadow editable-text book-title-sync" contenteditable="false">제목을 입력하세요</div>
                         </div>
                         <div class="absolute bottom-4 right-4 text-box">
-                            <p class="editable-text book-author-sync" contenteditable="false">글쓴이</p>
+                            <p class="book-author-sync" contenteditable="false">글쓴이</p>
                         </div>
                     </div>
                 </div>
@@ -507,13 +507,6 @@
             if (target.classList.contains('book-title-sync')) {
                 const newContent = target.textContent;
                 document.querySelectorAll('.book-title-sync').forEach(el => {
-                    if (el !== target) {
-                        el.textContent = newContent;
-                    }
-                });
-            } else if (target.classList.contains('book-author-sync')) {
-                const newContent = target.textContent;
-                document.querySelectorAll('.book-author-sync').forEach(el => {
                     if (el !== target) {
                         el.textContent = newContent;
                     }
