@@ -322,6 +322,13 @@
                     return;
                 }
             }
+            if (type === 'story') {
+                const storySpreads = Array.from(document.querySelectorAll('#book-viewer .book-spread[data-page-type="story"]'));
+                if (storySpreads.indexOf(currentSpread) === 0) {
+                    showNotification("기본 줄거리 페이지는 삭제할 수 없습니다.");
+                    return;
+                }
+            }
             currentSpread.remove();
             totalBookSpreads--;
             bookCurrentPage = Math.max(0, Math.min(bookCurrentPage, totalBookSpreads - 1));
@@ -434,10 +441,13 @@
     const type = currentSpread.dataset.pageType;
 
     if (type === 'story') {
-        actionContainer.innerHTML = `
-            <button onclick="addManualPage()" class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-cyan-600">+ 페이지 추가</button>
-            <button onclick="deleteCurrentPage()" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">페이지 삭제</button>
-        `;
+        const storySpreads = Array.from(document.querySelectorAll('#book-viewer .book-spread[data-page-type="story"]'));
+        const storyIndex = storySpreads.indexOf(currentSpread);
+        let buttons = `<button onclick="addManualPage()" class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-cyan-600">+ 페이지 추가</button>`;
+        if (storyIndex > 0) {
+            buttons += `<button onclick="deleteCurrentPage()" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">페이지 삭제</button>`;
+        }
+        actionContainer.innerHTML = buttons;
     } else if (type === 'character') {
         const charSpreads = Array.from(document.querySelectorAll('#book-viewer .book-spread[data-page-type="character"]'));
         const charIndex = charSpreads.indexOf(currentSpread);
