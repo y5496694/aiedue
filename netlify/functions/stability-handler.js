@@ -1,4 +1,4 @@
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -13,7 +13,7 @@ exports.handler = async (event) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'Accept': 'image/png',
         'Authorization': `Bearer ${Stability_api_key}`
       },
       body: JSON.stringify({
@@ -21,14 +21,22 @@ exports.handler = async (event) => {
       })
     });
 
-    const data = await response.json();
+    const arrayBuffer = await response.arrayBuffer();
     if (!response.ok) {
-      throw new Error(data.error?.message || 'Stability API Error');
+      let errorMessage = 'Stability API Error';
+      try {
+        const errorData = JSON.parse(Buffer.from(arrayBuffer).toString('utf8'));
+        errorMessage = errorData.error?.message || errorData.error || errorMessage;
+      } catch (_) {}
+      throw new Error(errorMessage);
     }
+
+    const base64 = Buffer.from(arrayBuffer).toString('base64');
+    const result = { artifacts: [{ base64 }] };
 
     return {
       statusCode: 200,
-      body: JSON.stringify(data)
+      body: JSON.stringify(result)
     };
   } catch (error) {
     return {
