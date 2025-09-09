@@ -1157,14 +1157,15 @@
         function showModal(title, message, onConfirm = null) {
             modalTitle.textContent = title;
             modalMessage.innerHTML = message;
-            
+
             // Clone and replace the button to remove old event listeners
             const newConfirmBtn = modalConfirmBtn.cloneNode(true);
             modalConfirmBtn.parentNode.replaceChild(newConfirmBtn, modalConfirmBtn);
             modalConfirmBtn = document.getElementById('modal-confirm-btn'); // Re-assign the global variable
+            modalConfirmBtn.textContent = '확인';
+            modalConfirmBtn.style.display = 'inline-block';
 
             if (onConfirm && typeof onConfirm === 'function') {
-                modalConfirmBtn.style.display = 'inline-block';
                 modalConfirmBtn.onclick = () => {
                     onConfirm();
                 };
@@ -2749,7 +2750,10 @@
                 } else if (hw.type === 'readingJournal') {
                     openReadingJournalModal(hw.id, hw.problemId);
                 } else if (hw.type === 'bookActivity') {
-                    window.location.href = 'book.html';
+                    showModal('책 만들기 활동', `코드: ${hw.bookCode}`, () => {
+                        window.location.href = `book.html?code=${encodeURIComponent(hw.bookCode)}`;
+                    });
+                    modalConfirmBtn.textContent = '책 만들기 이동하기';
                 } else {
                     openHomeworkModal(hw.id, hw.problemId);
                 }
@@ -3074,15 +3078,30 @@
                     const problemDoc = await getDoc(doc(db, "learningProblems", currentAssignmentItemId));
                     const problemSet = problemDoc.data();
                     for (const studentId of selectedStudentIds) {
-                        const assignmentData = {
-                            problemId: currentAssignmentItemId, 
-                            type: problemSet.type, 
-                            title: problemSet.title,
-                            reward: problemSet.reward,
-                            status: 'assigned',
-                            assignedAt: serverTimestamp()
-                        };
-                        await addDoc(collection(db, `users/${studentId}/assignedHomework`), assignmentData);
+                        if (problemSet.type === 'bookActivity') {
+                            const existingBooksSnap = await getDocs(query(collection(db, `users/${studentId}/assignedHomework`), where('type', '==', 'bookActivity')));
+                            const bookCode = `책${existingBooksSnap.size + 1}`;
+                            const assignmentData = {
+                                problemId: currentAssignmentItemId,
+                                type: problemSet.type,
+                                title: problemSet.title,
+                                reward: problemSet.reward,
+                                status: 'assigned',
+                                bookCode,
+                                assignedAt: serverTimestamp()
+                            };
+                            await addDoc(collection(db, `users/${studentId}/assignedHomework`), assignmentData);
+                        } else {
+                            const assignmentData = {
+                                problemId: currentAssignmentItemId,
+                                type: problemSet.type,
+                                title: problemSet.title,
+                                reward: problemSet.reward,
+                                status: 'assigned',
+                                assignedAt: serverTimestamp()
+                            };
+                            await addDoc(collection(db, `users/${studentId}/assignedHomework`), assignmentData);
+                        }
                     }
                 } else if (currentAssignmentType === 'lifeRule') {
                     const repeatType = document.querySelector('input[name="repeatType"]:checked').value;
@@ -3155,7 +3174,7 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                            <button data-hwid="${hw.id}" data-problemid="${hw.problemId}" data-type="${hw.type}" class="view-homework-btn text-amber-600 hover:text-amber-900">
+                            <button data-hwid="${hw.id}" data-problemid="${hw.problemId}" data-type="${hw.type}" data-bookcode="${hw.bookCode || ''}" class="view-homework-btn text-amber-600 hover:text-amber-900">
                                 ${isCompleted ? '결과 보기' : '숙제로 이동하기'}
                             </button>
                             ${isAdminViewing ? `<button data-hwid="${hw.id}" class="delete-assigned-hw-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>` : ''}
@@ -3180,7 +3199,11 @@
                         } else if (hwType === 'readingJournal') {
                             openReadingJournalModal(e.target.dataset.hwid, e.target.dataset.problemid);
                         } else if (hwType === 'bookActivity') {
-                            window.location.href = 'book.html';
+                            const code = e.target.dataset.bookcode;
+                            showModal('책 만들기 활동', `코드: ${code}`, () => {
+                                window.location.href = `book.html?code=${encodeURIComponent(code)}`;
+                            });
+                            modalConfirmBtn.textContent = '책 만들기 이동하기';
                         } else {
                             openHomeworkModal(e.target.dataset.hwid, e.target.dataset.problemid);
                         }
