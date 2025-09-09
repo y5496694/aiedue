@@ -62,6 +62,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref as storageRef, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // 전역 변수
         let bookCurrentPage = 0;
@@ -69,6 +70,7 @@
         let bookCode = null;
         let auth;
         let db;
+        let storage;
         // 로그인한 사용자 이름을 저장하고 책의 저자 영역을 동기화합니다.
         window.authorName = '';
         window.syncBookAuthor = function() {
@@ -375,13 +377,47 @@
             btn.disabled = true;
             btn.textContent = '저장 중...';
             try {
+                const pages = document.querySelectorAll('#book-viewer .book-page');
+                const images = {};
+                const texts = {};
+                const uploads = [];
+
+                pages.forEach((page, idx) => {
+                    const bg = page.style.backgroundImage;
+                    const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
+                    if (match) {
+                        if (!page.dataset.imageName) {
+                            page.dataset.imageName = `page-${idx}-${Date.now()}.png`;
+                        }
+                        const imgRef = storageRef(storage, `users/${auth.currentUser.uid}/bookDrafts/${bookCode}/${page.dataset.imageName}`);
+                        uploads.push(uploadString(imgRef, match[1], 'data_url'));
+                        images[idx] = page.dataset.imageName;
+                    } else if (page.dataset.imageName) {
+                        images[idx] = page.dataset.imageName;
+                    }
+
+                    const textarea = page.querySelector('.manual-text-area');
+                    if (textarea) {
+                        texts[idx] = textarea.value;
+                    } else {
+                        const textBox = page.querySelector('.text-box');
+                        if (textBox) texts[idx] = textBox.textContent.trim();
+                    }
+                });
+
+                await Promise.all(uploads);
+
                 const viewerHtml = document.getElementById('book-viewer').innerHTML;
                 const context = document.getElementById('manual-book-context').value;
+
                 await setDoc(doc(db, 'users', auth.currentUser.uid, 'bookDrafts', bookCode), {
                     viewerHtml,
                     context,
+                    images,
+                    texts,
                     updatedAt: serverTimestamp()
                 }, { merge: true });
+
                 showNotification('저장되었습니다!');
             } catch (err) {
                 console.error(err);
@@ -587,6 +623,7 @@
         const app = initializeApp(firebaseConfig);
         auth = getAuth(app);
         db = getFirestore(app);
+        storage = getStorage(app);
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -607,6 +644,36 @@
                         const spreads = Array.from(document.querySelectorAll('#book-viewer .book-spread'));
                         const activeIdx = spreads.findIndex(s => s.classList.contains('active'));
                         bookCurrentPage = activeIdx >= 0 ? activeIdx : 0;
+
+                        // 텍스트 복원
+                        if (data.texts) {
+                            const pages = document.querySelectorAll('#book-viewer .book-page');
+                            Object.entries(data.texts).forEach(([idx, text]) => {
+                                const page = pages[idx];
+                                if (!page) return;
+                                const textarea = page.querySelector('.manual-text-area');
+                                if (textarea) {
+                                    textarea.value = text;
+                                } else {
+                                    const textBox = page.querySelector('.text-box');
+                                    if (textBox) textBox.textContent = text;
+                                }
+                            });
+                        }
+
+                        // 이미지 복원
+                        if (data.images) {
+                            const pages = document.querySelectorAll('#book-viewer .book-page');
+                            await Promise.all(Object.entries(data.images).map(async ([idx, name]) => {
+                                const page = pages[idx];
+                                if (!page) return;
+                                page.dataset.imageName = name;
+                                const imgRef = storageRef(storage, `users/${user.uid}/bookDrafts/${bookCode}/${name}`);
+                                const url = await getDownloadURL(imgRef);
+                                page.style.backgroundImage = `url('${url}')`;
+                            }));
+                        }
+
                         updateBookView();
                         window.syncBookAuthor();
                     } else {
