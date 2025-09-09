@@ -37,10 +37,6 @@
                     <span class="text-sm text-gray-600">글쓴이: <span id="author-display" class="book-author-sync"></span></span>
                 </div>
                 <div id="viewer-controls" class="flex flex-wrap justify-center items-center gap-2">
-                    <button onclick="addManualPage()" class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-cyan-600">+ 페이지 추가</button>
-                    <button onclick="deleteCurrentPage()" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">페이지 삭제</button>
-                    <button onclick="addCharacterPage()" class="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">+ 등장인물 추가</button>
-                    <button onclick="toggleBookEdit(this)" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600">글 편집</button>
                     <button id="generate-images-btn" onclick="completeManualBook()" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed">그림 생성하기</button>
                     <button id="save-book-pdf-btn" onclick="downloadBookAsPDF()" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 hidden">PDF 저장</button>
                     <button id="register-library-btn" onclick="registerToLibrary()" class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed hidden" disabled>도서관 등록하기</button>
@@ -134,7 +130,7 @@
                     <div class="book-page bg-white border-r border-gray-300">
                         <div style="width: 80%; text-align: center;">
                             <div class="text-box mb-4">
-                                <h1 class="text-3xl font-bold editable-text book-title-sync" contenteditable="false">제목을 입력하세요</h1>
+                                <h1 class="text-3xl font-bold editable-text book-title-sync" contenteditable="true">제목을 입력하세요</h1>
                             </div>
                             <div class="text-box inline-block">
                                 <p class="book-author-sync" contenteditable="false">글쓴이</p>
@@ -144,7 +140,7 @@
                     <div class="book-page bg-gray-200">
                         <div class="absolute top-6 left-6">
                             <div class="text-sm font-semibold mb-1 text-gray-600">제목</div>
-                            <div class="text-xl p-2 bg-white bg-opacity-80 rounded shadow editable-text book-title-sync" contenteditable="false">제목을 입력하세요</div>
+                            <div class="text-xl p-2 bg-white bg-opacity-80 rounded shadow editable-text book-title-sync" contenteditable="true">제목을 입력하세요</div>
                         </div>
                         <div class="absolute bottom-4 right-4 text-box">
                             <p class="book-author-sync" contenteditable="false">글쓴이</p>
@@ -161,7 +157,7 @@
                         <h2 class="absolute top-6 text-2xl font-bold text-gray-700">등장인물 소개</h2>
                         <div class="w-full h-full flex flex-col items-center justify-center pt-16">
                            <div class="w-full h-1/2 bg-gray-200 mb-4 rounded flex items-center justify-center text-gray-400 character-image-box" style="background-size: cover; background-position: center;">그림 1</div>
-                           <div class="editable-text text-xl font-bold" contenteditable="false">이름 1</div>
+                           <div class="editable-text text-xl font-bold" contenteditable="true">이름 1</div>
                            <textarea class="manual-text-area mt-2 h-1/4 text-sm" placeholder="어떤 인물인지 설명해주세요."></textarea>
                         </div>
                         <div class="page-number" style="left: 0.5rem;">1</div>
@@ -171,7 +167,7 @@
                          <h2 class="absolute top-6 text-2xl font-bold text-gray-700 opacity-0">등장인물 소개</h2>
                          <div class="w-full h-full flex flex-col items-center justify-center pt-16">
                            <div class="w-full h-1/2 bg-gray-200 mb-4 rounded flex items-center justify-center text-gray-400 character-image-box" style="background-size: cover; background-position: center;">그림 2</div>
-                           <div class="editable-text text-xl font-bold" contenteditable="false">이름 2</div>
+                           <div class="editable-text text-xl font-bold" contenteditable="true">이름 2</div>
                            <textarea class="manual-text-area mt-2 h-1/4 text-sm" placeholder="어떤 인물인지 설명해주세요."></textarea>
                         </div>
                         <div class="page-number" style="right: 0.5rem;">2</div>
@@ -195,11 +191,11 @@
                 </div>
             `;
 
-            // 네비게이션 버튼 및 읽기 버튼
+            // 네비게이션 버튼 및 페이지 액션 버튼 컨테이너
             const navButtons = `
                 <button id="prev-page-btn" onclick="changeBookPage(-1)" class="page-nav left-2">‹</button>
                 <button id="next-page-btn" onclick="changeBookPage(1)" class="page-nav right-2">›</button>
-                <button id="read-aloud-btn" onclick="readCurrentPage()" class="absolute top-4 right-4 bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center text-xl z-10">🔊</button>
+                <div id="page-action-buttons" class="absolute top-4 right-4 flex gap-2 z-10"></div>
             `;
 
             viewer.innerHTML = spread0 + spread1 + spread2 + navButtons;
@@ -256,7 +252,7 @@
                     <h2 class="absolute top-6 text-2xl font-bold text-gray-700">등장인물 소개</h2>
                     <div class="w-full h-full flex flex-col items-center justify-center pt-16">
                        <div class="w-full h-1/2 bg-gray-200 mb-4 rounded flex items-center justify-center text-gray-400 character-image-box" style="background-size: cover; background-position: center;">그림 ${charNum1}</div>
-                       <div class="editable-text text-xl font-bold" contenteditable="false">이름 ${charNum1}</div>
+                       <div class="editable-text text-xl font-bold" contenteditable="true">이름 ${charNum1}</div>
                        <textarea class="manual-text-area mt-2 h-1/4 text-sm" placeholder="어떤 인물인지 설명해주세요."></textarea>
                     </div>
                     <div class="page-number" style="left: 0.5rem;"></div>
@@ -265,7 +261,7 @@
                      <h2 class="absolute top-6 text-2xl font-bold text-gray-700 opacity-0">등장인물 소개</h2>
                      <div class="w-full h-full flex flex-col items-center justify-center pt-16">
                        <div class="w-full h-1/2 bg-gray-200 mb-4 rounded flex items-center justify-center text-gray-400 character-image-box" style="background-size: cover; background-position: center;">그림 ${charNum2}</div>
-                       <div class="editable-text text-xl font-bold" contenteditable="false">이름 ${charNum2}</div>
+                       <div class="editable-text text-xl font-bold" contenteditable="true">이름 ${charNum2}</div>
                        <textarea class="manual-text-area mt-2 h-1/4 text-sm" placeholder="어떤 인물인지 설명해주세요."></textarea>
                     </div>
                     <div class="page-number" style="right: 0.5rem;"></div>
@@ -312,24 +308,26 @@
 
         // 현재 페이지 삭제
         function deleteCurrentPage() {
-            if (bookCurrentPage === 0) {
+            const currentSpread = document.getElementById(`spread-${bookCurrentPage}`);
+            if (!currentSpread) return;
+            const type = currentSpread.dataset.pageType;
+            if (type === 'cover') {
                 showNotification("표지는 삭제할 수 없습니다.");
                 return;
             }
-             if (totalBookSpreads <= 3) {
-                showNotification("책의 기본 구조(표지, 등장인물, 이야기)는 삭제할 수 없습니다.");
-                return;
+            if (type === 'character') {
+                const charSpreads = Array.from(document.querySelectorAll('#book-viewer .book-spread[data-page-type="character"]'));
+                if (charSpreads.indexOf(currentSpread) === 0) {
+                    showNotification("기본 등장인물 페이지는 삭제할 수 없습니다.");
+                    return;
+                }
             }
-
-            const spreadToDelete = document.getElementById(`spread-${bookCurrentPage}`);
-            if (spreadToDelete) {
-                spreadToDelete.remove();
-                totalBookSpreads--;
-                bookCurrentPage = Math.max(0, bookCurrentPage - 1);
-                updatePageNumbersAndIDs();
-                updateBookView();
-                showNotification("페이지가 삭제되었습니다.");
-            }
+            currentSpread.remove();
+            totalBookSpreads--;
+            bookCurrentPage = Math.max(0, Math.min(bookCurrentPage, totalBookSpreads - 1));
+            updatePageNumbersAndIDs();
+            updateBookView();
+            showNotification("페이지가 삭제되었습니다.");
         }
 
         // 도서관 등록 (구현 예정)
@@ -422,52 +420,34 @@
             updateBookView();
         }
 
-        // 현재 페이지에 맞게 뷰 업데이트
         function updateBookView() {
-            document.querySelectorAll(".book-spread").forEach((spread, index) => {
-                spread.classList.toggle("active", index === bookCurrentPage);
-            });
-            document.getElementById("prev-page-btn").style.display = bookCurrentPage === 0 ? "none" : "block";
-            document.getElementById("next-page-btn").style.display = bookCurrentPage >= totalBookSpreads - 1 ? "none" : "block";
-        }
+    document.querySelectorAll(".book-spread").forEach((spread, index) => {
+        spread.classList.toggle("active", index === bookCurrentPage);
+    });
+    document.getElementById("prev-page-btn").style.display = bookCurrentPage === 0 ? "none" : "block";
+    document.getElementById("next-page-btn").style.display = bookCurrentPage >= totalBookSpreads - 1 ? "none" : "block";
 
-        // 현재 페이지 내용 읽어주기
-        function readCurrentPage() {
-            const currentSpread = document.getElementById(`spread-${bookCurrentPage}`);
-            if (currentSpread) {
-                let textToRead = '';
-                if (bookCurrentPage === 0) { // 표지
-                    textToRead = Array.from(currentSpread.querySelectorAll('.editable-text')).map(el => el.textContent).join('. ');
-                } else { // 등장인물 또는 이야기 페이지
-                     const textareas = currentSpread.querySelectorAll('textarea');
-                     const editables = currentSpread.querySelectorAll('.editable-text');
-                     let content = [];
-                     editables.forEach(el => content.push(el.textContent));
-                     textareas.forEach(ta => content.push(ta.value));
-                     textToRead = content.join('. ');
-                }
-                speak(textToRead.trim());
-            }
-        }
+    const actionContainer = document.getElementById('page-action-buttons');
+    actionContainer.innerHTML = '';
+    const currentSpread = document.getElementById(`spread-${bookCurrentPage}`);
+    if (!currentSpread) return;
+    const type = currentSpread.dataset.pageType;
 
-        // 글 편집 모드 토글
-        function toggleBookEdit(button) {
-            const isEditing = button.textContent === "편집 완료";
-            document.querySelectorAll("#book-viewer .editable-text, #book-viewer .manual-text-area").forEach(el => {
-                el.contentEditable = !isEditing;
-                el.classList.toggle("outline-blue-500", !isEditing);
-                el.classList.toggle("outline-2", !isEditing);
-                el.classList.toggle("outline", !isEditing);
-                 if (el.tagName.toLowerCase() !== 'textarea') {
-                    el.style.cursor = isEditing ? 'default' : 'text';
-                }
-            });
-            button.textContent = isEditing ? "글 편집" : "편집 완료";
-            button.classList.toggle("bg-blue-500", isEditing);
-            button.classList.toggle("hover:bg-blue-600", isEditing);
-            button.classList.toggle("bg-red-500", !isEditing);
-            button.classList.toggle("hover:bg-red-600", !isEditing);
+    if (type === 'story') {
+        actionContainer.innerHTML = `
+            <button onclick="addManualPage()" class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-cyan-600">+ 페이지 추가</button>
+            <button onclick="deleteCurrentPage()" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">페이지 삭제</button>
+        `;
+    } else if (type === 'character') {
+        const charSpreads = Array.from(document.querySelectorAll('#book-viewer .book-spread[data-page-type="character"]'));
+        const charIndex = charSpreads.indexOf(currentSpread);
+        let buttons = `<button onclick="addCharacterPage()" class="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">+ 등장인물 추가</button>`;
+        if (charIndex > 0) {
+            buttons += `<button onclick="deleteCurrentPage()" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">페이지 삭제</button>`;
         }
+        actionContainer.innerHTML = buttons;
+    }
+}
 
         // PDF로 다운로드
         async function downloadBookAsPDF() {
