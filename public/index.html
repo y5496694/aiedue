@@ -4762,33 +4762,46 @@
             currentAssignmentId = assignmentId;
             const dataToShow = viewedUserData;
             const assignmentRef = doc(db, `users/${dataToShow.id}/assignedHomework`, assignmentId);
-            const assignmentDoc = await getDoc(assignmentRef);
-            if (!assignmentDoc.exists()) {
-                showModal('오류', '활동을 불러올 수 없습니다.');
-                return;
-            }
-            const assignmentData = assignmentDoc.data();
-            document.getElementById('book-activity-modal-title').textContent = assignmentData.title;
-            let bookCode = assignmentData.bookCode;
-            if (!bookCode) {
-                bookCode = `book${Date.now()}`;
-                await updateDoc(assignmentRef, { bookCode });
-            }
-            bookCodeDisplay.textContent = bookCode;
-            openBookPageLink.href = `book.html?code=${encodeURIComponent(bookCode)}`;
 
-            const bookRef = doc(db, 'Book', bookCode);
-            const bookSnap = await getDoc(bookRef);
-            if (!bookSnap.exists()) {
-                await setDoc(bookRef, {
-                    createdAt: serverTimestamp(),
-                    owner: dataToShow.id,
-                    assignmentId,
-                    title: assignmentData.title || ''
-                });
-            }
+            try {
+                const assignmentDoc = await getDoc(assignmentRef);
+                if (!assignmentDoc.exists()) {
+                    showModal('오류', '활동을 불러올 수 없습니다.');
+                    return;
+                }
 
-            bookActivityModal.style.display = 'flex';
+                const assignmentData = assignmentDoc.data();
+                document.getElementById('book-activity-modal-title').textContent = assignmentData.title;
+
+                let bookCode = assignmentData.bookCode;
+                if (!bookCode) {
+                    bookCode = `book${Date.now()}`;
+                    await updateDoc(assignmentRef, { bookCode });
+                }
+                bookCodeDisplay.textContent = bookCode;
+                openBookPageLink.href = `book.html?code=${encodeURIComponent(bookCode)}`;
+
+                try {
+                    const bookRef = doc(db, 'Book', bookCode);
+                    const bookSnap = await getDoc(bookRef);
+                    if (!bookSnap.exists()) {
+                        await setDoc(bookRef, {
+                            createdAt: serverTimestamp(),
+                            owner: dataToShow.id,
+                            assignmentId,
+                            title: assignmentData.title || ''
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error initializing book document:', error);
+                    showModal('오류', '책 정보를 생성하는 중 오류가 발생했습니다.');
+                }
+
+                bookActivityModal.style.display = 'flex';
+            } catch (error) {
+                console.error('Error opening book activity modal:', error);
+                showModal('오류', '활동을 불러오는 중 오류가 발생했습니다.');
+            }
         }
 
         // ----- Reading Log Rendering -----
