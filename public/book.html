@@ -94,7 +94,13 @@
          */
         async function generateImageForParagraph(text, context = "") {
             const prompt = `${text}\n${context}`;
-            const res = await fetch(`/.netlify/functions/stability-handler?prompt=${encodeURIComponent(prompt)}`);
+            const res = await fetch('/.netlify/functions/stability-handler', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ prompt })
+            });
 
             let data;
             try {
