@@ -34,7 +34,8 @@
             <header class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
                 <div class="flex items-end gap-2">
                     <h1 class="text-2xl md:text-4xl font-bold text-emerald-800">AI 책 만들기</h1>
-                    <span class="text-sm text-gray-600">글쓴이: <span id="author-display" class="book-author-sync"></span></span>
+                    <span class="text-sm text-gray-600">글쓴이: <span id="author-display" class="book-author-sync"></span> (<span id="email-display"></span>)</span>
+                    <span class="text-sm text-gray-600 ml-2">코드: <span id="book-code-display"></span></span>
                 </div>
                 <div id="viewer-controls" class="flex flex-wrap justify-center items-center gap-2">
                     <button id="generate-images-btn" onclick="completeManualBook()" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed">그림 생성하기</button>
@@ -61,8 +62,11 @@
         // 전역 변수
         let bookCurrentPage = 0;
         let totalBookSpreads = 0;
-        // 로그인한 사용자 이름을 저장하고 책의 저자 영역을 동기화합니다.
+        let bookEditingLocked = false;
+        // 로그인한 사용자 이름 및 이메일을 저장하고 책의 저자 영역을 동기화합니다.
         window.authorName = '';
+        window.authorEmail = '';
+        window.bookCode = new URLSearchParams(window.location.search).get('code') || '';
         window.syncBookAuthor = function() {
             document.querySelectorAll('.book-author-sync').forEach(el => el.textContent = window.authorName);
         };
@@ -250,6 +254,7 @@
         
         // 등장인물 페이지 추가
         function addCharacterPage() {
+            if (bookEditingLocked) { showNotification("책이 완성되어 페이지를 추가할 수 없습니다."); return; }
             const viewer = document.getElementById("book-viewer");
             const characterSpreads = viewer.querySelectorAll('.book-spread[data-page-type="character"]');
             const lastCharacterSpread = characterSpreads[characterSpreads.length - 1];
@@ -300,6 +305,7 @@
 
         // 이야기 페이지 추가
         function addManualPage() {
+            if (bookEditingLocked) { showNotification("책이 완성되어 페이지를 추가할 수 없습니다."); return; }
             const viewer = document.getElementById("book-viewer");
             const newSpread = document.createElement("div");
             newSpread.className = "book-spread book-viewer";
@@ -328,6 +334,7 @@
 
         // 현재 페이지 삭제
         function deleteCurrentPage() {
+            if (bookEditingLocked) { showNotification("책이 완성되어 페이지를 삭제할 수 없습니다."); return; }
             const currentSpread = document.getElementById(`spread-${bookCurrentPage}`);
             if (!currentSpread) return;
             const type = currentSpread.dataset.pageType;
@@ -409,16 +416,18 @@
                 const storySpreads = document.querySelectorAll('.book-spread[data-page-type="story"]');
                 for (const spread of storySpreads) {
                     const text = spread.querySelector("textarea").value;
-                    if (text) {
-                        const imageUrl = await generateImageForParagraph(text, context);
-                        const imagePage = spread.querySelector(".book-page:first-child");
-                        const pageNumHTML = imagePage.querySelector('.page-number')?.outerHTML || '';
-                        imagePage.style.backgroundImage = `url('${imageUrl}')`;
-                        imagePage.innerHTML = pageNumHTML;
-                    }
+                    const promptText = text || '아무 장면';
+                    const imageUrl = await generateImageForParagraph(promptText, context);
+                    const imagePage = spread.querySelector(".book-page:first-child");
+                    const pageNumHTML = imagePage.querySelector('.page-number')?.outerHTML || '';
+                    imagePage.style.backgroundImage = `url('${imageUrl}')`;
+                    imagePage.innerHTML = pageNumHTML;
                 }
                 showNotification("책이 완성되었습니다! 이제 도서관에 등록할 수 있습니다.");
-                
+
+                bookEditingLocked = true;
+                updateBookView();
+
                 // 그림 생성 버튼은 영구적으로 비활성화
                 generateBtn.disabled = true;
                 
@@ -456,6 +465,7 @@
 
     const actionContainer = document.getElementById('page-action-buttons');
     actionContainer.innerHTML = '';
+    if (bookEditingLocked) return;
     const currentSpread = document.getElementById(`spread-${bookCurrentPage}`);
     if (!currentSpread) return;
     const type = currentSpread.dataset.pageType;
@@ -532,7 +542,11 @@
         });
 
         // 페이지 로드 시 초기화
-        document.addEventListener('DOMContentLoaded', startManualBookCreation);
+        document.addEventListener('DOMContentLoaded', () => {
+            startManualBookCreation();
+            const codeDisplay = document.getElementById('book-code-display');
+            if (codeDisplay) codeDisplay.textContent = window.bookCode;
+        });
         
         // 단어 클릭 시 TTS 이벤트 리스너
         document.addEventListener("click", e => {
@@ -563,7 +577,10 @@
             if (user) {
                 const userDoc = await getDoc(doc(db, 'users', user.uid));
                 window.authorName = userDoc.data()?.name || '';
+                window.authorEmail = user.email || '';
                 window.syncBookAuthor();
+                const emailDisplay = document.getElementById('email-display');
+                if (emailDisplay) emailDisplay.textContent = window.authorEmail;
             } else {
                 window.location.href = 'index.html';
             }
