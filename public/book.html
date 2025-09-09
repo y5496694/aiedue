@@ -58,7 +58,11 @@
     <div id="notification"></div>
 
 
-    <script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
         // 전역 변수
         let bookCurrentPage = 0;
         let totalBookSpreads = 0;
@@ -570,11 +574,6 @@
                 speak(e.target.textContent.trim());
             }
         });
-    </script>
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDCeJPDQUNi-KmJ9DhkTRIu-9t2PGZCpt0",
@@ -620,6 +619,15 @@
                 window.location.href = 'index.html';
             }
         });
+
+        window.addCharacterPage = addCharacterPage;
+        window.addManualPage = addManualPage;
+        window.deleteCurrentPage = deleteCurrentPage;
+        window.changeBookPage = changeBookPage;
+        window.completeManualBook = completeManualBook;
+        window.saveBookDraft = saveBookDraft;
+        window.downloadBookAsPDF = downloadBookAsPDF;
+        window.registerToLibrary = registerToLibrary;
     </script>
 </body>
 </html>
