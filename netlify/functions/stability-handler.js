@@ -7,18 +7,23 @@ exports.handler = async (event) => {
 
   try {
     const { type, payload } = JSON.parse(event.body);
-    // 환경 변수 이름을 'Stability_api_key'로 수정했습니다.
     const { Stability_api_key } = process.env;
 
     if (type === 'stability') {
+      const bodyPayload = {
+        height: payload.height || 768,
+        width: payload.width || 768,
+        output_format: payload.output_format || 'webp',
+        ...payload,
+      };
+
       const response = await fetch("https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // 사용하는 변수명도 'Stability_api_key'로 수정했습니다.
           'Authorization': `Bearer ${Stability_api_key}`,
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(bodyPayload)
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Stability AI Error');
