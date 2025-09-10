@@ -219,7 +219,8 @@
         async function loadLibraryBooks() {
             const listEl = document.getElementById('library-book-list');
             listEl.innerHTML = '';
-            const snap = await getDocs(collection(db, 'Book'));
+            const q = query(collection(db, 'Book'), where('isPublic', '==', true));
+            const snap = await getDocs(q);
             snap.forEach(docSnap => {
                 const data = docSnap.data();
                 const item = document.createElement('button');
@@ -726,12 +727,32 @@
             }
         }
 
-        // 도서관 등록 (구현 예정)
-        function registerToLibrary() {
-            showNotification("도서관에 등록되었습니다! (구현 예정)");
-            // 실제 구현 시, 이 곳에서 도서관 사이트로 데이터를 전송하거나
-            // 미니 뷰어를 여는 로직이 들어갑니다.
-            // 예: window.open(`https://mylibrary.com/viewer?bookId=SOME_UNIQUE_ID`);
+        // 도서관 등록
+        async function registerToLibrary() {
+            if (!bookCode || !auth?.currentUser) {
+                showNotification('등록할 책이 없습니다.');
+                return;
+            }
+
+            const btn = document.getElementById('register-library-btn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '등록 중...';
+
+            try {
+                await updateDoc(doc(db, 'Book', bookCode), {
+                    isPublic: true,
+                    publishedAt: serverTimestamp()
+                });
+                showNotification('도서관에 등록되었습니다!');
+                await loadLibraryBooks();
+            } catch (error) {
+                console.error('도서관 등록 실패:', error);
+                showNotification('도서관 등록 실패: ' + error.message);
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
         }
 
         // 책 완성 (그림 생성)
@@ -1063,7 +1084,8 @@
                     authorId: bookAuthorUid,
                     owner: bookAuthorUid,
                     createdAt: serverTimestamp(),
-                    title
+                    title,
+                    isPublic: false
                 });
                 await addDoc(collection(db, `users/${bookAuthorUid}/myBooks`), {
                     bookId: newBookCode,
