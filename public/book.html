@@ -114,11 +114,12 @@
                     <span class="text-sm text-gray-600">글쓴이: <span id="author-display" class="book-author-sync"></span></span>
                 </div>
                 <div id="viewer-controls" class="flex flex-wrap justify-center items-center gap-2">
-                    <button id="generate-images-gpt-btn" onclick="completeManualBookGPT()" class="bg-pink-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-pink-700 disabled:bg-gray-400 disabled:cursor-not-allowed">GPT 사진 만들기/1토큰</button>
+                    <button id="generate-images-gpt-btn" onclick="completeManualBookGPT()" class="bg-pink-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-pink-700 disabled:bg-gray-400 disabled:cursor-not-allowed hidden">GPT 사진 만들기/1토큰</button>
                     <button id="generate-images-btn" onclick="completeManualBook()" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed">그림 생성하기</button>
                     <button id="save-book-btn" onclick="saveBookDraft()" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed">저장하기</button>
                     <button id="save-book-pdf-btn" onclick="downloadBookAsPDF()" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 hidden">PDF 저장</button>
                     <button id="register-library-btn" onclick="registerToLibrary()" class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed hidden" disabled>책 완성</button>
+                    <button id="edit-book-btn" onclick="enableEditMode()" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600 hidden">편집</button>
                 </div>
             </header>
 
@@ -221,12 +222,17 @@
         let bookCurrentPage = 0;
         let totalBookSpreads = 0;
         let bookCode = null;
-        let bookAuthorUid = null;
+        let bookAuthorUid = null; // 현재 로그인한 사용자 UID
+        let bookOwnerUid = null;  // 책 소유자 UID
         let auth;
         let db;
         let storage;
         let userTokens = 0;
         let currentClassStudents = [];
+        let isViewMode = false;
+        let canEditBook = false;
+        let bookIsPublic = false;
+        let imagesGenerated = false;
         // 로그인한 사용자 이름을 저장하고 책의 저자 영역을 동기화합니다.
         window.authorName = '';
         window.syncBookAuthor = function() {
@@ -288,17 +294,25 @@
             listEl.innerHTML = '';
             const q = query(collection(db, 'Book'), where('isPublic', '==', true));
             const snap = await getDocs(q);
-            snap.forEach(docSnap => {
+            for (const docSnap of snap.docs) {
                 const data = docSnap.data();
                 const item = document.createElement('button');
-                const created = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleDateString('ko-KR') : '';
-                item.innerHTML = `<div class="font-semibold">${data.title || '제목없음'}</div>` +
+                let coverUrl = '';
+                if (data.coverImage) {
+                    try {
+                        coverUrl = await getDownloadURL(storageRef(storage, `Book/${docSnap.id}/${data.coverImage}`));
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }
+                item.innerHTML = `<div class="w-32 h-40 bg-gray-200 bg-cover bg-center mb-2"${coverUrl ? ` style="background-image:url('${coverUrl}')"` : ''}></div>` +
+                                  `<div class="font-semibold">${data.title || '제목없음'}</div>` +
                                   `<div class="text-xs text-gray-600">글쓴이: ${data.author || ''}</div>` +
                                   `<div class="text-xs text-gray-600">코드: ${docSnap.id}</div>`;
-                item.className = 'text-left px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 flex-shrink-0';
+                item.className = 'text-left p-2 bg-gray-100 rounded-lg hover:bg-gray-200 flex-shrink-0';
                 item.addEventListener('click', () => loadBook(docSnap.id));
                 listEl.appendChild(item);
-            });
+            }
         }
 
         async function loadBook(id) {
@@ -310,6 +324,10 @@
             }
             bookCode = id;
             const data = bookDoc.data();
+            bookOwnerUid = data.owner || data.authorId || auth.currentUser.uid;
+            bookIsPublic = !!data.isPublic;
+            imagesGenerated = !!data.coverImage;
+            canEditBook = auth.currentUser && (auth.currentUser.uid === bookOwnerUid || window.currentUserRole === 'teacher');
             buildBookViewer();
 
             for (let i = 1; i < (data.characterSpreadCount || 1); i++) {
@@ -386,7 +404,7 @@
             document.getElementById('book-viewer-page').classList.remove('hidden');
             document.getElementById('book-list-section').classList.add('hidden');
             bookCurrentPage = 0;
-            updateBookView();
+            setViewMode(bookIsPublic);
         }
 
         async function updateUserInfo() {
@@ -396,6 +414,7 @@
             const data = userDoc.data() || {};
             window.authorName = data.name || '';
             userTokens = Number(data.aeduTokens) || 0;
+            window.currentUserRole = data.role || 'student';
             document.getElementById('display-user-name').textContent = window.authorName;
             document.getElementById('display-user-tokens').textContent = `${userTokens}`;
             const roleBadgeEl = document.getElementById('role-badge');
@@ -845,7 +864,7 @@
 
                 await setDoc(doc(db, 'Book', bookCode), data, { merge: true });
 
-                const myBooksRef = collection(db, `users/${bookAuthorUid}/myBooks`);
+                const myBooksRef = collection(db, `users/${bookOwnerUid}/myBooks`);
                 const q = query(myBooksRef, where('bookId', '==', bookCode));
                 const snap = await getDocs(q);
                 snap.forEach(docSnap => updateDoc(docSnap.ref, { title: data.title }));
@@ -878,6 +897,8 @@
                     publishedAt: serverTimestamp()
                 });
                 showNotification('도서관에 등록되었습니다!');
+                bookIsPublic = true;
+                setViewMode(true);
                 await loadLibraryBooks();
             } catch (error) {
                 console.error('도서관 등록 실패:', error);
@@ -886,6 +907,60 @@
                 btn.textContent = originalText;
                 btn.disabled = false;
             }
+        }
+
+        function setViewMode(mode) {
+            isViewMode = mode;
+            applyViewMode();
+            updateBookView();
+        }
+
+        function applyViewMode() {
+            const gptBtn = document.getElementById('generate-images-gpt-btn');
+            const generateBtn = document.getElementById('generate-images-btn');
+            const saveBtn = document.getElementById('save-book-btn');
+            const registerBtn = document.getElementById('register-library-btn');
+            const editBtn = document.getElementById('edit-book-btn');
+            const pdfBtn = document.getElementById('save-book-pdf-btn');
+            const promptWrapper = document.getElementById('page-prompt-wrapper');
+            const actionContainer = document.getElementById('page-action-buttons');
+
+            if (gptBtn) gptBtn.classList.add('hidden');
+
+            if (isViewMode) {
+                if (generateBtn) generateBtn.classList.add('hidden');
+                if (saveBtn) saveBtn.classList.add('hidden');
+                if (registerBtn) registerBtn.classList.add('hidden');
+                if (promptWrapper) promptWrapper.classList.add('hidden');
+                if (actionContainer) actionContainer.classList.add('hidden');
+                if (pdfBtn) pdfBtn.classList.remove('hidden');
+                if (canEditBook) {
+                    if (editBtn) editBtn.classList.remove('hidden');
+                } else if (editBtn) {
+                    editBtn.classList.add('hidden');
+                }
+                document.querySelectorAll('#book-viewer textarea').forEach(t => t.setAttribute('readonly', true));
+                document.querySelectorAll('#book-viewer .editable-text').forEach(e => e.setAttribute('contenteditable', 'false'));
+            } else {
+                if (generateBtn) {
+                    if (imagesGenerated) {
+                        generateBtn.classList.add('hidden');
+                    } else {
+                        generateBtn.classList.remove('hidden');
+                    }
+                }
+                if (saveBtn) saveBtn.classList.remove('hidden');
+                if (!bookIsPublic && registerBtn) registerBtn.classList.remove('hidden');
+                if (promptWrapper) promptWrapper.classList.remove('hidden');
+                if (actionContainer) actionContainer.classList.remove('hidden');
+                if (editBtn) editBtn.classList.add('hidden');
+                document.querySelectorAll('#book-viewer textarea').forEach(t => t.removeAttribute('readonly'));
+                document.querySelectorAll('#book-viewer .editable-text').forEach(e => e.setAttribute('contenteditable', 'true'));
+            }
+        }
+
+        function enableEditMode() {
+            setViewMode(false);
         }
 
         // 책 완성 (그림 생성)
@@ -950,10 +1025,12 @@
                     }
                 }
                 showNotification("책이 완성되었습니다! 이제 도서관에 등록할 수 있습니다.");
-                
-                // 그림 생성 버튼은 영구적으로 비활성화
+
+                // 그림 생성 버튼은 영구적으로 비활성화하고 숨기기
                 generateBtn.disabled = true;
-                
+                generateBtn.classList.add('hidden');
+                imagesGenerated = true;
+
                 // PDF 저장 및 도서관 등록 버튼 보이기 및 활성화
                 if(savePdfBtn) {
                     savePdfBtn.classList.remove('hidden');
@@ -1143,30 +1220,35 @@
     if (!currentSpread) return;
     const type = currentSpread.dataset.pageType;
 
-    if (type === 'story') {
-        const storySpreads = Array.from(document.querySelectorAll('#book-viewer .book-spread[data-page-type="story"]'));
-        const storyIndex = storySpreads.indexOf(currentSpread);
-        const charSpreads = document.querySelectorAll('#book-viewer .book-spread[data-page-type="character"]');
-        let buttons = '';
-        if (charSpreads.length === 0) {
-            buttons += `<button onclick="addCharacterPage()" class="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">+ 등장인물 추가</button>`;
-        }
-        buttons += `<button onclick="addManualPage()" class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-cyan-600">+ 페이지 추가</button>`;
-        if (storyIndex > 0) {
+    if (!isViewMode) {
+        if (type === 'story') {
+            const storySpreads = Array.from(document.querySelectorAll('#book-viewer .book-spread[data-page-type="story"]'));
+            const storyIndex = storySpreads.indexOf(currentSpread);
+            const charSpreads = document.querySelectorAll('#book-viewer .book-spread[data-page-type="character"]');
+            let buttons = '';
+            if (charSpreads.length === 0) {
+                buttons += `<button onclick="addCharacterPage()" class="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">+ 등장인물 추가</button>`;
+            }
+            buttons += `<button onclick="addManualPage()" class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-cyan-600">+ 페이지 추가</button>`;
+            if (storyIndex > 0) {
+                buttons += `<button onclick="deleteCurrentPage()" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">페이지 삭제</button>`;
+            }
+            actionContainer.innerHTML = buttons;
+        } else if (type === 'character') {
+            let buttons = `<button onclick="addCharacterPage()" class="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">+ 등장인물 추가</button>`;
             buttons += `<button onclick="deleteCurrentPage()" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">페이지 삭제</button>`;
+            actionContainer.innerHTML = buttons;
+        } else if (type === 'cover') {
+            const charSpreads = document.querySelectorAll('#book-viewer .book-spread[data-page-type="character"]');
+            if (charSpreads.length === 0) {
+                actionContainer.innerHTML = `<button onclick="addCharacterPage()" class="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">+ 등장인물 추가</button>`;
+            }
         }
-        actionContainer.innerHTML = buttons;
-    } else if (type === 'character') {
-        let buttons = `<button onclick="addCharacterPage()" class="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">+ 등장인물 추가</button>`;
-        buttons += `<button onclick="deleteCurrentPage()" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">페이지 삭제</button>`;
-        actionContainer.innerHTML = buttons;
-    } else if (type === 'cover') {
-        const charSpreads = document.querySelectorAll('#book-viewer .book-spread[data-page-type="character"]');
-        if (charSpreads.length === 0) {
-            actionContainer.innerHTML = `<button onclick="addCharacterPage()" class="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">+ 등장인물 추가</button>`;
-        }
+        renderPromptArea(currentSpread);
+    } else {
+        const wrapper = document.getElementById('page-prompt-wrapper');
+        if (wrapper) wrapper.innerHTML = '';
     }
-    renderPromptArea(currentSpread);
 }
 
         // PDF로 다운로드
@@ -1633,6 +1715,7 @@
         window.saveBookDraft = saveBookDraft;
         window.downloadBookAsPDF = downloadBookAsPDF;
         window.registerToLibrary = registerToLibrary;
+        window.enableEditMode = enableEditMode;
     </script>
 </body>
 </html>
