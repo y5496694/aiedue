@@ -71,15 +71,22 @@
 
     <div id="book-content" class="hidden">
     <div id="book-list-section" class="max-w-7xl mx-auto mb-4">
-        <div class="bg-white p-4 rounded-lg shadow flex items-center gap-2 overflow-x-auto">
-            <div id="book-list" class="flex gap-2"></div>
-            <button id="add-book-btn" class="ml-auto bg-blue-500 text-white px-4 py-2 rounded-lg whitespace-nowrap">+ 책 추가</button>
+        <div class="bg-white p-4 rounded-lg shadow">
+            <div id="user-info" class="mb-4">
+                <span id="display-user-name" class="font-bold"></span>
+                <span class="ml-2 text-sm text-gray-700">내 지갑: <span id="display-user-tokens">0</span>토큰</span>
+            </div>
+            <div class="flex items-center gap-2 overflow-x-auto">
+                <div id="book-list" class="flex gap-2"></div>
+                <button id="add-book-btn" class="ml-auto bg-blue-500 text-white px-4 py-2 rounded-lg whitespace-nowrap">+ 책 추가/1토큰</button>
+            </div>
         </div>
     </div>
     <div id="book-viewer-page" class="page-content max-w-7xl mx-auto hidden">
         <div class="bg-white rounded-2xl shadow-lg p-4 md:p-6">
             <header class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
                 <div class="flex items-end gap-2">
+                    <button id="back-to-list-btn" class="bg-gray-500 text-white px-3 py-1 rounded-lg">목록으로</button>
                     <h1 class="text-2xl md:text-4xl font-bold text-emerald-800">AI 책 만들기</h1>
                     <span class="text-sm text-gray-600">글쓴이: <span id="author-display" class="book-author-sync"></span></span>
                 </div>
@@ -120,6 +127,7 @@
         let auth;
         let db;
         let storage;
+        let userTokens = 0;
         // 로그인한 사용자 이름을 저장하고 책의 저자 영역을 동기화합니다.
         window.authorName = '';
         window.syncBookAuthor = function() {
@@ -227,8 +235,21 @@
             }
 
             document.getElementById('book-viewer-page').classList.remove('hidden');
+            document.getElementById('book-list-section').classList.add('hidden');
             bookCurrentPage = 0;
             updateBookView();
+        }
+
+        async function updateUserInfo() {
+            if (!bookAuthorUid) return;
+            const userRef = doc(db, 'users', bookAuthorUid);
+            const userDoc = await getDoc(userRef);
+            const data = userDoc.data() || {};
+            window.authorName = data.name || '';
+            userTokens = Number(data.aeduTokens) || 0;
+            document.getElementById('display-user-name').textContent = window.authorName;
+            document.getElementById('display-user-tokens').textContent = `${userTokens}`;
+            window.syncBookAuthor();
         }
 
         /**
@@ -839,9 +860,10 @@
             if (!title) return;
             const userRef = doc(db, 'users', bookAuthorUid);
             const userDoc = await getDoc(userRef);
-            const tokens = userDoc.data()?.aeduTokens || 0;
-            if (tokens <= 0) { alert('에이두 토큰이 부족합니다.'); return; }
+            const tokens = Number(userDoc.data()?.aeduTokens) || 0;
+            if (tokens < 1) { alert('에이두 토큰이 부족합니다.'); return; }
             await updateDoc(userRef, { aeduTokens: increment(-1) });
+            await updateUserInfo();
             const newBookCode = `book${Date.now()}`;
             await setDoc(doc(db, 'Book', newBookCode), {
                 author: window.authorName || '',
@@ -859,6 +881,12 @@
             buildBookViewer();
             document.querySelector('#spread-0 .book-title-sync').textContent = title;
             document.getElementById('book-viewer-page').classList.remove('hidden');
+            document.getElementById('book-list-section').classList.add('hidden');
+        });
+
+        document.getElementById('back-to-list-btn').addEventListener('click', () => {
+            document.getElementById('book-viewer-page').classList.add('hidden');
+            document.getElementById('book-list-section').classList.remove('hidden');
         });
 
         document.getElementById('book-student-login-btn').addEventListener('click', async () => {
@@ -887,15 +915,14 @@
             const loginView = document.getElementById('book-login-view');
             const contentView = document.getElementById('book-content');
             const viewerPage = document.getElementById('book-viewer-page');
+            const listSection = document.getElementById('book-list-section');
             if (user) {
                 loginView.classList.add('hidden');
                 contentView.classList.remove('hidden');
                 viewerPage.classList.add('hidden');
+                listSection.classList.remove('hidden');
                 bookAuthorUid = user.uid;
-                const userRef = doc(db, 'users', bookAuthorUid);
-                const userDoc = await getDoc(userRef);
-                window.authorName = userDoc.data()?.name || '';
-                window.syncBookAuthor();
+                await updateUserInfo();
                 await loadUserBooks();
             } else {
                 loginView.classList.remove('hidden');
