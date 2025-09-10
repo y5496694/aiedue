@@ -70,7 +70,13 @@
     </div>
 
     <div id="book-content" class="hidden">
-    <div id="book-viewer-page" class="page-content max-w-7xl mx-auto">
+    <div id="book-list-section" class="max-w-7xl mx-auto mb-4">
+        <div class="bg-white p-4 rounded-lg shadow flex items-center gap-2 overflow-x-auto">
+            <div id="book-list" class="flex gap-2"></div>
+            <button id="add-book-btn" class="ml-auto bg-blue-500 text-white px-4 py-2 rounded-lg whitespace-nowrap">+ 책 추가</button>
+        </div>
+    </div>
+    <div id="book-viewer-page" class="page-content max-w-7xl mx-auto hidden">
         <div class="bg-white rounded-2xl shadow-lg p-4 md:p-6">
             <header class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
                 <div class="flex items-end gap-2">
@@ -103,7 +109,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, serverTimestamp, updateDoc, increment, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, serverTimestamp, updateDoc, increment, collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref as storageRef, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // 전역 변수
@@ -139,6 +145,90 @@
             setTimeout(() => {
                 notification.classList.remove('show');
             }, duration);
+        }
+
+        async function loadUserBooks() {
+            if (!bookAuthorUid) return;
+            const listEl = document.getElementById('book-list');
+            listEl.innerHTML = '';
+            const snap = await getDocs(collection(db, `users/${bookAuthorUid}/myBooks`));
+            snap.forEach(docSnap => {
+                const data = docSnap.data();
+                const btn = document.createElement('button');
+                btn.textContent = data.title || '제목없음';
+                btn.className = 'px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 whitespace-nowrap';
+                btn.addEventListener('click', () => loadBook(data.bookId));
+                listEl.appendChild(btn);
+            });
+        }
+
+        async function loadBook(id) {
+            const bookRef = doc(db, 'Book', id);
+            const bookDoc = await getDoc(bookRef);
+            if (!bookDoc.exists()) {
+                alert('책을 불러올 수 없습니다.');
+                return;
+            }
+            bookCode = id;
+            const data = bookDoc.data();
+            buildBookViewer();
+
+            for (let i = 1; i < (data.characterSpreadCount || 1); i++) {
+                addCharacterPage();
+            }
+            for (let i = 1; i < (data.storySpreadCount || 1); i++) {
+                addManualPage();
+            }
+
+            document.querySelector('#spread-0 .book-title-sync').textContent = data.title || '';
+            window.authorName = data.author || window.authorName;
+            window.syncBookAuthor();
+
+            if (data.coverImage) {
+                const url = await getDownloadURL(storageRef(storage, `Book/${bookCode}/${data.coverImage}`));
+                const coverPage = document.querySelector('#spread-0 .book-page:nth-child(2)');
+                coverPage.style.backgroundImage = `url('${url}')`;
+                coverPage.dataset.imageName = data.coverImage;
+            }
+
+            const charPages = document.querySelectorAll('.book-spread[data-page-type="character"] .book-page');
+            for (let i = 0; i < charPages.length; i++) {
+                const idx = i + 1;
+                const page = charPages[i];
+                const imgName = data[`character${idx}Image`];
+                if (imgName) {
+                    const url = await getDownloadURL(storageRef(storage, `Book/${bookCode}/${imgName}`));
+                    const box = page.querySelector('.character-image-box');
+                    box.style.backgroundImage = `url('${url}')`;
+                    box.dataset.imageName = imgName;
+                    box.textContent = '';
+                }
+                const nameVal = data[`character${idx}Name`];
+                if (nameVal) page.querySelector('.editable-text').textContent = nameVal;
+                const descVal = data[`character${idx}Desc`];
+                if (descVal) page.querySelector('textarea.manual-text-area').value = descVal;
+            }
+
+            const storySpreads = document.querySelectorAll('.book-spread[data-page-type="story"]');
+            for (let i = 0; i < storySpreads.length; i++) {
+                const idx = i + 1;
+                const spread = storySpreads[i];
+                const imgName = data[`story${idx}Image`];
+                if (imgName) {
+                    const url = await getDownloadURL(storageRef(storage, `Book/${bookCode}/${imgName}`));
+                    const imagePage = spread.querySelector('.book-page:first-child');
+                    const pageNumHTML = imagePage.querySelector('.page-number')?.outerHTML || '';
+                    imagePage.style.backgroundImage = `url('${url}')`;
+                    imagePage.innerHTML = pageNumHTML;
+                    imagePage.dataset.imageName = imgName;
+                }
+                const textVal = data[`story${idx}Text`];
+                if (textVal) spread.querySelector('.book-page:last-child textarea.manual-text-area').value = textVal;
+            }
+
+            document.getElementById('book-viewer-page').classList.remove('hidden');
+            bookCurrentPage = 0;
+            updateBookView();
         }
 
         /**
@@ -188,6 +278,7 @@
         // 수동 책 만들기 시작
         function startManualBookCreation() {
             buildBookViewer();
+            document.getElementById('book-viewer-page').classList.remove('hidden');
         }
 
         // 책 뷰어 UI 구성
@@ -272,6 +363,7 @@
             `;
 
             viewer.innerHTML = spread0 + spread1 + spread2 + navButtons;
+            document.getElementById('manual-book-context').value = '';
 
             bookCurrentPage = 0;
             document.getElementById('spread-0').classList.add('active'); // 첫 페이지 활성화
@@ -507,6 +599,11 @@
 
                 await setDoc(doc(db, 'Book', bookCode), data, { merge: true });
 
+                const myBooksRef = collection(db, `users/${bookAuthorUid}/myBooks`);
+                const q = query(myBooksRef, where('bookId', '==', bookCode));
+                const snap = await getDocs(q);
+                snap.forEach(docSnap => updateDoc(docSnap.ref, { title: data.title }));
+
                 showNotification('저장되었습니다!');
             } catch (err) {
                 console.error(err);
@@ -736,6 +833,34 @@
         teacherLoginTab.addEventListener('click', () => switchLoginTab('teacher'));
         switchLoginTab('student');
 
+        document.getElementById('add-book-btn').addEventListener('click', async () => {
+            if (!bookAuthorUid) return;
+            const title = prompt('책 제목을 입력하세요');
+            if (!title) return;
+            const userRef = doc(db, 'users', bookAuthorUid);
+            const userDoc = await getDoc(userRef);
+            const tokens = userDoc.data()?.aeduTokens || 0;
+            if (tokens <= 0) { alert('에이두 토큰이 부족합니다.'); return; }
+            await updateDoc(userRef, { aeduTokens: increment(-1) });
+            const newBookCode = `book${Date.now()}`;
+            await setDoc(doc(db, 'Book', newBookCode), {
+                author: window.authorName || '',
+                owner: bookAuthorUid,
+                createdAt: serverTimestamp(),
+                title
+            });
+            await addDoc(collection(db, `users/${bookAuthorUid}/myBooks`), {
+                bookId: newBookCode,
+                title,
+                createdAt: serverTimestamp()
+            });
+            await loadUserBooks();
+            bookCode = newBookCode;
+            buildBookViewer();
+            document.querySelector('#spread-0 .book-title-sync').textContent = title;
+            document.getElementById('book-viewer-page').classList.remove('hidden');
+        });
+
         document.getElementById('book-student-login-btn').addEventListener('click', async () => {
             const codeInput = document.getElementById('book-student-code').value.trim();
             const normalizedCode = codeInput.replace(/[\uFF10-\uFF19]/g, m => String.fromCharCode(m.charCodeAt(0) - 0xFEE0));
@@ -761,40 +886,18 @@
         onAuthStateChanged(auth, async (user) => {
             const loginView = document.getElementById('book-login-view');
             const contentView = document.getElementById('book-content');
+            const viewerPage = document.getElementById('book-viewer-page');
             if (user) {
                 loginView.classList.add('hidden');
                 contentView.classList.remove('hidden');
+                viewerPage.classList.add('hidden');
                 bookAuthorUid = user.uid;
-                bookCode = `book${Date.now()}`;
-
                 const userRef = doc(db, 'users', bookAuthorUid);
                 const userDoc = await getDoc(userRef);
-                const tokens = userDoc.data()?.aeduTokens || 0;
-                if (tokens <= 0) {
-                    alert('에이두 토큰이 부족합니다.');
-                    return;
-                }
-
-                await updateDoc(userRef, { aeduTokens: increment(-1) });
                 window.authorName = userDoc.data()?.name || '';
                 window.syncBookAuthor();
-
-                const bookRef = doc(db, 'Book', bookCode);
-                await setDoc(bookRef, {
-                    author: window.authorName || '',
-                    owner: bookAuthorUid,
-                    createdAt: serverTimestamp()
-                });
-
-                await addDoc(collection(db, `users/${bookAuthorUid}/myBooks`), {
-                    bookId: bookCode,
-                    title: '',
-                    createdAt: serverTimestamp()
-                });
-
-                startManualBookCreation();
-            }
-            else {
+                await loadUserBooks();
+            } else {
                 loginView.classList.remove('hidden');
                 contentView.classList.add('hidden');
             }
