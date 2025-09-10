@@ -4779,7 +4779,7 @@
                     await updateDoc(assignmentRef, { bookCode });
                 }
                 bookCodeDisplay.textContent = bookCode;
-                openBookPageLink.href = `book.html?code=${encodeURIComponent(bookCode)}`;
+                openBookPageLink.href = `book.html?code=${encodeURIComponent(bookCode)}&uid=${encodeURIComponent(dataToShow.id)}`;
 
                 try {
                     const bookRef = doc(db, 'Book', bookCode);
@@ -4795,6 +4795,7 @@
                 } catch (error) {
                     console.error('Error initializing book document:', error);
                     showModal('오류', '책 정보를 생성하는 중 오류가 발생했습니다.');
+                    return;
                 }
 
                 bookActivityModal.style.display = 'flex';

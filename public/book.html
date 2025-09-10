@@ -68,6 +68,7 @@
         let bookCurrentPage = 0;
         let totalBookSpreads = 0;
         let bookCode = null;
+        let bookAuthorUid = null;
         let auth;
         let db;
         let storage;
@@ -673,17 +674,18 @@
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                const userDoc = await getDoc(doc(db, 'users', user.uid));
-                window.authorName = userDoc.data()?.name || '';
-                window.syncBookAuthor();
-
                 const params = new URLSearchParams(window.location.search);
                 bookCode = params.get('code');
+                bookAuthorUid = params.get('uid') || user.uid;
                 if (!bookCode) {
                     bookCode = `book${Date.now()}`;
                     params.set('code', bookCode);
                     window.history.replaceState({}, '', `${window.location.pathname}?${params}`);
                 }
+
+                const userDoc = await getDoc(doc(db, 'users', bookAuthorUid));
+                window.authorName = userDoc.data()?.name || '';
+                window.syncBookAuthor();
 
                 const bookRef = doc(db, 'Book', bookCode);
                 const bookSnap = await getDoc(bookRef);
@@ -758,6 +760,7 @@
                     } else {
                         await setDoc(bookRef, {
                             author: window.authorName || '',
+                            owner: bookAuthorUid,
                             createdAt: serverTimestamp()
                         });
                         startManualBookCreation();
