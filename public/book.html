@@ -125,10 +125,7 @@
                 <!-- 책 뷰어가 여기에 생성됩니다. -->
             </div>
 
-            <div id="manual-book-context-wrapper" class="mt-4">
-                <label for="manual-book-context" class="block text-lg font-semibold text-gray-700 mb-2">🎨 그림 생성 AI에게 알려줄 내용</label>
-                <textarea id="manual-book-context" class="w-full p-3 border border-gray-300 rounded-lg" rows="3" placeholder="예: 주인공 토끼는 항상 빨간색 나비넥타이를 매고 있어."></textarea>
-            </div>
+            <div id="page-prompt-wrapper" class="mt-4"></div>
         </div>
     </div>
     </div>
@@ -551,7 +548,6 @@
             `;
 
             viewer.innerHTML = spread0 + spread1 + spread2 + navButtons;
-            document.getElementById('manual-book-context').value = '';
 
             bookCurrentPage = 0;
             document.getElementById('spread-0').classList.add('active'); // 첫 페이지 활성화
@@ -841,41 +837,46 @@
             generateBtn.textContent = "생성 중...";
             generateBtn.disabled = true;
 
-            const context = document.getElementById("manual-book-context").value;
+            const context = '';
 
             try {
                 // 표지 이미지 생성
-                const titleText = document.querySelector("#spread-0 .book-title-sync").textContent;
-                const coverImage = await generateImageForParagraph(titleText, context);
+                const coverSpread = document.querySelector('#spread-0');
+                const coverPrompt = coverSpread?.dataset.prompt || document.querySelector("#spread-0 .book-title-sync").textContent;
+                const coverImage = await generateImageForParagraph(coverPrompt, context);
                 document.querySelector("#spread-0 .book-page:last-child").style.backgroundImage = `url('${coverImage}')`;
-                
+
                 // 등장인물 이미지 생성
                 const charSpreads = document.querySelectorAll('.book-spread[data-page-type="character"]');
-                for(const charSpread of charSpreads) {
-                    const charDescriptions = charSpread.querySelectorAll('textarea');
+                for (const charSpread of charSpreads) {
                     const charImageBoxes = charSpread.querySelectorAll('.character-image-box');
+                    const prompts = [charSpread.dataset.promptLeft, charSpread.dataset.promptRight];
+                    const charDescriptions = charSpread.querySelectorAll('textarea');
                     const charNames = charSpread.querySelectorAll('.editable-text');
-                    
-                    if (charDescriptions[0] && (charDescriptions[0].value || charNames[0].textContent)) {
-                        const char1Text = charNames[0].textContent + ", " + charDescriptions[0].value;
-                        const char1Image = await generateImageForParagraph(char1Text, context);
-                        charImageBoxes[0].style.backgroundImage = `url('${char1Image}')`;
-                        charImageBoxes[0].textContent = '';
-                    }
-                    if (charDescriptions[1] && (charDescriptions[1].value || charNames[1].textContent)) {
-                        const char2Text = charNames[1].textContent + ", " + charDescriptions[1].value;
-                        const char2Image = await generateImageForParagraph(char2Text, context);
-                        charImageBoxes[1].style.backgroundImage = `url('${char2Image}')`;
-                        charImageBoxes[1].textContent = '';
+
+                    for (let i = 0; i < charImageBoxes.length; i++) {
+                        let prompt = prompts[i];
+                        if (!prompt) {
+                            const desc = charDescriptions[i]?.value || '';
+                            const name = charNames[i]?.textContent || '';
+                            if (desc || name) {
+                                prompt = `${name}, ${desc}`.trim();
+                            }
+                        }
+                        if (prompt) {
+                            const charImage = await generateImageForParagraph(prompt, context);
+                            charImageBoxes[i].style.backgroundImage = `url('${charImage}')`;
+                            charImageBoxes[i].textContent = '';
+                        }
                     }
                 }
 
                 // 각 이야기 페이지 이미지 생성
                 const storySpreads = document.querySelectorAll('.book-spread[data-page-type="story"]');
                 for (const spread of storySpreads) {
-                    const text = spread.querySelector("textarea").value;
-                    if (text) {
-                        const imageUrl = await generateImageForParagraph(text, context);
+                    const prompt = spread.dataset.prompt || spread.querySelector("textarea").value;
+                    if (prompt) {
+                        const imageUrl = await generateImageForParagraph(prompt, context);
                         const imagePage = spread.querySelector(".book-page:first-child");
                         const pageNumHTML = imagePage.querySelector('.page-number')?.outerHTML || '';
                         imagePage.style.backgroundImage = `url('${imageUrl}')`;
@@ -912,6 +913,60 @@
             updateBookView();
         }
 
+        function renderPromptArea(spread) {
+            const wrapper = document.getElementById('page-prompt-wrapper');
+            if (!wrapper) return;
+            wrapper.innerHTML = '';
+            if (!spread) return;
+
+            const type = spread.dataset.pageType;
+
+            if (type === 'cover') {
+                wrapper.innerHTML = `
+            <label class="block text-lg font-semibold text-gray-700 mb-2">표지 사진을 어떻게 만들까요?</label>
+            <textarea id="page-prompt-input" class="w-full p-3 border border-gray-300 rounded-lg" rows="3"></textarea>
+        `;
+                const input = wrapper.querySelector('#page-prompt-input');
+                input.value = spread.dataset.prompt || '';
+                input.addEventListener('input', (e) => {
+                    spread.dataset.prompt = e.target.value;
+                });
+            } else if (type === 'character') {
+                wrapper.innerHTML = `
+            <div class="flex gap-4">
+                <div class="flex-1">
+                    <label class="block text-lg font-semibold text-gray-700 mb-2 text-left">등장인물을 어떻게 만들까요?</label>
+                    <textarea id="page-prompt-left" class="w-full p-3 border border-gray-300 rounded-lg" rows="2"></textarea>
+                </div>
+                <div class="flex-1 text-right">
+                    <label class="block text-lg font-semibold text-gray-700 mb-2 text-right">등장인물을 어떻게 만들까요?</label>
+                    <textarea id="page-prompt-right" class="w-full p-3 border border-gray-300 rounded-lg" rows="2"></textarea>
+                </div>
+            </div>
+        `;
+                const left = wrapper.querySelector('#page-prompt-left');
+                const right = wrapper.querySelector('#page-prompt-right');
+                left.value = spread.dataset.promptLeft || '';
+                right.value = spread.dataset.promptRight || '';
+                left.addEventListener('input', (e) => {
+                    spread.dataset.promptLeft = e.target.value;
+                });
+                right.addEventListener('input', (e) => {
+                    spread.dataset.promptRight = e.target.value;
+                });
+            } else if (type === 'story') {
+                wrapper.innerHTML = `
+            <label class="block text-lg font-semibold text-gray-700 mb-2">이 페이지의 줄거리 사진을 어떻게 만들까요?</label>
+            <textarea id="page-prompt-input" class="w-full p-3 border border-gray-300 rounded-lg" rows="3"></textarea>
+        `;
+                const input = wrapper.querySelector('#page-prompt-input');
+                input.value = spread.dataset.prompt || '';
+                input.addEventListener('input', (e) => {
+                    spread.dataset.prompt = e.target.value;
+                });
+            }
+        }
+
         function updateBookView() {
     document.querySelectorAll(".book-spread").forEach((spread, index) => {
         spread.classList.toggle("active", index === bookCurrentPage);
@@ -942,6 +997,7 @@
         }
         actionContainer.innerHTML = buttons;
     }
+    renderPromptArea(currentSpread);
 }
 
         // PDF로 다운로드
