@@ -837,7 +837,7 @@
         <div class="modal-content">
             <span class="close-button" id="close-book-activity-modal-btn">&times;</span>
             <h3 id="book-activity-modal-title" class="text-xl font-bold mb-4"></h3>
-            <p class="mb-4">책 고유 코드: <span id="book-code-display"></span></p>
+            <!-- 책 고유 코드 시스템 제거 -->
             <div class="flex justify-center gap-4">
                 <button id="claim-book-token-btn" class="btn btn-secondary">에이두 토큰 받기</button>
                 <a id="open-book-page-link" class="btn btn-primary" target="_blank">책 만들기</a>
@@ -1137,7 +1137,6 @@
         const readingJournalModal = document.getElementById('reading-journal-modal');
         const bookActivityCreationModal = document.getElementById('book-activity-creation-modal');
         const bookActivityModal = document.getElementById('book-activity-modal');
-        const bookCodeDisplay = document.getElementById('book-code-display');
         const openBookPageLink = document.getElementById('open-book-page-link');
         const readingLogEntryModal = document.getElementById('reading-log-entry-modal');
         const editInfoModal = document.getElementById('edit-info-modal');
@@ -4782,13 +4781,8 @@
                 const assignmentData = assignmentDoc.data();
                 document.getElementById('book-activity-modal-title').textContent = assignmentData.title;
 
-                let bookCode = assignmentData.bookCode;
-                if (!bookCode) {
-                    bookCode = `book${Date.now()}`;
-                    await updateDoc(assignmentRef, { bookCode });
-                }
-                bookCodeDisplay.textContent = bookCode;
-                openBookPageLink.href = `book.html?code=${encodeURIComponent(bookCode)}&uid=${encodeURIComponent(dataToShow.id)}`;
+                // 책 고유 코드 생성 기능 제거
+                openBookPageLink.href = `book.html`;
 
                 const tokenBtn = document.getElementById('claim-book-token-btn');
                 tokenBtn.disabled = assignmentData.tokenClaimed;
@@ -4812,20 +4806,6 @@
                         showModal('오류', '토큰을 지급받는 중 오류가 발생했습니다.');
                     }
                 };
-
-                try {
-                    const bookRef = doc(db, 'Book', bookCode);
-                    await setDoc(bookRef, {
-                        createdAt: serverTimestamp(),
-                        owner: dataToShow.id,
-                        assignmentId,
-                        title: assignmentData.title || ''
-                    }, { merge: true });
-                } catch (error) {
-                    console.error('Error initializing book document:', error);
-                    showModal('오류', '책 정보를 생성하는 중 오류가 발생했습니다.');
-                    return;
-                }
 
                 bookActivityModal.style.display = 'flex';
             } catch (error) {
