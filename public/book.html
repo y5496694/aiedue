@@ -88,6 +88,8 @@
         <div class="flex items-center gap-3 bg-white border rounded-full px-4 py-2">
             <span id="role-badge" class="font-bold mr-1 hidden">교사</span>
             <span id="display-user-name" class="font-bold"></span>
+            <button id="token-give-btn" class="bg-purple-500 text-white px-2 py-1 rounded text-sm hidden">토큰 지급</button>
+            <button id="my-class-btn" class="bg-amber-500 text-white px-2 py-1 rounded text-sm hidden">내 학급</button>
             <span class="text-sm text-gray-700">내 지갑: <span id="display-user-tokens">0</span>토큰</span>
             <button id="book-logout-btn" class="text-sm text-gray-500 underline">로그아웃</button>
         </div>
@@ -144,11 +146,58 @@
         </div>
     </div>
 
+    <!-- 내 학급 팝업 -->
+    <div id="my-class-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-80">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold">내 학급</h2>
+                <button id="close-my-class-modal" class="text-xl">&times;</button>
+            </div>
+            <ul id="my-class-student-list" class="space-y-1 max-h-60 overflow-y-auto mb-4"></ul>
+            <div class="text-right">
+                <button id="add-my-class-student-btn" class="px-3 py-1 rounded bg-blue-500 text-white">학생 추가</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 학급 학생 추가 팝업 -->
+    <div id="class-add-students-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold">학생 추가</h2>
+                <button id="close-class-add-students-btn" class="text-xl">&times;</button>
+            </div>
+            <div class="mb-2">
+                <input type="text" id="class-student-search" class="w-full p-2 border rounded" placeholder="이름 또는 코드로 검색..." />
+            </div>
+            <div id="class-student-list" class="space-y-2 max-h-60 overflow-y-auto border p-2 rounded mb-4"></div>
+            <div class="text-right">
+                <button id="class-add-students-confirm-btn" class="px-3 py-1 rounded bg-blue-500 text-white">추가</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 토큰 지급 팝업 -->
+    <div id="token-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold">토큰 지급</h2>
+                <button id="close-token-modal" class="text-xl">&times;</button>
+            </div>
+            <label class="flex items-center space-x-2 mb-2"><input type="checkbox" id="token-select-class" class="h-4 w-4"><span>내 학급 전체 선택</span></label>
+            <div id="token-user-list" class="space-y-2 max-h-60 overflow-y-auto border p-2 rounded mb-4"></div>
+            <input type="number" id="token-amount" class="w-full p-2 border rounded mb-4" placeholder="지급할 토큰 양" />
+            <div class="text-right">
+                <button id="token-distribute-confirm" class="px-3 py-1 rounded bg-purple-500 text-white">지급하기</button>
+            </div>
+        </div>
+    </div>
+
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, serverTimestamp, updateDoc, increment, collection, addDoc, getDocs, query, where, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, serverTimestamp, updateDoc, increment, collection, addDoc, getDocs, query, where, runTransaction, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref as storageRef, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // 전역 변수
@@ -160,6 +209,7 @@
         let db;
         let storage;
         let userTokens = 0;
+        let currentClassStudents = [];
         // 로그인한 사용자 이름을 저장하고 책의 저자 영역을 동기화합니다.
         window.authorName = '';
         window.syncBookAuthor = function() {
@@ -316,11 +366,17 @@
             document.getElementById('display-user-name').textContent = window.authorName;
             document.getElementById('display-user-tokens').textContent = `${userTokens}`;
             const roleBadgeEl = document.getElementById('role-badge');
+            const myClassBtn = document.getElementById('my-class-btn');
+            const tokenGiveBtn = document.getElementById('token-give-btn');
             if (data.role === 'teacher') {
                 roleBadgeEl.classList.remove('hidden');
                 roleBadgeEl.textContent = '교사';
+                myClassBtn.classList.remove('hidden');
+                tokenGiveBtn.classList.remove('hidden');
             } else {
                 roleBadgeEl.classList.add('hidden');
+                myClassBtn.classList.add('hidden');
+                tokenGiveBtn.classList.add('hidden');
             }
             window.syncBookAuthor();
         }
@@ -1099,6 +1155,133 @@
                 alert('책을 추가하지 못했습니다. 다시 시도해주세요.');
             }
         });
+
+        // --- My Class and Token Features ---
+        const myClassBtn = document.getElementById('my-class-btn');
+        const myClassModal = document.getElementById('my-class-modal');
+        const myClassStudentList = document.getElementById('my-class-student-list');
+        const addMyClassStudentBtn = document.getElementById('add-my-class-student-btn');
+        const closeMyClassModalBtn = document.getElementById('close-my-class-modal');
+
+        const classAddStudentsModal = document.getElementById('class-add-students-modal');
+        const classStudentList = document.getElementById('class-student-list');
+        const classStudentSearch = document.getElementById('class-student-search');
+        const classAddStudentsConfirmBtn = document.getElementById('class-add-students-confirm-btn');
+        const closeClassAddStudentsBtn = document.getElementById('close-class-add-students-btn');
+
+        const tokenGiveBtn = document.getElementById('token-give-btn');
+        const tokenModal = document.getElementById('token-modal');
+        const tokenUserList = document.getElementById('token-user-list');
+        const tokenSelectClass = document.getElementById('token-select-class');
+        const tokenAmountInput = document.getElementById('token-amount');
+        const tokenDistributeConfirm = document.getElementById('token-distribute-confirm');
+        const closeTokenModalBtn = document.getElementById('close-token-modal');
+
+        myClassBtn.addEventListener('click', openMyClassModal);
+        closeMyClassModalBtn.addEventListener('click', () => myClassModal.classList.add('hidden'));
+        addMyClassStudentBtn.addEventListener('click', openAddStudentsModal);
+        closeClassAddStudentsBtn.addEventListener('click', () => classAddStudentsModal.classList.add('hidden'));
+        classAddStudentsConfirmBtn.addEventListener('click', confirmAddStudents);
+
+        tokenGiveBtn.addEventListener('click', openTokenModal);
+        closeTokenModalBtn.addEventListener('click', () => tokenModal.classList.add('hidden'));
+        tokenSelectClass.addEventListener('change', () => {
+            document.querySelectorAll('#token-user-list input[data-inclass="1"]').forEach(cb => cb.checked = tokenSelectClass.checked);
+        });
+        tokenDistributeConfirm.addEventListener('click', distributeTokens);
+
+        async function openMyClassModal() {
+            myClassModal.classList.remove('hidden');
+            myClassStudentList.innerHTML = '로딩 중...';
+            try {
+                const classDoc = await getDoc(doc(db, 'classes', bookAuthorUid));
+                if (!classDoc.exists()) {
+                    myClassStudentList.innerHTML = '<li class="text-sm text-gray-500">학급이 없습니다.</li>';
+                    currentClassStudents = [];
+                    return;
+                }
+                currentClassStudents = classDoc.data().students || [];
+                let html = '';
+                for (const sid of currentClassStudents) {
+                    try {
+                        const sdoc = await getDoc(doc(db, 'users', sid));
+                        if (sdoc.exists()) {
+                            const sdata = sdoc.data();
+                            html += `<li>${sdata.name}</li>`;
+                        }
+                    } catch (_) {}
+                }
+                myClassStudentList.innerHTML = html || '<li class="text-sm text-gray-500">학생 없음</li>';
+            } catch (err) {
+                myClassStudentList.innerHTML = `<li class="text-red-500">오류: ${err.message}</li>`;
+            }
+        }
+
+        async function openAddStudentsModal() {
+            classAddStudentsModal.classList.remove('hidden');
+            classStudentList.innerHTML = '학생 목록 로딩 중...';
+            try {
+                const usersSnapshot = await getDocs(query(collection(db, 'users'), where('role', '==', 'student')));
+                classStudentList.innerHTML = usersSnapshot.docs.map(d => {
+                    const s = { id: d.id, ...d.data() };
+                    const checked = currentClassStudents.includes(s.id) ? 'checked disabled' : '';
+                    return `<label class="flex items-center space-x-2 p-1"><input type="checkbox" data-studentid="${s.id}" ${checked}><span>${s.name} (코드: ${s.userCode})</span></label>`;
+                }).join('');
+            } catch (err) {
+                classStudentList.innerHTML = `<p class=\"text-red-500 text-center\">학생 목록을 불러오지 못했습니다.</p>`;
+            }
+            classStudentSearch.value = '';
+            classStudentSearch.oninput = e => {
+                const term = e.target.value.toLowerCase();
+                document.querySelectorAll('#class-student-list label').forEach(lbl => {
+                    lbl.style.display = lbl.textContent.toLowerCase().includes(term) ? 'flex' : 'none';
+                });
+            };
+        }
+
+        async function confirmAddStudents() {
+            const selected = Array.from(document.querySelectorAll('#class-student-list input:checked:not(:disabled)')).map(i => i.dataset.studentid);
+            if (selected.length > 0) {
+                try {
+                    await updateDoc(doc(db, 'classes', bookAuthorUid), { students: arrayUnion(...selected) });
+                } catch (_) {}
+            }
+            classAddStudentsModal.classList.add('hidden');
+            openMyClassModal();
+        }
+
+        async function openTokenModal() {
+            tokenModal.classList.remove('hidden');
+            tokenUserList.innerHTML = '불러오는 중...';
+            try {
+                const classDoc = await getDoc(doc(db, 'classes', bookAuthorUid));
+                currentClassStudents = classDoc.exists() ? (classDoc.data().students || []) : [];
+                const usersSnap = await getDocs(collection(db, 'users'));
+                tokenUserList.innerHTML = usersSnap.docs.map(d => {
+                    const u = { id: d.id, ...d.data() };
+                    const inClass = currentClassStudents.includes(u.id) ? '1' : '0';
+                    return `<label class="flex items-center space-x-2 p-1"><input type="checkbox" class="token-user-checkbox" data-inclass="${inClass}" value="${u.id}"><span>${u.name}</span></label>`;
+                }).join('');
+            } catch (err) {
+                tokenUserList.innerHTML = `<p class=\"text-red-500 text-center\">목록을 불러오지 못했습니다.</p>`;
+            }
+        }
+
+        async function distributeTokens() {
+            const amount = Number(tokenAmountInput.value);
+            if (isNaN(amount) || amount <= 0) { showNotification('토큰 양을 입력하세요'); return; }
+            const selected = Array.from(document.querySelectorAll('.token-user-checkbox:checked')).map(i => i.value);
+            try {
+                for (const uid of selected) {
+                    await updateDoc(doc(db, 'users', uid), { aeduTokens: increment(amount) });
+                }
+                showNotification('토큰 지급이 완료되었습니다.');
+            } catch (err) {
+                showNotification(`토큰 지급 실패: ${err.message}`);
+            }
+            tokenAmountInput.value = '';
+            tokenModal.classList.add('hidden');
+        }
 
         document.getElementById('back-to-list-btn').addEventListener('click', () => {
             document.getElementById('book-viewer-page').classList.add('hidden');
