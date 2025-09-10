@@ -901,6 +901,7 @@
                 const newBookCode = `book${Date.now()}`;
                 await setDoc(doc(db, 'Book', newBookCode), {
                     author: window.authorName || '',
+                    authorId: bookAuthorUid,
                     owner: bookAuthorUid,
                     createdAt: serverTimestamp(),
                     title
