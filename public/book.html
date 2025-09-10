@@ -215,7 +215,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, serverTimestamp, updateDoc, increment, collection, addDoc, getDocs, query, where, runTransaction, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref as storageRef, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // 전역 변수
         let bookCurrentPage = 0;
@@ -754,17 +754,21 @@
 
                   const uploads = [];
 
+                  async function uploadDataUrl(imgRef, dataUrl) {
+                      const res = await fetch(dataUrl);
+                      const blob = await res.blob();
+                      return uploadBytes(imgRef, blob);
+                  }
+
                   // 표지 이미지 (1장 오른쪽 배경)
                   const coverPage = document.querySelector('#spread-0 .book-page:nth-child(2)');
                   if (coverPage) {
                     const bg = coverPage.style.backgroundImage;
                     const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
                     if (match) {
-                        if (!coverPage.dataset.imageName) {
-                            coverPage.dataset.imageName = `cover-${Date.now()}.webp`;
-                        }
-                        const imgRef = storageRef(storage, `Book/${bookCode}/${coverPage.dataset.imageName}`);
-                        uploads.push(uploadString(imgRef, match[1], 'data_url'));
+                        coverPage.dataset.imageName = 'cover.webp';
+                        const imgRef = storageRef(storage, `Book/${bookCode}/cover.webp`);
+                        uploads.push(uploadDataUrl(imgRef, match[1]));
                         data.coverImage = coverPage.dataset.imageName;
                     } else if (coverPage.dataset.imageName) {
                         data.coverImage = coverPage.dataset.imageName;
@@ -784,13 +788,12 @@
                       if (imgBox) {
                           const bg = imgBox.style.backgroundImage;
                           const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
+                          const imageName = `character${charIndex}.webp`;
                           if (match) {
-                              if (!imgBox.dataset.imageName) {
-                                  imgBox.dataset.imageName = `character-${charIndex}-${Date.now()}.webp`;
-                              }
-                              const imgRef = storageRef(storage, `Book/${bookCode}/${imgBox.dataset.imageName}`);
-                              uploads.push(uploadString(imgRef, match[1], 'data_url'));
-                              data[`character${charIndex}Image`] = imgBox.dataset.imageName;
+                              imgBox.dataset.imageName = imageName;
+                              const imgRef = storageRef(storage, `Book/${bookCode}/${imageName}`);
+                              uploads.push(uploadDataUrl(imgRef, match[1]));
+                              data[`character${charIndex}Image`] = imageName;
                           } else if (imgBox.dataset.imageName) {
                               data[`character${charIndex}Image`] = imgBox.dataset.imageName;
                           }
@@ -821,13 +824,12 @@
                     if (imagePage) {
                         const bg = imagePage.style.backgroundImage;
                         const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
+                        const imageName = `story${storyIndex}.webp`;
                         if (match) {
-                            if (!imagePage.dataset.imageName) {
-                                imagePage.dataset.imageName = `story-${storyIndex}-${Date.now()}.webp`;
-                            }
-                            const imgRef = storageRef(storage, `Book/${bookCode}/${imagePage.dataset.imageName}`);
-                            uploads.push(uploadString(imgRef, match[1], 'data_url'));
-                            data[`story${storyIndex}Image`] = imagePage.dataset.imageName;
+                            imagePage.dataset.imageName = imageName;
+                            const imgRef = storageRef(storage, `Book/${bookCode}/${imageName}`);
+                            uploads.push(uploadDataUrl(imgRef, match[1]));
+                            data[`story${storyIndex}Image`] = imageName;
                         } else if (imagePage.dataset.imageName) {
                             data[`story${storyIndex}Image`] = imagePage.dataset.imageName;
                         }
