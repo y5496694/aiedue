@@ -188,8 +188,8 @@
                     <button data-tab="homework" id="homework-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">오늘의 숙제</button>
                     <button data-tab="life-rules-management" id="life-rules-management-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">생활 규칙 관리</button>
                     <button data-tab="learning-problems" id="learning-problems-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">학습 문제 관리</button>
-                    <button data-tab="library" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">에이두 도서관</button>
                     <button data-tab="reading-log" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">에이두 독서기록장</button>
+                    <button data-tab="library" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm ml-auto">에이두 도서관</button>
                 </nav>
             </div>
 
@@ -332,7 +332,10 @@
                 </div>
             </div>
             <div id="library-tab-content" class="tab-content">
-                <h2 class="text-2xl font-bold mb-4">📚 에이두 도서관</h2>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">📚 에이두 도서관</h2>
+                    <a href="book.html" id="create-ai-book-btn" class="btn btn-primary">에이두 AI 책만들기</a>
+                </div>
                 <p>준비중입니다.</p>
             </div>
             <div id="reading-log-tab-content" class="tab-content">
