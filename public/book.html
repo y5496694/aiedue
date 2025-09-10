@@ -112,6 +112,18 @@
 
     <div id="notification"></div>
 
+    <!-- 새 책 추가 팝업 -->
+    <div id="add-book-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-80">
+            <h2 class="text-lg font-semibold mb-4">새 책 만들기</h2>
+            <input type="text" id="new-book-title" class="w-full p-2 border border-gray-300 rounded mb-4" placeholder="책 제목을 입력하세요" />
+            <div class="flex justify-end gap-2">
+                <button id="cancel-add-book" class="px-3 py-1 rounded bg-gray-300">취소</button>
+                <button id="confirm-add-book" class="px-3 py-1 rounded bg-blue-500 text-white">확인</button>
+            </div>
+        </div>
+    </div>
+
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -162,11 +174,14 @@
             const snap = await getDocs(collection(db, `users/${bookAuthorUid}/myBooks`));
             snap.forEach(docSnap => {
                 const data = docSnap.data();
-                const btn = document.createElement('button');
-                btn.textContent = data.title || '제목없음';
-                btn.className = 'px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 whitespace-nowrap';
-                btn.addEventListener('click', () => loadBook(data.bookId));
-                listEl.appendChild(btn);
+                const item = document.createElement('button');
+                const created = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleDateString('ko-KR') : '';
+                item.innerHTML = `<div class="font-semibold">${data.title || '제목없음'}</div>` +
+                                  `<div class="text-xs text-gray-600">생성일: ${created}</div>` +
+                                  `<div class="text-xs text-gray-600">코드: ${data.bookId}</div>`;
+                item.className = 'text-left px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 flex-shrink-0';
+                item.addEventListener('click', () => loadBook(data.bookId));
+                listEl.appendChild(item);
             });
         }
 
@@ -854,10 +869,28 @@
         teacherLoginTab.addEventListener('click', () => switchLoginTab('teacher'));
         switchLoginTab('student');
 
-        document.getElementById('add-book-btn').addEventListener('click', async () => {
+        const addBookBtn = document.getElementById('add-book-btn');
+        const addBookModal = document.getElementById('add-book-modal');
+        const cancelAddBookBtn = document.getElementById('cancel-add-book');
+        const confirmAddBookBtn = document.getElementById('confirm-add-book');
+        const newBookTitleInput = document.getElementById('new-book-title');
+
+        addBookBtn.addEventListener('click', () => {
             if (!bookAuthorUid) return;
-            const title = prompt('책 제목을 입력하세요');
-            if (!title) return;
+            newBookTitleInput.value = '';
+            addBookModal.classList.remove('hidden');
+            newBookTitleInput.focus();
+        });
+
+        cancelAddBookBtn.addEventListener('click', () => {
+            addBookModal.classList.add('hidden');
+        });
+
+        confirmAddBookBtn.addEventListener('click', async () => {
+            if (!bookAuthorUid) return;
+            const title = newBookTitleInput.value.trim();
+            if (!title) { alert('책 제목을 입력하세요'); return; }
+
             const userRef = doc(db, 'users', bookAuthorUid);
             const userDoc = await getDoc(userRef);
             const tokens = Number(userDoc.data()?.aeduTokens) || 0;
@@ -882,6 +915,7 @@
             document.querySelector('#spread-0 .book-title-sync').textContent = title;
             document.getElementById('book-viewer-page').classList.remove('hidden');
             document.getElementById('book-list-section').classList.add('hidden');
+            addBookModal.classList.add('hidden');
         });
 
         document.getElementById('back-to-list-btn').addEventListener('click', () => {
