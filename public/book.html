@@ -420,8 +420,9 @@
         }
 
         async function generateImageForParagraph(text, context = "") {
-            const prompt = `${text}\n${context}`.trim();
-            const englishPrompt = await translateToEnglish(prompt);
+            const basePrompt = `${text}\n${context}`.trim();
+            const englishPrompt = await translateToEnglish(basePrompt);
+            const finalPrompt = `${englishPrompt}, bright, child-friendly, storybook style`;
             const res = await fetch('/.netlify/functions/stability-handler', {
                 method: 'POST',
                 headers: {
@@ -430,12 +431,13 @@
                 body: JSON.stringify({
                     type: 'stability',
                     payload: {
-                        text_prompts: [{ text: englishPrompt }],
+                        text_prompts: [{ text: finalPrompt }],
                         cfg_scale: 7,
-                        height: 1024,
-                        width: 1024,
+                        height: 768,
+                        width: 768,
                         samples: 1,
-                        steps: 30
+                        steps: 30,
+                        output_format: 'webp'
                     }
                 })
             });
@@ -457,7 +459,7 @@
                 throw new Error('이미지 데이터가 없습니다.');
             }
 
-            return `data:image/png;base64,${base64}`;
+            return `data:image/webp;base64,${base64}`;
         }
 
         // 수동 책 만들기 시작
@@ -581,12 +583,6 @@
         function addCharacterPage() {
             const viewer = document.getElementById("book-viewer");
             const characterSpreads = viewer.querySelectorAll('.book-spread[data-page-type="character"]');
-            const lastCharacterSpread = characterSpreads[characterSpreads.length - 1];
-            
-            if (!lastCharacterSpread) {
-                showNotification("오류: 마지막 등장인물 페이지를 찾을 수 없습니다.");
-                return;
-            }
 
             const existingCharacters = viewer.querySelectorAll('.character-image-box').length;
             const charNum1 = existingCharacters + 1;
@@ -617,7 +613,13 @@
                 </div>
             `;
 
-            lastCharacterSpread.after(newSpread);
+            if (characterSpreads.length === 0) {
+                const cover = document.getElementById('spread-0');
+                cover.after(newSpread);
+            } else {
+                const lastCharacterSpread = characterSpreads[characterSpreads.length - 1];
+                lastCharacterSpread.after(newSpread);
+            }
             totalBookSpreads++;
             
             updatePageNumbersAndIDs();
@@ -665,11 +667,7 @@
                 return;
             }
             if (type === 'character') {
-                const charSpreads = Array.from(document.querySelectorAll('#book-viewer .book-spread[data-page-type="character"]'));
-                if (charSpreads.indexOf(currentSpread) === 0) {
-                    showNotification("기본 등장인물 페이지는 삭제할 수 없습니다.");
-                    return;
-                }
+                // 등장인물 페이지는 모두 삭제 가능
             }
             if (type === 'story') {
                 const storySpreads = Array.from(document.querySelectorAll('#book-viewer .book-spread[data-page-type="story"]'));
@@ -714,7 +712,7 @@
                     const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
                     if (match) {
                         if (!coverPage.dataset.imageName) {
-                            coverPage.dataset.imageName = `cover-${Date.now()}.png`;
+                            coverPage.dataset.imageName = `cover-${Date.now()}.webp`;
                         }
                         const imgRef = storageRef(storage, `Book/${bookCode}/${coverPage.dataset.imageName}`);
                         uploads.push(uploadString(imgRef, match[1], 'data_url'));
@@ -734,7 +732,7 @@
                         const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
                         if (match) {
                             if (!imgBox.dataset.imageName) {
-                                imgBox.dataset.imageName = `character-${charIndex}-${Date.now()}.png`;
+                                imgBox.dataset.imageName = `character-${charIndex}-${Date.now()}.webp`;
                             }
                             const imgRef = storageRef(storage, `Book/${bookCode}/${imgBox.dataset.imageName}`);
                             uploads.push(uploadString(imgRef, match[1], 'data_url'));
@@ -764,7 +762,7 @@
                         const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
                         if (match) {
                             if (!imagePage.dataset.imageName) {
-                                imagePage.dataset.imageName = `story-${storyIndex}-${Date.now()}.png`;
+                                imagePage.dataset.imageName = `story-${storyIndex}-${Date.now()}.webp`;
                             }
                             const imgRef = storageRef(storage, `Book/${bookCode}/${imagePage.dataset.imageName}`);
                             uploads.push(uploadString(imgRef, match[1], 'data_url'));
@@ -837,17 +835,10 @@
             generateBtn.textContent = "생성 중...";
             generateBtn.disabled = true;
 
-            const context = '';
-
             try {
-                // 표지 이미지 생성
-                const coverSpread = document.querySelector('#spread-0');
-                const coverPrompt = coverSpread?.dataset.prompt || document.querySelector("#spread-0 .book-title-sync").textContent;
-                const coverImage = await generateImageForParagraph(coverPrompt, context);
-                document.querySelector("#spread-0 .book-page:last-child").style.backgroundImage = `url('${coverImage}')`;
-
-                // 등장인물 이미지 생성
+                // 등장인물 컨텍스트 수집 및 이미지 생성
                 const charSpreads = document.querySelectorAll('.book-spread[data-page-type="character"]');
+                const contextParts = [];
                 for (const charSpread of charSpreads) {
                     const charImageBoxes = charSpread.querySelectorAll('.character-image-box');
                     const prompts = [charSpread.dataset.promptLeft, charSpread.dataset.promptRight];
@@ -864,17 +855,28 @@
                             }
                         }
                         if (prompt) {
-                            const charImage = await generateImageForParagraph(prompt, context);
+                            contextParts.push(prompt);
+                            const charPrompt = `${prompt}, white background, single character`;
+                            const charImage = await generateImageForParagraph(charPrompt, '');
                             charImageBoxes[i].style.backgroundImage = `url('${charImage}')`;
                             charImageBoxes[i].textContent = '';
                         }
                     }
                 }
+                const context = contextParts.join('\n');
+
+                // 표지 이미지 생성
+                const coverSpread = document.querySelector('#spread-0');
+                const coverPrompt = coverSpread?.dataset.prompt || document.querySelector("#spread-0 .book-title-sync").textContent;
+                const coverImage = await generateImageForParagraph(coverPrompt, '');
+                document.querySelector("#spread-0 .book-page:last-child").style.backgroundImage = `url('${coverImage}')`;
 
                 // 각 이야기 페이지 이미지 생성
                 const storySpreads = document.querySelectorAll('.book-spread[data-page-type="story"]');
                 for (const spread of storySpreads) {
-                    const prompt = spread.dataset.prompt || spread.querySelector("textarea").value;
+                    const storyText = spread.querySelector("textarea").value;
+                    const extra = spread.dataset.prompt || '';
+                    const prompt = `${storyText}\n${extra}`.trim();
                     if (prompt) {
                         const imageUrl = await generateImageForParagraph(prompt, context);
                         const imagePage = spread.querySelector(".book-page:first-child");
@@ -983,19 +985,25 @@
     if (type === 'story') {
         const storySpreads = Array.from(document.querySelectorAll('#book-viewer .book-spread[data-page-type="story"]'));
         const storyIndex = storySpreads.indexOf(currentSpread);
-        let buttons = `<button onclick="addManualPage()" class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-cyan-600">+ 페이지 추가</button>`;
+        const charSpreads = document.querySelectorAll('#book-viewer .book-spread[data-page-type="character"]');
+        let buttons = '';
+        if (charSpreads.length === 0) {
+            buttons += `<button onclick="addCharacterPage()" class="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">+ 등장인물 추가</button>`;
+        }
+        buttons += `<button onclick="addManualPage()" class="bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-cyan-600">+ 페이지 추가</button>`;
         if (storyIndex > 0) {
             buttons += `<button onclick="deleteCurrentPage()" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">페이지 삭제</button>`;
         }
         actionContainer.innerHTML = buttons;
     } else if (type === 'character') {
-        const charSpreads = Array.from(document.querySelectorAll('#book-viewer .book-spread[data-page-type="character"]'));
-        const charIndex = charSpreads.indexOf(currentSpread);
         let buttons = `<button onclick="addCharacterPage()" class="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">+ 등장인물 추가</button>`;
-        if (charIndex > 0) {
-            buttons += `<button onclick="deleteCurrentPage()" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">페이지 삭제</button>`;
-        }
+        buttons += `<button onclick="deleteCurrentPage()" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">페이지 삭제</button>`;
         actionContainer.innerHTML = buttons;
+    } else if (type === 'cover') {
+        const charSpreads = document.querySelectorAll('#book-viewer .book-spread[data-page-type="character"]');
+        if (charSpreads.length === 0) {
+            actionContainer.innerHTML = `<button onclick="addCharacterPage()" class="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600">+ 등장인물 추가</button>`;
+        }
     }
     renderPromptArea(currentSpread);
 }
