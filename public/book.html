@@ -110,7 +110,7 @@
             <header class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
                 <div class="flex items-end gap-2">
                     <button id="back-to-list-btn" class="bg-gray-500 text-white px-3 py-1 rounded-lg">목록으로</button>
-                    <h1 class="text-2xl md:text-4xl font-bold text-emerald-800 flex items-center gap-2">📚 <span>에이두 북메이커</span></h1>
+                    <h1 class="text-2xl md:text-4xl font-bold text-emerald-800 flex items-center gap-2">📚 <span class="book-title-sync">에이두 북메이커</span></h1>
                     <span class="text-sm text-gray-600">글쓴이: <span id="author-display" class="book-author-sync"></span></span>
                 </div>
                 <div id="viewer-controls" class="flex flex-wrap justify-center items-center gap-2">
@@ -321,7 +321,7 @@
                 addManualPage();
             }
 
-            document.querySelectorAll('#spread-0 .book-title-sync').forEach(el => {
+            document.querySelectorAll('.book-title-sync').forEach(el => {
                 el.textContent = data.title || '';
             });
             window.authorName = data.author || window.authorName;
