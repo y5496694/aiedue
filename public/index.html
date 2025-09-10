@@ -198,7 +198,7 @@
                     <div class="lg:col-span-2 space-y-6">
                         <div id="wallet-section" class="bg-white p-6 rounded-lg shadow-md">
                             <h2 id="wallet-title" class="text-xl font-bold mb-4">💰 내 지갑 현황</h2>
-                              <div id="wallet-financial-info" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                              <div id="wallet-financial-info" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                                   <div>
                                       <p class="text-sm text-gray-500">현재 잔액</p>
                                       <p id="currentBalance" class="text-3xl font-bold text-sky-600">0 원</p>
@@ -207,6 +207,10 @@
                                       <p class="text-sm text-gray-500">총 자산 가치</p>
                                       <p id="totalAssetValue" class="text-3xl font-bold text-emerald-600">0 원</p>
                                       <p class="text-xs text-stone-500">(현금 + 주식 평가액)</p>
+                                  </div>
+                                  <div>
+                                      <p class="text-sm text-gray-500">에이두 토큰</p>
+                                      <p id="aedu-token-balance" class="text-3xl font-bold text-purple-600">0 토큰</p>
                                   </div>
                               </div>
                             <hr class="my-4">
@@ -834,7 +838,10 @@
             <span class="close-button" id="close-book-activity-modal-btn">&times;</span>
             <h3 id="book-activity-modal-title" class="text-xl font-bold mb-4"></h3>
             <p class="mb-4">책 고유 코드: <span id="book-code-display"></span></p>
-            <a id="open-book-page-link" class="btn btn-primary" target="_blank">책 만들기 페이지 열기</a>
+            <div class="flex justify-center gap-4">
+                <button id="claim-book-token-btn" class="btn btn-secondary">에이두 토큰 받기</button>
+                <a id="open-book-page-link" class="btn btn-primary" target="_blank">책 만들기</a>
+            </div>
         </div>
     </div>
     <div id="reading-log-entry-modal" class="modal-overlay hidden">
@@ -1362,6 +1369,8 @@
             if (!dataToShow) return;
               const balance = dataToShow.balance || dataToShow.coins || 0;
               document.getElementById('currentBalance').textContent = formatCurrency(balance);
+              const tokenBalance = dataToShow.aeduTokens || 0;
+              document.getElementById('aedu-token-balance').textContent = `${tokenBalance} 토큰`;
             let stockValue = 0;
             if (dataToShow.portfolio) {
                 for (const stockId in dataToShow.portfolio) {
@@ -4780,6 +4789,29 @@
                 }
                 bookCodeDisplay.textContent = bookCode;
                 openBookPageLink.href = `book.html?code=${encodeURIComponent(bookCode)}&uid=${encodeURIComponent(dataToShow.id)}`;
+
+                const tokenBtn = document.getElementById('claim-book-token-btn');
+                tokenBtn.disabled = assignmentData.tokenClaimed;
+                if (tokenBtn.disabled) {
+                    tokenBtn.classList.add('btn-disabled');
+                } else {
+                    tokenBtn.classList.remove('btn-disabled');
+                }
+                tokenBtn.onclick = async () => {
+                    if (tokenBtn.disabled) return;
+                    try {
+                        await updateDoc(doc(db, 'users', dataToShow.id), { aeduTokens: increment(1) });
+                        await updateDoc(assignmentRef, { tokenClaimed: true });
+                        tokenBtn.disabled = true;
+                        tokenBtn.classList.add('btn-disabled');
+                        viewedUserData.aeduTokens = (viewedUserData.aeduTokens || 0) + 1;
+                        updateDashboardDisplay();
+                        showModal('토큰 지급', '에이두 토큰 1개가 지급되었습니다!');
+                    } catch (error) {
+                        console.error('Error claiming token:', error);
+                        showModal('오류', '토큰을 지급받는 중 오류가 발생했습니다.');
+                    }
+                };
 
                 try {
                     const bookRef = doc(db, 'Book', bookCode);
