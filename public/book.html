@@ -203,7 +203,9 @@
                 addManualPage();
             }
 
-            document.querySelector('#spread-0 .book-title-sync').textContent = data.title || '';
+            document.querySelectorAll('#spread-0 .book-title-sync').forEach(el => {
+                el.textContent = data.title || '';
+            });
             window.authorName = data.author || window.authorName;
             window.syncBookAuthor();
 
