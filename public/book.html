@@ -103,7 +103,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, serverTimestamp, updateDoc, increment, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref as storageRef, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // 전역 변수
@@ -764,98 +764,35 @@
             if (user) {
                 loginView.classList.add('hidden');
                 contentView.classList.remove('hidden');
-                const params = new URLSearchParams(window.location.search);
-                bookCode = params.get('code');
-                bookAuthorUid = params.get('uid') || user.uid;
-                if (!bookCode) {
-                    bookCode = `book${Date.now()}`;
-                    params.set('code', bookCode);
-                    window.history.replaceState({}, '', `${window.location.pathname}?${params}`);
+                bookAuthorUid = user.uid;
+                bookCode = `book${Date.now()}`;
+
+                const userRef = doc(db, 'users', bookAuthorUid);
+                const userDoc = await getDoc(userRef);
+                const tokens = userDoc.data()?.aeduTokens || 0;
+                if (tokens <= 0) {
+                    alert('에이두 토큰이 부족합니다.');
+                    return;
                 }
-                const userDoc = await getDoc(doc(db, 'users', bookAuthorUid));
+
+                await updateDoc(userRef, { aeduTokens: increment(-1) });
                 window.authorName = userDoc.data()?.name || '';
                 window.syncBookAuthor();
 
                 const bookRef = doc(db, 'Book', bookCode);
-                const bookSnap = await getDoc(bookRef);
-                if (bookSnap.exists()) {
-                    const data = bookSnap.data();
+                await setDoc(bookRef, {
+                    author: window.authorName || '',
+                    owner: bookAuthorUid,
+                    createdAt: serverTimestamp()
+                });
 
-                        buildBookViewer();
+                await addDoc(collection(db, `users/${bookAuthorUid}/myBooks`), {
+                    bookId: bookCode,
+                    title: '',
+                    createdAt: serverTimestamp()
+                });
 
-                        const charSpreadCount = data.characterSpreadCount || 1;
-                        for (let i = 1; i < charSpreadCount; i++) addCharacterPage();
-                        const storySpreadCount = data.storySpreadCount || 1;
-                        for (let i = 1; i < storySpreadCount; i++) addManualPage();
-                        updatePageNumbersAndIDs();
-
-                        document.querySelectorAll('.book-title-sync').forEach(el => el.textContent = data.title || '');
-                        if (data.author) {
-                            window.authorName = data.author;
-                            window.syncBookAuthor();
-                        }
-
-                        if (data.coverImage) {
-                            const coverPage = document.querySelector('#spread-0 .book-page:nth-child(2)');
-                            if (coverPage) {
-                                coverPage.dataset.imageName = data.coverImage;
-                                const imgRef = storageRef(storage, `Book/${bookCode}/${data.coverImage}`);
-                                const url = await getDownloadURL(imgRef);
-                                coverPage.style.backgroundImage = `url('${url}')`;
-                            }
-                        }
-
-                        const characterPages = document.querySelectorAll('.book-spread[data-page-type="character"] .book-page');
-                        for (let i = 0; i < characterPages.length; i++) {
-                            const page = characterPages[i];
-                            const idx = i + 1;
-                            const name = data[`character${idx}Name`];
-                            const desc = data[`character${idx}Desc`];
-                            const imgName = data[`character${idx}Image`];
-                            if (name) page.querySelector('.editable-text').textContent = name;
-                            if (desc !== undefined) page.querySelector('textarea.manual-text-area').value = desc;
-                            if (imgName) {
-                                const imgBox = page.querySelector('.character-image-box');
-                                imgBox.dataset.imageName = imgName;
-                                const imgRef = storageRef(storage, `Book/${bookCode}/${imgName}`);
-                                const url = await getDownloadURL(imgRef);
-                                imgBox.style.backgroundImage = `url('${url}')`;
-                                imgBox.textContent = '';
-                            }
-                        }
-
-                        const storySpreads = document.querySelectorAll('.book-spread[data-page-type="story"]');
-                        for (let i = 0; i < storySpreads.length; i++) {
-                            const spread = storySpreads[i];
-                            const imgName = data[`story${i + 1}Image`];
-                            const text = data[`story${i + 1}Text`];
-                            if (text !== undefined) {
-                                const textarea = spread.querySelector('textarea.manual-text-area');
-                                if (textarea) textarea.value = text;
-                            }
-                            if (imgName) {
-                                const imagePage = spread.querySelector('.book-page:first-child');
-                                imagePage.dataset.imageName = imgName;
-                                const imgRef = storageRef(storage, `Book/${bookCode}/${imgName}`);
-                                const url = await getDownloadURL(imgRef);
-                                imagePage.style.backgroundImage = `url('${url}')`;
-                            }
-                        }
-
-                        totalBookSpreads = document.querySelectorAll('#book-viewer .book-spread').length;
-                        bookCurrentPage = 0;
-                        updateBookView();
-                        window.syncBookAuthor();
-                    } else {
-                        await setDoc(bookRef, {
-                            author: window.authorName || '',
-                            owner: bookAuthorUid,
-                            createdAt: serverTimestamp()
-                        });
-                        startManualBookCreation();
-                    }
-
-                }
+                startManualBookCreation();
             }
             else {
                 loginView.classList.remove('hidden');
