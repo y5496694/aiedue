@@ -4783,15 +4783,12 @@
 
                 try {
                     const bookRef = doc(db, 'Book', bookCode);
-                    const bookSnap = await getDoc(bookRef);
-                    if (!bookSnap.exists()) {
-                        await setDoc(bookRef, {
-                            createdAt: serverTimestamp(),
-                            owner: dataToShow.id,
-                            assignmentId,
-                            title: assignmentData.title || ''
-                        });
-                    }
+                    await setDoc(bookRef, {
+                        createdAt: serverTimestamp(),
+                        owner: dataToShow.id,
+                        assignmentId,
+                        title: assignmentData.title || ''
+                    }, { merge: true });
                 } catch (error) {
                     console.error('Error initializing book document:', error);
                     showModal('오류', '책 정보를 생성하는 중 오류가 발생했습니다.');
