@@ -185,6 +185,7 @@
                 <button id="close-token-modal" class="text-xl">&times;</button>
             </div>
             <label class="flex items-center space-x-2 mb-2"><input type="checkbox" id="token-select-class" class="h-4 w-4"><span>내 학급 전체 선택</span></label>
+            <input type="text" id="token-user-search" class="w-full p-2 border rounded mb-2" placeholder="이름 또는 코드로 검색..." />
             <div id="token-user-list" class="space-y-2 max-h-60 overflow-y-auto border p-2 rounded mb-4"></div>
             <input type="number" id="token-amount" class="w-full p-2 border rounded mb-4" placeholder="지급할 토큰 양" />
             <div class="text-right">
@@ -1173,6 +1174,8 @@
         const tokenModal = document.getElementById('token-modal');
         const tokenUserList = document.getElementById('token-user-list');
         const tokenSelectClass = document.getElementById('token-select-class');
+        const tokenUserSearch = document.getElementById('token-user-search');
+        const tokenSelectClassLabel = tokenSelectClass.parentElement;
         const tokenAmountInput = document.getElementById('token-amount');
         const tokenDistributeConfirm = document.getElementById('token-distribute-confirm');
         const closeTokenModalBtn = document.getElementById('close-token-modal');
@@ -1183,7 +1186,7 @@
         closeClassAddStudentsBtn.addEventListener('click', () => classAddStudentsModal.classList.add('hidden'));
         classAddStudentsConfirmBtn.addEventListener('click', confirmAddStudents);
 
-        tokenGiveBtn.addEventListener('click', openTokenModal);
+        tokenGiveBtn.addEventListener('click', () => openTokenModal());
         closeTokenModalBtn.addEventListener('click', () => tokenModal.classList.add('hidden'));
         tokenSelectClass.addEventListener('change', () => {
             document.querySelectorAll('#token-user-list input[data-inclass="1"]').forEach(cb => cb.checked = tokenSelectClass.checked);
@@ -1207,11 +1210,14 @@
                         const sdoc = await getDoc(doc(db, 'users', sid));
                         if (sdoc.exists()) {
                             const sdata = sdoc.data();
-                            html += `<li>${sdata.name}</li>`;
+                            html += `<li class="flex justify-between items-center py-1 border-b border-dotted border-gray-300 last:border-b-0"><span>${sdata.name} (코드: ${sdata.userCode})</span><button class="give-token-btn bg-purple-500 text-white px-2 py-1 rounded text-xs" data-uid="${sdoc.id}">토큰 지급</button></li>`;
                         }
                     } catch (_) {}
                 }
                 myClassStudentList.innerHTML = html || '<li class="text-sm text-gray-500">학생 없음</li>';
+                myClassStudentList.querySelectorAll('.give-token-btn').forEach(btn => {
+                    btn.addEventListener('click', () => openTokenModal([btn.dataset.uid]));
+                });
             } catch (err) {
                 myClassStudentList.innerHTML = `<li class="text-red-500">오류: ${err.message}</li>`;
             }
@@ -1228,7 +1234,7 @@
                     return `<label class="flex items-center space-x-2 p-1"><input type="checkbox" data-studentid="${s.id}" ${checked}><span>${s.name} (코드: ${s.userCode})</span></label>`;
                 }).join('');
             } catch (err) {
-                classStudentList.innerHTML = `<p class=\"text-red-500 text-center\">학생 목록을 불러오지 못했습니다.</p>`;
+                classStudentList.innerHTML = `<p class="text-red-500 text-center">학생 목록을 불러오지 못했습니다.</p>`;
             }
             classStudentSearch.value = '';
             classStudentSearch.oninput = e => {
@@ -1250,9 +1256,13 @@
             openMyClassModal();
         }
 
-        async function openTokenModal() {
+        async function openTokenModal(targetUserIds = null) {
             tokenModal.classList.remove('hidden');
             tokenUserList.innerHTML = '불러오는 중...';
+            const restrict = Array.isArray(targetUserIds) && targetUserIds.length > 0;
+            tokenSelectClassLabel.classList.toggle('hidden', restrict);
+            tokenUserSearch.classList.toggle('hidden', restrict);
+            tokenSelectClass.checked = false;
             try {
                 const classDoc = await getDoc(doc(db, 'classes', bookAuthorUid));
                 currentClassStudents = classDoc.exists() ? (classDoc.data().students || []) : [];
@@ -1260,17 +1270,30 @@
                 tokenUserList.innerHTML = usersSnap.docs.map(d => {
                     const u = { id: d.id, ...d.data() };
                     const inClass = currentClassStudents.includes(u.id) ? '1' : '0';
-                    return `<label class="flex items-center space-x-2 p-1"><input type="checkbox" class="token-user-checkbox" data-inclass="${inClass}" value="${u.id}"><span>${u.name}</span></label>`;
+                    const checked = restrict && targetUserIds.includes(u.id) ? 'checked' : '';
+                    const display = !restrict || targetUserIds.includes(u.id) ? 'flex' : 'none';
+                    const code = u.userCode || '';
+                    return `<label class="flex items-center space-x-2 p-1" data-name="${u.name}" data-code="${code}" style="display:${display}"><input type="checkbox" class="token-user-checkbox" data-inclass="${inClass}" value="${u.id}" ${checked}><span>${u.name} (코드: ${code})</span></label>`;
                 }).join('');
             } catch (err) {
-                tokenUserList.innerHTML = `<p class=\"text-red-500 text-center\">목록을 불러오지 못했습니다.</p>`;
+                tokenUserList.innerHTML = `<p class="text-red-500 text-center">목록을 불러오지 못했습니다.</p>`;
             }
+            tokenUserSearch.value = '';
+            tokenUserSearch.oninput = e => {
+                const term = e.target.value.toLowerCase();
+                document.querySelectorAll('#token-user-list label').forEach(lbl => {
+                    const name = (lbl.dataset.name || '').toLowerCase();
+                    const code = String(lbl.dataset.code || '').toLowerCase();
+                    lbl.style.display = name.includes(term) || code.includes(term) ? 'flex' : 'none';
+                });
+            };
         }
 
         async function distributeTokens() {
             const amount = Number(tokenAmountInput.value);
             if (isNaN(amount) || amount <= 0) { showNotification('토큰 양을 입력하세요'); return; }
             const selected = Array.from(document.querySelectorAll('.token-user-checkbox:checked')).map(i => i.value);
+            if (selected.length === 0) { showNotification('학생을 선택하세요'); return; }
             try {
                 for (const uid of selected) {
                     await updateDoc(doc(db, 'users', uid), { aeduTokens: increment(amount) });
