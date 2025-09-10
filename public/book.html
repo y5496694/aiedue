@@ -114,6 +114,7 @@
                     <span class="text-sm text-gray-600">글쓴이: <span id="author-display" class="book-author-sync"></span></span>
                 </div>
                 <div id="viewer-controls" class="flex flex-wrap justify-center items-center gap-2">
+                    <button id="generate-images-gpt-btn" onclick="completeManualBookGPT()" class="bg-pink-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-pink-700 disabled:bg-gray-400 disabled:cursor-not-allowed">GPT 사진 만들기/1토큰</button>
                     <button id="generate-images-btn" onclick="completeManualBook()" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed">그림 생성하기</button>
                     <button id="save-book-btn" onclick="saveBookDraft()" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed">저장하기</button>
                     <button id="save-book-pdf-btn" onclick="downloadBookAsPDF()" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 hidden">PDF 저장</button>
@@ -471,6 +472,38 @@
             }
 
             const base64 = data.image || data.artifacts?.[0]?.base64;
+            if (!base64) {
+                throw new Error('이미지 데이터가 없습니다.');
+            }
+
+            return `data:image/webp;base64,${base64}`;
+        }
+
+        async function generateImageForParagraphGPT(text, context = "") {
+            const basePrompt = `${text}\n${context}`.trim();
+            const englishPrompt = await translateToEnglish(basePrompt);
+            const finalPrompt = `${englishPrompt}, bright, child-friendly, storybook style`;
+            const res = await fetch('/.netlify/functions/gpt-handler', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ prompt: finalPrompt })
+            });
+
+            let data;
+            try {
+                data = await res.json();
+            } catch (_) {
+                throw new Error('서버 응답을 파싱하지 못했습니다.');
+            }
+
+            if (!res.ok) {
+                const message = data.error?.message || data.error || 'GPT Image API Error';
+                throw new Error(message);
+            }
+
+            const base64 = data.data?.[0]?.b64_json;
             if (!base64) {
                 throw new Error('이미지 데이터가 없습니다.');
             }
@@ -935,6 +968,103 @@
                 // 실패 시 그림 생성 버튼 원상 복구
                 generateBtn.textContent = originalGenerateText;
                 generateBtn.disabled = false;
+            }
+        }
+
+        async function completeManualBookGPT() {
+            const gptBtn = document.getElementById("generate-images-gpt-btn");
+            const stabilityBtn = document.getElementById("generate-images-btn");
+            const registerBtn = document.getElementById('register-library-btn');
+            const savePdfBtn = document.getElementById('save-book-pdf-btn');
+
+            const originalText = "GPT 사진 만들기/1토큰";
+
+            gptBtn.textContent = "생성 중...";
+            gptBtn.disabled = true;
+            if (stabilityBtn) stabilityBtn.disabled = true;
+
+            try {
+                const userRef = doc(db, 'users', bookAuthorUid);
+                const userDoc = await getDoc(userRef);
+                const tokens = Number(userDoc.data()?.aeduTokens) || 0;
+                if (tokens < 1) {
+                    alert('에이두 토큰이 부족합니다.');
+                    gptBtn.textContent = originalText;
+                    gptBtn.disabled = false;
+                    if (stabilityBtn) stabilityBtn.disabled = false;
+                    return;
+                }
+                await updateDoc(userRef, { aeduTokens: increment(-1) });
+                await updateUserInfo();
+
+                // 등장인물 컨텍스트 수집 및 이미지 생성
+                const charSpreads = document.querySelectorAll('.book-spread[data-page-type="character"]');
+                const contextParts = [];
+                for (const charSpread of charSpreads) {
+                    const charImageBoxes = charSpread.querySelectorAll('.character-image-box');
+                    const prompts = [charSpread.dataset.promptLeft, charSpread.dataset.promptRight];
+                    const charDescriptions = charSpread.querySelectorAll('textarea');
+                    const charNames = charSpread.querySelectorAll('.editable-text');
+
+                    for (let i = 0; i < charImageBoxes.length; i++) {
+                        let prompt = prompts[i];
+                        if (!prompt) {
+                            const desc = charDescriptions[i]?.value || '';
+                            const name = charNames[i]?.textContent || '';
+                            if (desc || name) {
+                                prompt = `${name}, ${desc}`.trim();
+                            }
+                        }
+                        if (prompt) {
+                            contextParts.push(prompt);
+                            const charPrompt = `${prompt}, white background, single character`;
+                            const charImage = await generateImageForParagraphGPT(charPrompt, '');
+                            charImageBoxes[i].style.backgroundImage = `url('${charImage}')`;
+                            charImageBoxes[i].textContent = '';
+                        }
+                    }
+                }
+                const context = contextParts.join('\n');
+
+                // 표지 이미지 생성
+                const coverSpread = document.querySelector('#spread-0');
+                const coverPrompt = coverSpread?.dataset.prompt || document.querySelector("#spread-0 .book-title-sync").textContent;
+                const coverImage = await generateImageForParagraphGPT(coverPrompt, '');
+                document.querySelector("#spread-0 .book-page:last-child").style.backgroundImage = `url('${coverImage}')`;
+
+                // 각 이야기 페이지 이미지 생성
+                const storySpreads = document.querySelectorAll('.book-spread[data-page-type="story"]');
+                for (const spread of storySpreads) {
+                    const storyText = spread.querySelector("textarea").value;
+                    const extra = spread.dataset.prompt || '';
+                    const prompt = `${storyText}\n${extra}`.trim();
+                    if (prompt) {
+                        const imageUrl = await generateImageForParagraphGPT(prompt, context);
+                        const imagePage = spread.querySelector(".book-page:first-child");
+                        const pageNumHTML = imagePage.querySelector('.page-number')?.outerHTML || '';
+                        imagePage.style.backgroundImage = `url('${imageUrl}')`;
+                        imagePage.innerHTML = pageNumHTML;
+                    }
+                }
+                showNotification("책이 완성되었습니다! 이제 도서관에 등록할 수 있습니다.");
+
+                gptBtn.disabled = true;
+
+                if (savePdfBtn) {
+                    savePdfBtn.classList.remove('hidden');
+                }
+                if (registerBtn) {
+                    registerBtn.classList.remove('hidden');
+                    registerBtn.disabled = false;
+                }
+
+            } catch (error) {
+                console.error("수동 책 완성 오류:", error);
+                showNotification(`그림 생성 중 오류가 발생했습니다: ${error.message}`);
+
+                gptBtn.textContent = originalText;
+                gptBtn.disabled = false;
+                if (stabilityBtn) stabilityBtn.disabled = false;
             }
         }
         
@@ -1497,6 +1627,7 @@
         window.deleteCurrentPage = deleteCurrentPage;
         window.changeBookPage = changeBookPage;
         window.completeManualBook = completeManualBook;
+        window.completeManualBookGPT = completeManualBookGPT;
         window.saveBookDraft = saveBookDraft;
         window.downloadBookAsPDF = downloadBookAsPDF;
         window.registerToLibrary = registerToLibrary;
