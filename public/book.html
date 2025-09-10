@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap');
         body { font-family: 'Gowun Dodum', sans-serif; }
@@ -25,10 +26,50 @@
         .tts-word:hover { color: #3b82f6; }
         #notification { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background-color: #2c3e50; color: white; padding: 1rem 2rem; border-radius: 8px; z-index: 1000; transition: opacity 0.5s, transform 0.5s; opacity: 0; pointer-events: none; }
         #notification.show { opacity: 1; transform: translate(-50%, 10px); }
+        .login-tab.active { border-bottom-color: #F59E0B; color: #F59E0B; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .form-input { transition: all 0.3s; }
+        .form-input:focus { border-color: #F59E0B; box-shadow: 0 0 0 2px rgba(245,158,11,0.2); }
+        .btn { transition: background-color 0.3s; }
+        .btn-primary { background-color: #F59E0B; color: white; }
+        .btn-primary:hover { background-color: #D97706; }
+        .btn-secondary { background-color: #6B7280; color: white; }
+        .btn-secondary:hover { background-color: #4B5563; }
+        .btn-disabled { background-color: #D1D5DB; cursor: not-allowed; }
     </style>
 </head>
 <body class="p-2 md:p-8 bg-gray-100">
 
+    <div id="book-login-view" class="max-w-md mx-auto mb-8 bg-white p-6 rounded-lg shadow-lg">
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                <button id="book-student-login-tab" class="login-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">🧑‍🎓 학생</button>
+                <button id="book-teacher-login-tab" class="login-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">🧑‍🏫 교사</button>
+            </nav>
+        </div>
+        <div id="book-student-login-content" class="tab-content pt-6">
+            <div class="mb-4">
+                <label for="book-student-code" class="block text-sm font-medium text-gray-700 mb-1">고유 숫자 코드</label>
+                <input type="text" id="book-student-code" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="발급받은 코드를 입력하세요">
+            </div>
+            <button id="book-student-login-btn" class="w-full py-2 rounded-md btn btn-primary">학생 로그인</button>
+        </div>
+        <div id="book-teacher-login-content" class="tab-content pt-6">
+            <div class="mb-4">
+                <label for="book-teacher-email" class="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+                <input type="email" id="book-teacher-email" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="example@email.com">
+            </div>
+            <div class="mb-6">
+                <label for="book-teacher-password" class="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+                <input type="password" id="book-teacher-password" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="••••••••">
+            </div>
+            <button id="book-teacher-login-btn" class="w-full py-2 rounded-md btn btn-primary">교사 로그인</button>
+            <button id="book-teacher-google-login-btn" class="w-full py-2 mt-2 rounded-md btn btn-secondary"><i class="fab fa-google mr-2"></i>Google로 로그인</button>
+        </div>
+    </div>
+
+    <div id="book-content" class="hidden">
     <div id="book-viewer-page" class="page-content max-w-7xl mx-auto">
         <div class="bg-white rounded-2xl shadow-lg p-4 md:p-6">
             <header class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
@@ -54,13 +95,14 @@
             </div>
         </div>
     </div>
-    
+    </div>
+
     <div id="notification"></div>
 
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref as storageRef, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
@@ -671,9 +713,57 @@
         auth = getAuth(app);
         db = getFirestore(app);
         storage = getStorage(app);
+        const studentLoginTab = document.getElementById('book-student-login-tab');
+        const teacherLoginTab = document.getElementById('book-teacher-login-tab');
+        const studentLoginContent = document.getElementById('book-student-login-content');
+        const teacherLoginContent = document.getElementById('book-teacher-login-content');
+
+        function switchLoginTab(tab) {
+            if (tab === 'student') {
+                studentLoginTab.classList.add('active');
+                teacherLoginTab.classList.remove('active');
+                studentLoginContent.classList.add('active');
+                teacherLoginContent.classList.remove('active');
+            } else {
+                teacherLoginTab.classList.add('active');
+                studentLoginTab.classList.remove('active');
+                teacherLoginContent.classList.add('active');
+                studentLoginContent.classList.remove('active');
+            }
+        }
+
+        studentLoginTab.addEventListener('click', () => switchLoginTab('student'));
+        teacherLoginTab.addEventListener('click', () => switchLoginTab('teacher'));
+        switchLoginTab('student');
+
+        document.getElementById('book-student-login-btn').addEventListener('click', async () => {
+            const codeInput = document.getElementById('book-student-code').value.trim();
+            const normalizedCode = codeInput.replace(/[\uFF10-\uFF19]/g, m => String.fromCharCode(m.charCodeAt(0) - 0xFEE0));
+            if (!normalizedCode || !/^\d+$/.test(normalizedCode)) { alert('유효한 숫자 코드를 입력해주세요.'); return; }
+            const codeAsInt = parseInt(normalizedCode, 10);
+            const email = `${codeAsInt}@abc.com`;
+            const password = `${codeAsInt}qwerty`;
+            try { await signInWithEmailAndPassword(auth, email, password); } catch (_) { alert('로그인 실패'); }
+        });
+
+        document.getElementById('book-teacher-login-btn').addEventListener('click', async () => {
+            const email = document.getElementById('book-teacher-email').value;
+            const password = document.getElementById('book-teacher-password').value;
+            if (!email || !password) { alert('이메일과 비밀번호를 모두 입력해주세요.'); return; }
+            try { await signInWithEmailAndPassword(auth, email, password); } catch (_) { alert('로그인 실패'); }
+        });
+
+        document.getElementById('book-teacher-google-login-btn').addEventListener('click', async () => {
+            const provider = new GoogleAuthProvider();
+            try { await signInWithPopup(auth, provider); } catch (_) { alert('로그인 실패'); }
+        });
 
         onAuthStateChanged(auth, async (user) => {
+            const loginView = document.getElementById('book-login-view');
+            const contentView = document.getElementById('book-content');
             if (user) {
+                loginView.classList.add('hidden');
+                contentView.classList.remove('hidden');
                 const params = new URLSearchParams(window.location.search);
                 bookCode = params.get('code');
                 bookAuthorUid = params.get('uid') || user.uid;
@@ -682,7 +772,6 @@
                     params.set('code', bookCode);
                     window.history.replaceState({}, '', `${window.location.pathname}?${params}`);
                 }
-
                 const userDoc = await getDoc(doc(db, 'users', bookAuthorUid));
                 window.authorName = userDoc.data()?.name || '';
                 window.syncBookAuthor();
@@ -767,8 +856,10 @@
                     }
 
                 }
-            } else {
-                window.location.href = 'index.html';
+            }
+            else {
+                loginView.classList.remove('hidden');
+                contentView.classList.add('hidden');
             }
         });
 
