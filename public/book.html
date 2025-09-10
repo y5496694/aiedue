@@ -271,8 +271,27 @@
          * 이미지 생성 API를 모방하는 함수입니다.
          * 실제로는 서버에 요청을 보내야 하지만, 여기서는 플레이스홀더 이미지 URL을 반환합니다.
          */
+        async function translateToEnglish(text) {
+            try {
+                const payload = {
+                    contents: [{ role: 'user', parts: [{ text: `Translate the following text to English:\n${text}` }] }]
+                };
+                const res = await fetch('/.netlify/functions/gemini-handler', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error?.message || 'Gemini API Error');
+                return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || text;
+            } catch (error) {
+                console.error('Translation failed:', error);
+                return text;
+            }
+        }
+
         async function generateImageForParagraph(text, context = "") {
-            const prompt = `${text}\n${context}`;
+            const prompt = `${text}\n${context}`.trim();
+            const englishPrompt = await translateToEnglish(prompt);
             const res = await fetch('/.netlify/functions/stability-handler', {
                 method: 'POST',
                 headers: {
@@ -281,7 +300,7 @@
                 body: JSON.stringify({
                     type: 'stability',
                     payload: {
-                        text_prompts: [{ text: prompt }],
+                        text_prompts: [{ text: englishPrompt }],
                         cfg_scale: 7,
                         height: 1024,
                         width: 1024,
