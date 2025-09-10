@@ -85,17 +85,20 @@
     <div id="book-content" class="hidden">
     <div class="max-w-7xl mx-auto mb-4 flex justify-between items-center">
         <h1 class="text-2xl font-bold">에이두 AI 책만들기</h1>
-        <button id="book-logout-btn" class="text-sm text-gray-500 underline">로그아웃</button>
+        <div class="flex items-center gap-3 bg-white border rounded-full px-4 py-2">
+            <span id="display-user-name" class="font-bold"></span>
+            <span class="text-sm text-gray-700">내 지갑: <span id="display-user-tokens">0</span>토큰</span>
+            <button id="book-logout-btn" class="text-sm text-gray-500 underline">로그아웃</button>
+        </div>
     </div>
     <div id="book-list-section" class="max-w-7xl mx-auto mb-4">
         <div class="bg-white p-4 rounded-lg shadow">
-            <div id="user-info" class="mb-4">
-                <span id="display-user-name" class="font-bold"></span>
-                <span class="ml-2 text-sm text-gray-700">내 지갑: <span id="display-user-tokens">0</span>토큰</span>
+            <div class="mb-4 flex gap-4 border-b">
+                <button id="my-books-tab" class="pb-2 text-sm font-medium border-b-2 border-orange-500 text-orange-500">내 책</button>
+                <button id="library-tab" class="pb-2 text-sm font-medium border-b-2 border-transparent text-gray-500">에이두 도서관</button>
             </div>
-            <div class="flex items-center gap-2 overflow-x-auto">
-                <div id="book-list" class="flex gap-2"></div>
-            </div>
+            <div id="my-book-list" class="flex items-center gap-2 overflow-x-auto"></div>
+            <div id="library-book-list" class="hidden flex items-center gap-2 overflow-x-auto"></div>
         </div>
     </div>
     <div id="book-viewer-page" class="page-content max-w-7xl mx-auto hidden">
@@ -185,7 +188,7 @@
 
         async function loadUserBooks() {
             if (!bookAuthorUid) return;
-            const listEl = document.getElementById('book-list');
+            const listEl = document.getElementById('my-book-list');
             listEl.innerHTML = '';
             const snap = await getDocs(collection(db, `users/${bookAuthorUid}/myBooks`));
             snap.forEach(docSnap => {
@@ -210,6 +213,23 @@
                 newBookTitleInput.focus();
             });
             listEl.appendChild(addBtn);
+        }
+
+        async function loadLibraryBooks() {
+            const listEl = document.getElementById('library-book-list');
+            listEl.innerHTML = '';
+            const snap = await getDocs(collection(db, 'Book'));
+            snap.forEach(docSnap => {
+                const data = docSnap.data();
+                const item = document.createElement('button');
+                const created = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleDateString('ko-KR') : '';
+                item.innerHTML = `<div class="font-semibold">${data.title || '제목없음'}</div>` +
+                                  `<div class="text-xs text-gray-600">글쓴이: ${data.author || ''}</div>` +
+                                  `<div class="text-xs text-gray-600">코드: ${docSnap.id}</div>`;
+                item.className = 'text-left px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 flex-shrink-0';
+                item.addEventListener('click', () => loadBook(docSnap.id));
+                listEl.appendChild(item);
+            });
         }
 
         async function loadBook(id) {
@@ -984,6 +1004,26 @@
         const confirmAddBookBtn = document.getElementById('confirm-add-book');
         const newBookTitleInput = document.getElementById('new-book-title');
         const bookLogoutBtn = document.getElementById('book-logout-btn');
+        const myBooksTab = document.getElementById('my-books-tab');
+        const libraryTab = document.getElementById('library-tab');
+        const myBookListEl = document.getElementById('my-book-list');
+        const libraryBookListEl = document.getElementById('library-book-list');
+
+        myBooksTab.addEventListener('click', () => {
+            myBooksTab.classList.add('border-orange-500', 'text-orange-500');
+            libraryTab.classList.remove('border-orange-500', 'text-orange-500');
+            myBookListEl.classList.remove('hidden');
+            libraryBookListEl.classList.add('hidden');
+            loadUserBooks();
+        });
+
+        libraryTab.addEventListener('click', () => {
+            libraryTab.classList.add('border-orange-500', 'text-orange-500');
+            myBooksTab.classList.remove('border-orange-500', 'text-orange-500');
+            libraryBookListEl.classList.remove('hidden');
+            myBookListEl.classList.add('hidden');
+            loadLibraryBooks();
+        });
 
         bookLogoutBtn.addEventListener('click', async () => {
             try {
@@ -1071,6 +1111,7 @@
                 bookAuthorUid = user.uid;
                 await updateUserInfo();
                 await loadUserBooks();
+                await loadLibraryBooks();
             } else {
                 loginView.classList.remove('hidden');
                 registerView.classList.add('hidden');
