@@ -318,6 +318,11 @@
                 addManualPage();
             }
 
+            const coverSpread = document.querySelector('#spread-0');
+            if (coverSpread && data.coverPrompt !== undefined) {
+                coverSpread.dataset.prompt = data.coverPrompt || '';
+            }
+
             document.querySelectorAll('.book-title-sync').forEach(el => {
                 el.textContent = data.title || '';
             });
@@ -349,6 +354,15 @@
                 if (descVal) page.querySelector('textarea.manual-text-area').value = descVal;
             }
 
+            const charSpreads = document.querySelectorAll('.book-spread[data-page-type="character"]');
+            charSpreads.forEach((spread, idx) => {
+                const base = idx * 2 + 1;
+                const leftPrompt = data[`character${base}Prompt`];
+                const rightPrompt = data[`character${base + 1}Prompt`];
+                if (leftPrompt !== undefined) spread.dataset.promptLeft = leftPrompt;
+                if (rightPrompt !== undefined) spread.dataset.promptRight = rightPrompt;
+            });
+
             const storySpreads = document.querySelectorAll('.book-spread[data-page-type="story"]');
             for (let i = 0; i < storySpreads.length; i++) {
                 const idx = i + 1;
@@ -364,6 +378,8 @@
                 }
                 const textVal = data[`story${idx}Text`];
                 if (textVal) spread.querySelector('.book-page:last-child textarea.manual-text-area').value = textVal;
+                const promptVal = data[`story${idx}Prompt`];
+                if (promptVal !== undefined) spread.dataset.prompt = promptVal;
             }
 
             document.getElementById('book-viewer-page').classList.remove('hidden');
@@ -703,11 +719,11 @@
                     storySpreadCount: document.querySelectorAll('#book-viewer .book-spread[data-page-type="story"]').length,
                 };
 
-                const uploads = [];
+                  const uploads = [];
 
-                // 표지 이미지 (1장 오른쪽 배경)
-                const coverPage = document.querySelector('#spread-0 .book-page:nth-child(2)');
-                if (coverPage) {
+                  // 표지 이미지 (1장 오른쪽 배경)
+                  const coverPage = document.querySelector('#spread-0 .book-page:nth-child(2)');
+                  if (coverPage) {
                     const bg = coverPage.style.backgroundImage;
                     const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
                     if (match) {
@@ -720,42 +736,54 @@
                     } else if (coverPage.dataset.imageName) {
                         data.coverImage = coverPage.dataset.imageName;
                     }
+                  }
+
+                const coverSpread = document.querySelector('#spread-0');
+                if (coverSpread) {
+                    data.coverPrompt = coverSpread.dataset.prompt || '';
                 }
 
-                // 등장인물 정보 저장
-                const characterPages = document.querySelectorAll('.book-spread[data-page-type="character"] .book-page');
-                characterPages.forEach((page, idx) => {
-                    const charIndex = idx + 1;
-                    const imgBox = page.querySelector('.character-image-box');
-                    if (imgBox) {
-                        const bg = imgBox.style.backgroundImage;
-                        const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
-                        if (match) {
-                            if (!imgBox.dataset.imageName) {
-                                imgBox.dataset.imageName = `character-${charIndex}-${Date.now()}.webp`;
-                            }
-                            const imgRef = storageRef(storage, `Book/${bookCode}/${imgBox.dataset.imageName}`);
-                            uploads.push(uploadString(imgRef, match[1], 'data_url'));
-                            data[`character${charIndex}Image`] = imgBox.dataset.imageName;
-                        } else if (imgBox.dataset.imageName) {
-                            data[`character${charIndex}Image`] = imgBox.dataset.imageName;
-                        }
-                    }
+                  // 등장인물 정보 저장
+                  const characterPages = document.querySelectorAll('.book-spread[data-page-type="character"] .book-page');
+                  characterPages.forEach((page, idx) => {
+                      const charIndex = idx + 1;
+                      const imgBox = page.querySelector('.character-image-box');
+                      if (imgBox) {
+                          const bg = imgBox.style.backgroundImage;
+                          const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
+                          if (match) {
+                              if (!imgBox.dataset.imageName) {
+                                  imgBox.dataset.imageName = `character-${charIndex}-${Date.now()}.webp`;
+                              }
+                              const imgRef = storageRef(storage, `Book/${bookCode}/${imgBox.dataset.imageName}`);
+                              uploads.push(uploadString(imgRef, match[1], 'data_url'));
+                              data[`character${charIndex}Image`] = imgBox.dataset.imageName;
+                          } else if (imgBox.dataset.imageName) {
+                              data[`character${charIndex}Image`] = imgBox.dataset.imageName;
+                          }
+                      }
 
-                    const nameEl = page.querySelector('.editable-text');
-                    if (nameEl) {
-                        data[`character${charIndex}Name`] = nameEl.textContent.trim();
-                    }
-                    const descEl = page.querySelector('textarea.manual-text-area');
-                    if (descEl) {
-                        data[`character${charIndex}Desc`] = descEl.value;
-                    }
-                });
+                      const nameEl = page.querySelector('.editable-text');
+                      if (nameEl) {
+                          data[`character${charIndex}Name`] = nameEl.textContent.trim();
+                      }
+                      const descEl = page.querySelector('textarea.manual-text-area');
+                      if (descEl) {
+                          data[`character${charIndex}Desc`] = descEl.value;
+                      }
+                  });
 
-                // 줄거리 저장
-                const storySpreads = document.querySelectorAll('.book-spread[data-page-type="story"]');
-                storySpreads.forEach((spread, idx) => {
-                    const storyIndex = idx + 1;
+                  const characterSpreads = document.querySelectorAll('.book-spread[data-page-type="character"]');
+                  characterSpreads.forEach((spread, idx) => {
+                      const base = idx * 2 + 1;
+                      data[`character${base}Prompt`] = spread.dataset.promptLeft || '';
+                      data[`character${base + 1}Prompt`] = spread.dataset.promptRight || '';
+                  });
+
+                  // 줄거리 저장
+                  const storySpreads = document.querySelectorAll('.book-spread[data-page-type="story"]');
+                  storySpreads.forEach((spread, idx) => {
+                      const storyIndex = idx + 1;
                     const imagePage = spread.querySelector('.book-page:first-child');
                     if (imagePage) {
                         const bg = imagePage.style.backgroundImage;
@@ -771,11 +799,12 @@
                             data[`story${storyIndex}Image`] = imagePage.dataset.imageName;
                         }
                     }
-                    const textPage = spread.querySelector('.book-page:last-child textarea.manual-text-area');
-                    if (textPage) {
-                        data[`story${storyIndex}Text`] = textPage.value;
-                    }
-                });
+                      const textPage = spread.querySelector('.book-page:last-child textarea.manual-text-area');
+                      if (textPage) {
+                          data[`story${storyIndex}Text`] = textPage.value;
+                      }
+                      data[`story${storyIndex}Prompt`] = spread.dataset.prompt || '';
+                  });
 
                 await Promise.all(uploads);
 
