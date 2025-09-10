@@ -86,6 +86,7 @@
     <div class="max-w-7xl mx-auto mb-4 flex justify-between items-center">
         <h1 class="text-2xl font-bold">에이두 AI 책만들기</h1>
         <div class="flex items-center gap-3 bg-white border rounded-full px-4 py-2">
+            <span id="role-badge" class="font-bold mr-1 hidden">교사</span>
             <span id="display-user-name" class="font-bold"></span>
             <span class="text-sm text-gray-700">내 지갑: <span id="display-user-tokens">0</span>토큰</span>
             <button id="book-logout-btn" class="text-sm text-gray-500 underline">로그아웃</button>
@@ -313,6 +314,13 @@
             userTokens = Number(data.aeduTokens) || 0;
             document.getElementById('display-user-name').textContent = window.authorName;
             document.getElementById('display-user-tokens').textContent = `${userTokens}`;
+            const roleBadgeEl = document.getElementById('role-badge');
+            if (data.role === 'teacher') {
+                roleBadgeEl.classList.remove('hidden');
+                roleBadgeEl.textContent = '교사';
+            } else {
+                roleBadgeEl.classList.add('hidden');
+            }
             window.syncBookAuthor();
         }
 
