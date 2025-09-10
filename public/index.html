@@ -438,6 +438,10 @@
                         <input type="number" id="won-adjustment-amount" class="w-full p-2 border rounded-md form-input" placeholder="조정할 금액 (예: 500, -500)">
                         <button id="adjust-won-btn" class="btn btn-primary px-4 py-2 whitespace-nowrap">금액 조정</button>
                     </div>
+                    <div class="flex items-center space-x-2 mt-1">
+                        <input type="number" id="token-adjustment-amount" class="w-full p-2 border rounded-md form-input" placeholder="조정할 토큰 (예: 5, -5)">
+                        <button id="adjust-token-btn" class="btn btn-primary px-4 py-2 whitespace-nowrap">토큰 조정</button>
+                    </div>
                 </div>
                 <div>
                     <h4 class="font-bold text-lg border-b pb-1 mb-2">📈 보유 주식</h4>
@@ -2218,6 +2222,16 @@
                 await updateDoc(doc(db, "users", studentToAdjustId), { balance: increment(amount) });
                 showModal('성공', '금액 조정이 완료되었습니다.');
                 document.getElementById('won-adjustment-amount').value = '';
+            });
+
+            document.getElementById('adjust-token-btn').addEventListener('click', async () => {
+                const amount = Number(document.getElementById('token-adjustment-amount').value);
+                if (isNaN(amount) || amount === 0) {
+                    showModal('오류', '정확한 토큰 수를 입력하세요.'); return;
+                }
+                await updateDoc(doc(db, "users", studentToAdjustId), { aeduTokens: increment(amount) });
+                showModal('성공', '토큰 조정이 완료되었습니다.');
+                document.getElementById('token-adjustment-amount').value = '';
             });
 
             document.querySelectorAll('.reset-stock-btn').forEach(btn => btn.addEventListener('click', async (e) => {
