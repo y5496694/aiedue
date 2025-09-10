@@ -128,6 +128,18 @@
             </div>
 
             <div id="page-prompt-wrapper" class="mt-4"></div>
+            <div id="book-like-section" class="mt-4 flex items-center gap-2 hidden">
+                <button id="book-like-btn" class="px-3 py-1 bg-pink-500 text-white rounded">좋아요</button>
+                <span id="book-like-count" class="text-sm text-gray-700">0</span>
+            </div>
+            <div id="book-comments-section" class="mt-6 hidden">
+                <h3 class="font-semibold mb-2">댓글</h3>
+                <div id="comments-list" class="space-y-2"></div>
+                <div class="flex gap-2 mt-2">
+                    <input type="text" id="new-comment-input" class="flex-1 p-2 border rounded" placeholder="댓글을 입력하세요" />
+                    <button id="add-comment-btn" class="px-3 py-1 bg-blue-500 text-white rounded">등록</button>
+                </div>
+            </div>
         </div>
     </div>
     </div>
@@ -260,6 +272,17 @@
             }, duration);
         }
 
+        // 간단한 HTML 이스케이프
+        function escapeHTML(str) {
+            return str.replace(/[&<>"']/g, m => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[m]));
+        }
+
         async function loadUserBooks() {
             if (!bookAuthorUid) return;
             const listEl = document.getElementById('my-book-list');
@@ -313,6 +336,118 @@
                 item.addEventListener('click', () => loadBook(docSnap.id));
                 listEl.appendChild(item);
             }
+        }
+
+        async function loadBookLikes() {
+            const countEl = document.getElementById('book-like-count');
+            const likeBtn = document.getElementById('book-like-btn');
+            countEl.textContent = '0';
+            likeBtn.disabled = false;
+            try {
+                const bookRef = doc(db, 'Book', bookCode);
+                const bookSnap = await getDoc(bookRef);
+                countEl.textContent = (bookSnap.data().likesCount || 0).toString();
+                const user = auth.currentUser;
+                if (user) {
+                    const likeDoc = await getDoc(doc(db, `Book/${bookCode}/likes`, user.uid));
+                    if (likeDoc.exists()) likeBtn.disabled = true;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function likeBook() {
+            if (!auth?.currentUser || !bookCode) return;
+            const user = auth.currentUser;
+            const likeRef = doc(db, `Book/${bookCode}/likes`, user.uid);
+            try {
+                await runTransaction(db, async (tx) => {
+                    const likeDoc = await tx.get(likeRef);
+                    if (likeDoc.exists()) throw new Error('already');
+                    tx.set(likeRef, { createdAt: serverTimestamp() });
+                    tx.update(doc(db, 'Book', bookCode), { likesCount: increment(1) });
+                });
+            } catch (e) {
+                console.error(e);
+            }
+            await loadBookLikes();
+        }
+
+        async function loadComments() {
+            const listEl = document.getElementById('comments-list');
+            listEl.innerHTML = '';
+            if (!bookCode) return;
+            try {
+                const snap = await getDocs(collection(db, `Book/${bookCode}/comments`));
+                const comments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                comments.sort((a, b) => {
+                    const likeA = a.likesCount || 0;
+                    const likeB = b.likesCount || 0;
+                    if (likeA !== likeB) return likeB - likeA;
+                    const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+                    const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+                    return timeA - timeB;
+                });
+                let html = '';
+                for (const c of comments) {
+                    let liked = false;
+                    if (auth.currentUser) {
+                        try {
+                            const likeDoc = await getDoc(doc(db, `Book/${bookCode}/comments/${c.id}/likes`, auth.currentUser.uid));
+                            liked = likeDoc.exists();
+                        } catch (_) {}
+                    }
+                    const dateStr = c.createdAt?.toDate ? c.createdAt.toDate().toLocaleDateString('ko-KR') : '';
+                    html += `<div class="border p-2 rounded" data-id="${c.id}">` +
+                            `<div class="text-sm mb-1"><span class="font-semibold">${escapeHTML(c.authorName || '')}</span> <span class="text-xs text-gray-500">${dateStr}</span></div>` +
+                            `<div class="mb-1">${escapeHTML(c.text || '')}</div>` +
+                            `<button class="text-xs text-blue-500 comment-like-btn" data-id="${c.id}" ${liked ? 'disabled' : ''}>추천 ${c.likesCount || 0}</button>` +
+                            `</div>`;
+                }
+                listEl.innerHTML = html;
+                document.querySelectorAll('.comment-like-btn').forEach(btn => {
+                    btn.addEventListener('click', () => likeComment(btn.dataset.id));
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function addComment() {
+            const input = document.getElementById('new-comment-input');
+            const text = input.value.trim();
+            if (!text || !auth?.currentUser || !bookCode) return;
+            input.value = '';
+            try {
+                await addDoc(collection(db, `Book/${bookCode}/comments`), {
+                    text,
+                    authorName: window.authorName || '',
+                    authorUid: auth.currentUser.uid,
+                    createdAt: serverTimestamp(),
+                    likesCount: 0
+                });
+            } catch (err) {
+                console.error(err);
+            }
+            await loadComments();
+        }
+
+        async function likeComment(id) {
+            if (!auth?.currentUser || !bookCode) return;
+            const likeRef = doc(db, `Book/${bookCode}/comments/${id}/likes`, auth.currentUser.uid);
+            const commentRef = doc(db, `Book/${bookCode}/comments`, id);
+            try {
+                await runTransaction(db, async (tx) => {
+                    const likeDoc = await tx.get(likeRef);
+                    if (likeDoc.exists()) throw new Error('already');
+                    tx.set(likeRef, { createdAt: serverTimestamp() });
+                    tx.update(commentRef, { likesCount: increment(1) });
+                });
+            } catch (err) {
+                console.error(err);
+            }
+            await loadComments();
         }
 
         async function loadBook(id) {
@@ -405,6 +540,8 @@
             document.getElementById('book-list-section').classList.add('hidden');
             bookCurrentPage = 0;
             setViewMode(bookIsPublic);
+            await loadBookLikes();
+            await loadComments();
         }
 
         async function updateUserInfo() {
@@ -924,6 +1061,8 @@
             const pdfBtn = document.getElementById('save-book-pdf-btn');
             const promptWrapper = document.getElementById('page-prompt-wrapper');
             const actionContainer = document.getElementById('page-action-buttons');
+            const likeSection = document.getElementById('book-like-section');
+            const commentsSection = document.getElementById('book-comments-section');
 
             if (gptBtn) gptBtn.classList.add('hidden');
 
@@ -934,6 +1073,8 @@
                 if (promptWrapper) promptWrapper.classList.add('hidden');
                 if (actionContainer) actionContainer.classList.add('hidden');
                 if (pdfBtn) pdfBtn.classList.remove('hidden');
+                if (likeSection) likeSection.classList.remove('hidden');
+                if (commentsSection) commentsSection.classList.remove('hidden');
                 if (canEditBook) {
                     if (editBtn) editBtn.classList.remove('hidden');
                 } else if (editBtn) {
@@ -953,6 +1094,9 @@
                 if (!bookIsPublic && registerBtn) registerBtn.classList.remove('hidden');
                 if (promptWrapper) promptWrapper.classList.remove('hidden');
                 if (actionContainer) actionContainer.classList.remove('hidden');
+                if (pdfBtn) pdfBtn.classList.add('hidden');
+                if (likeSection) likeSection.classList.add('hidden');
+                if (commentsSection) commentsSection.classList.add('hidden');
                 if (editBtn) editBtn.classList.add('hidden');
                 document.querySelectorAll('#book-viewer textarea').forEach(t => t.removeAttribute('readonly'));
                 document.querySelectorAll('#book-viewer .editable-text').forEach(e => e.setAttribute('contenteditable', 'true'));
@@ -1452,6 +1596,8 @@
         const libraryTab = document.getElementById('library-tab');
         const myBookListEl = document.getElementById('my-book-list');
         const libraryBookListEl = document.getElementById('library-book-list');
+        const bookLikeBtn = document.getElementById('book-like-btn');
+        const addCommentBtn = document.getElementById('add-comment-btn');
 
         myBooksTab.addEventListener('click', () => {
             myBooksTab.classList.add('border-orange-500', 'text-orange-500');
@@ -1468,6 +1614,9 @@
             myBookListEl.classList.add('hidden');
             loadLibraryBooks();
         });
+
+        bookLikeBtn.addEventListener('click', likeBook);
+        addCommentBtn.addEventListener('click', addComment);
 
         bookLogoutBtn.addEventListener('click', async () => {
             try {
