@@ -13,7 +13,7 @@ firebase deploy --only storage,firestore
 2. Apply the CORS policy to the storage bucket:
 
 ```sh
-gsutil cors set storage-cors.json gs://mansungcoin-c6e06.appspot.com
+gsutil cors set storage-cors.json gs://mansungcoin-c6e06.firebasestorage.app
 ```
 
 These steps allow authenticated users to upload images from `https://aiedue.netlify.app` without CORS issues.
