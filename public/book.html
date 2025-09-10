@@ -891,31 +891,31 @@
             const title = newBookTitleInput.value.trim();
             if (!title) { alert('책 제목을 입력하세요'); return; }
 
-            const userRef = doc(db, 'users', bookAuthorUid);
-            const userDoc = await getDoc(userRef);
-            const tokens = Number(userDoc.data()?.aeduTokens) || 0;
-            if (tokens < 1) { alert('에이두 토큰이 부족합니다.'); return; }
-            await updateDoc(userRef, { aeduTokens: increment(-1) });
-            await updateUserInfo();
-            const newBookCode = `book${Date.now()}`;
-            await setDoc(doc(db, 'Book', newBookCode), {
-                author: window.authorName || '',
-                owner: bookAuthorUid,
-                createdAt: serverTimestamp(),
-                title
-            });
-            await addDoc(collection(db, `users/${bookAuthorUid}/myBooks`), {
-                bookId: newBookCode,
-                title,
-                createdAt: serverTimestamp()
-            });
-            await loadUserBooks();
-            bookCode = newBookCode;
-            buildBookViewer();
-            document.querySelector('#spread-0 .book-title-sync').textContent = title;
-            document.getElementById('book-viewer-page').classList.remove('hidden');
-            document.getElementById('book-list-section').classList.add('hidden');
-            addBookModal.classList.add('hidden');
+            try {
+                const userRef = doc(db, 'users', bookAuthorUid);
+                const userDoc = await getDoc(userRef);
+                const tokens = Number(userDoc.data()?.aeduTokens) || 0;
+                if (tokens < 1) { alert('에이두 토큰이 부족합니다.'); return; }
+                await updateDoc(userRef, { aeduTokens: increment(-1) });
+                await updateUserInfo();
+                const newBookCode = `book${Date.now()}`;
+                await setDoc(doc(db, 'Book', newBookCode), {
+                    author: window.authorName || '',
+                    owner: bookAuthorUid,
+                    createdAt: serverTimestamp(),
+                    title
+                });
+                await addDoc(collection(db, `users/${bookAuthorUid}/myBooks`), {
+                    bookId: newBookCode,
+                    title,
+                    createdAt: serverTimestamp()
+                });
+                await loadUserBooks();
+                addBookModal.classList.add('hidden');
+            } catch (error) {
+                console.error('Error adding book:', error);
+                alert('책을 추가하지 못했습니다. 다시 시도해주세요.');
+            }
         });
 
         document.getElementById('back-to-list-btn').addEventListener('click', () => {
