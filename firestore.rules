@@ -83,13 +83,60 @@ service cloud.firestore {
       allow read: if request.auth != null &&
                   (resource.data.authorId == request.auth.uid || isTeacher());
 
-      // 수정·삭제: 작성자 또는 교사이며, authorId를 변경할 수 없음
-      allow update, delete: if request.auth != null &&
+      // 수정: 작성자 또는 교사이며, authorId를 변경할 수 없음
+      // 또한, 좋아요/댓글 수 증가를 위해 likesCount 또는 commentsCount 를
+      // +1만큼 증가시키는 업데이트는 모든 인증된 사용자에게 허용
+      allow update: if request.auth != null &&
         (
           (resource.data.authorId == request.auth.uid &&
            request.resource.data.authorId == request.auth.uid)
           || isTeacher()
+          || (
+            request.resource.data.diff(resource.data).changedKeys().hasOnly(['likesCount']) &&
+            request.resource.data.likesCount == resource.data.likesCount + 1
+          )
+          || (
+            request.resource.data.diff(resource.data).changedKeys().hasOnly(['commentsCount']) &&
+            request.resource.data.commentsCount == resource.data.commentsCount + 1
+          )
         );
+
+      // 삭제: 작성자 또는 교사만 가능
+      allow delete: if request.auth != null &&
+        (resource.data.authorId == request.auth.uid || isTeacher());
+
+      // 책에 대한 좋아요 정보
+      match /likes/{userId} {
+        allow read: if request.auth != null;
+        allow create, delete: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // 책에 대한 댓글 및 댓글 좋아요
+      match /comments/{commentId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+
+        // 댓글 수정은 작성자 또는 교사만 가능
+        // 단, likesCount 를 +1 증가시키는 업데이트는 누구나 가능
+        allow update: if request.auth != null && (
+          resource.data.authorUid == request.auth.uid ||
+          isTeacher() ||
+          (
+            request.resource.data.diff(resource.data).changedKeys().hasOnly(['likesCount']) &&
+            request.resource.data.likesCount == resource.data.likesCount + 1
+          )
+        );
+
+        // 댓글 삭제: 작성자 또는 교사만 가능
+        allow delete: if request.auth != null && (
+          resource.data.authorUid == request.auth.uid || isTeacher()
+        );
+
+        match /likes/{userId} {
+          allow read: if request.auth != null;
+          allow create, delete: if request.auth != null && request.auth.uid == userId;
+        }
+      }
     }
 
     // ──────────────────────────────────────────────────────────────
