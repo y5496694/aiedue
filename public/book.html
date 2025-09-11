@@ -128,7 +128,7 @@
             </div>
 
             <div id="page-prompt-wrapper" class="mt-4"></div>
-            <div id="book-like-section" class="mt-4 flex items-center gap-2 hidden">
+            <div id="book-like-section" class="mt-4 flex items-center gap-2 justify-end hidden">
                 <button id="book-like-btn" class="px-3 py-1 bg-pink-500 text-white rounded">좋아요</button>
                 <span id="book-like-count" class="text-sm text-gray-700">0</span>
             </div>
@@ -330,6 +330,7 @@
                 }
                 item.innerHTML = `<div class="w-32 h-40 bg-gray-200 bg-cover bg-center mb-2"${coverUrl ? ` style="background-image:url('${coverUrl}')"` : ''}></div>` +
                                   `<div class="font-semibold">${data.title || '제목없음'}</div>` +
+                                  `<div class="text-xs text-gray-600">좋아요 ${data.likesCount || 0} · 댓글 ${data.commentsCount || 0}</div>` +
                                   `<div class="text-xs text-gray-600">글쓴이: ${data.author || ''}</div>` +
                                   `<div class="text-xs text-gray-600">코드: ${docSnap.id}</div>`;
                 item.className = 'text-left p-2 bg-gray-100 rounded-lg hover:bg-gray-200 flex-shrink-0';
@@ -361,6 +362,7 @@
             if (!auth?.currentUser || !bookCode) return;
             const user = auth.currentUser;
             const likeRef = doc(db, `Book/${bookCode}/likes`, user.uid);
+            const countEl = document.getElementById('book-like-count');
             try {
                 await runTransaction(db, async (tx) => {
                     const likeDoc = await tx.get(likeRef);
@@ -368,6 +370,7 @@
                     tx.set(likeRef, { createdAt: serverTimestamp() });
                     tx.update(doc(db, 'Book', bookCode), { likesCount: increment(1) });
                 });
+                countEl.textContent = (Number(countEl.textContent) + 1).toString();
             } catch (e) {
                 console.error(e);
             }
@@ -427,6 +430,7 @@
                     createdAt: serverTimestamp(),
                     likesCount: 0
                 });
+                await updateDoc(doc(db, 'Book', bookCode), { commentsCount: increment(1) });
             } catch (err) {
                 console.error(err);
             }
