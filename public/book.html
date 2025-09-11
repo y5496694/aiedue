@@ -488,10 +488,14 @@
             window.syncBookAuthor();
 
             if (data.coverImage) {
-                const url = await getDownloadURL(storageRef(storage, `Book/${bookCode}/${data.coverImage}`));
-                const coverPage = document.querySelector('#spread-0 .book-page:nth-child(2)');
-                coverPage.style.backgroundImage = `url('${url}')`;
-                coverPage.dataset.imageName = data.coverImage;
+                try {
+                    const url = await getDownloadURL(storageRef(storage, `Book/${bookCode}/${data.coverImage}`));
+                    const coverPage = document.querySelector('#spread-0 .book-page:nth-child(2)');
+                    coverPage.style.backgroundImage = `url('${url}')`;
+                    coverPage.dataset.imageName = data.coverImage;
+                } catch (e) {
+                    console.error(e);
+                }
             }
 
             const charPages = document.querySelectorAll('.book-spread[data-page-type="character"] .book-page');
@@ -500,11 +504,15 @@
                 const page = charPages[i];
                 const imgName = data[`character${idx}Image`];
                 if (imgName) {
-                    const url = await getDownloadURL(storageRef(storage, `Book/${bookCode}/${imgName}`));
-                    const box = page.querySelector('.character-image-box');
-                    box.style.backgroundImage = `url('${url}')`;
-                    box.dataset.imageName = imgName;
-                    box.textContent = '';
+                    try {
+                        const url = await getDownloadURL(storageRef(storage, `Book/${bookCode}/${imgName}`));
+                        const box = page.querySelector('.character-image-box');
+                        box.style.backgroundImage = `url('${url}')`;
+                        box.dataset.imageName = imgName;
+                        box.textContent = '';
+                    } catch (e) {
+                        console.error(e);
+                    }
                 }
                 const nameVal = data[`character${idx}Name`];
                 if (nameVal) page.querySelector('.editable-text').textContent = nameVal;
@@ -527,12 +535,16 @@
                 const spread = storySpreads[i];
                 const imgName = data[`story${idx}Image`];
                 if (imgName) {
-                    const url = await getDownloadURL(storageRef(storage, `Book/${bookCode}/${imgName}`));
-                    const imagePage = spread.querySelector('.book-page:first-child');
-                    const pageNumHTML = imagePage.querySelector('.page-number')?.outerHTML || '';
-                    imagePage.style.backgroundImage = `url('${url}')`;
-                    imagePage.innerHTML = pageNumHTML;
-                    imagePage.dataset.imageName = imgName;
+                    try {
+                        const url = await getDownloadURL(storageRef(storage, `Book/${bookCode}/${imgName}`));
+                        const imagePage = spread.querySelector('.book-page:first-child');
+                        const pageNumHTML = imagePage.querySelector('.page-number')?.outerHTML || '';
+                        imagePage.style.backgroundImage = `url('${url}')`;
+                        imagePage.innerHTML = pageNumHTML;
+                        imagePage.dataset.imageName = imgName;
+                    } catch (e) {
+                        console.error(e);
+                    }
                 }
                 const textVal = data[`story${idx}Text`];
                 if (textVal) spread.querySelector('.book-page:last-child textarea.manual-text-area').value = textVal;
