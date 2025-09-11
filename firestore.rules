@@ -79,9 +79,10 @@ service cloud.firestore {
       allow create: if request.auth != null &&
                     request.resource.data.authorId == request.auth.uid;
 
-      // 읽기: 작성자 또는 교사
+      // 읽기: 공개 책은 모두, 비공개는 작성자 또는 교사만
       allow read: if request.auth != null &&
-                  (resource.data.authorId == request.auth.uid || isTeacher());
+                  (resource.data.isPublic == true ||
+                   resource.data.authorId == request.auth.uid || isTeacher());
 
       // 수정: 작성자 또는 교사이며, authorId를 변경할 수 없음
       // 또한, 좋아요/댓글 수 증가를 위해 likesCount 또는 commentsCount 를
