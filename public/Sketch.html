@@ -81,13 +81,15 @@
                             try {
                                 const data = JSON.parse(e.target.result);
                                 if (excalidrawAPI && data.elements && data.appState) {
-                                    // 이미지 등의 파일이 포함되어 있다면 먼저 추가
-                                    if (data.files) {
-                                        excalidrawAPI.addFiles(data.files);
+                                    // 파일 정보는 객체 형태로 저장되므로 Map으로 변환 후 추가
+                                    const files = data.files ? new Map(Object.entries(data.files)) : null;
+                                    if (files) {
+                                        excalidrawAPI.addFiles(files);
                                     }
                                     excalidrawAPI.updateScene({
                                         elements: data.elements,
                                         appState: data.appState,
+                                        ...(files ? { files } : {}),
                                         commitToHistory: true,
                                     });
                                 } else {
