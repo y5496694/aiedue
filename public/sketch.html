@@ -45,7 +45,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, serverTimestamp, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { getStorage, ref as storageRef, uploadBytes, getBlob, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDCeJPDQUNi-KmJ9DhkTRIu-9t2PGZCpt0",
@@ -85,9 +85,9 @@
                         (async () => {
                             try {
                                 const fileRef = storageRef(storage, `sketches/${user.uid}/${currentSketchId}.excalidraw`);
-                                const url = await getDownloadURL(fileRef);
-                                const res = await fetch(url);
-                                const data = await res.json();
+                                const blob = await getBlob(fileRef);
+                                const text = await blob.text();
+                                const data = JSON.parse(text);
                                 const files = data.files ? new Map(Object.entries(data.files)) : null;
                                 if (files) excalidrawAPI.addFiles(files);
                                 const appState = {
