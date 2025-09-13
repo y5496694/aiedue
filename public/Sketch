@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Excalidraw 웹 앱</title>
+    
+    <!-- Tailwind CSS 로드 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React 및 ReactDOM 로드 -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    
+    <!-- Excalidraw 라이브러리 로드 -->
+    <script src="https://unpkg.com/@excalidraw/excalidraw@0.17.5/dist/excalidraw.production.min.js" crossorigin></script>
+    
+    <!-- JSX를 브라우저에서 직접 변환하기 위한 Babel 로드 -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        /* Excalidraw가 전체 화면을 차지하도록 스타일 설정 */
+        html, body, #root {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+        }
+        #root {
+            display: flex;
+            flex-direction: column;
+        }
+        .excalidraw-wrapper {
+            flex-grow: 1; /* 남은 공간을 모두 차지하도록 설정 */
+            position: relative; /* Excalidraw가 이 컨테이너를 기준으로 렌더링되도록 함 */
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // 페이지의 모든 리소스(Excalidraw 스크립트 포함)가 로드된 후 React 앱을 렌더링합니다.
+        window.addEventListener('load', () => {
+            const Excalidraw = window.ExcalidrawLib.Excalidraw;
+
+            function App() {
+                const [excalidrawAPI, setExcalidrawAPI] = React.useState(null);
+
+                // 파일 저장 함수
+                const handleSaveToFile = () => {
+                    if (!excalidrawAPI) return;
+                    const elements = excalidrawAPI.getSceneElements();
+                    const appState = excalidrawAPI.getAppState();
+                    const data = JSON.stringify({
+                        type: "excalidraw", version: 2, source: "https://gemini.google.com",
+                        elements: elements, appState: appState,
+                    }, null, 2);
+                    const blob = new Blob([data], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `drawing-${Date.now()}.excalidraw`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                };
+
+                // 파일 불러오기 함수
+                const handleLoadFromFile = () => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = ".excalidraw, .json";
+                    input.onchange = (event) => {
+                        const file = event.target.files[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            try {
+                                const data = JSON.parse(e.target.result);
+                                if (data.elements && data.appState && excalidrawAPI) {
+                                    excalidrawAPI.updateScene({
+                                        elements: data.elements,
+                                        appState: data.appState,
+                                        commitToHistory: true,
+                                    });
+                                } else {
+                                    alert("유효하지 않은 Excalidraw 파일입니다.");
+                                }
+                            } catch (error) {
+                                console.error("파일을 읽는 중 오류가 발생했습니다.", error);
+                                alert("파일을 불러오는 데 실패했습니다.");
+                            }
+                        };
+                        reader.readAsText(file);
+                    };
+                    input.click();
+                };
+
+                return (
+                    <>
+                        {/* 상단 헤더 영역 */}
+                        <header className="flex items-center justify-between p-2 shadow-md bg-white z-10">
+                            {/* 로고 */}
+                            <div className="flex items-center space-x-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                                <span className="font-bold text-lg text-gray-800">에이두 스케치</span>
+                            </div>
+
+                            {/* 버튼들 */}
+                            <div className="flex space-x-2">
+                                <button onClick={handleSaveToFile} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all">파일로 저장하기</button>
+                                <button onClick={handleLoadFromFile} className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all">파일 불러오기</button>
+                            </div>
+                        </header>
+                        
+                        {/* Excalidraw 캔버스 영역 */}
+                        <div className="excalidraw-wrapper">
+                            <Excalidraw
+                                excalidrawAPI={(api) => setExcalidrawAPI(api)}
+                                langCode="ko-KR"
+                            />
+                        </div>
+                    </>
+                );
+            }
+
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<App />);
+        });
+    </script>
+</body>
+</html>
+
