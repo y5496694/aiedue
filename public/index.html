@@ -336,7 +336,7 @@
                     <h2 class="text-2xl font-bold">📚 에이두 도서관</h2>
                     <a href="book.html" id="create-ai-book-btn" class="btn btn-primary flex items-center gap-2">📚 <span>에이두 북메이커</span></a>
                 </div>
-                <p>준비중입니다.</p>
+                <div id="library-book-list" class="flex items-center gap-2 overflow-x-auto"></div>
             </div>
             <div id="reading-log-tab-content" class="tab-content">
                 <div class="flex justify-between items-center mb-4">
@@ -400,6 +400,12 @@
             <h3 id="modal-title" class="text-xl font-bold mb-4"></h3>
             <p id="modal-message" class="mb-6"></p>
             <button id="modal-confirm-btn" class="py-2 px-6 rounded-md btn btn-primary">확인</button>
+        </div>
+    </div>
+    <div id="library-book-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-full">
+            <span class="close-button" id="close-library-book-modal">&times;</span>
+            <iframe id="library-book-iframe" class="w-full h-full rounded" src=""></iframe>
         </div>
     </div>
     <div id="homework-modal" class="modal-overlay hidden">
@@ -1075,6 +1081,7 @@
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, runTransaction, updateDoc, increment, deleteField, serverTimestamp, Timestamp, orderBy, addDoc, deleteDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
+        import { getStorage, ref as storageRef, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // IMPORTANT: Replace with your actual Firebase config
         const firebaseConfig = {
@@ -1088,6 +1095,7 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const storage = getStorage(app);
         const functions = getFunctions(app, 'asia-northeast3');
 
         // --- Global State ---
@@ -1145,6 +1153,9 @@
         const bookActivityCreationModal = document.getElementById('book-activity-creation-modal');
         const bookActivityModal = document.getElementById('book-activity-modal');
         const openBookPageLink = document.getElementById('open-book-page-link');
+        const libraryBookModal = document.getElementById('library-book-modal');
+        const libraryBookIframe = document.getElementById('library-book-iframe');
+        const closeLibraryBookModalBtn = document.getElementById('close-library-book-modal');
         const readingLogEntryModal = document.getElementById('reading-log-entry-modal');
         const editInfoModal = document.getElementById('edit-info-modal');
         let studentToAdjustId = null;
@@ -1224,6 +1235,8 @@
                 switchTab('dashboard', tab.dataset.tab);
                 if (tab.dataset.tab === 'reading-log') {
                     renderReadingLog();
+                } else if (tab.dataset.tab === 'library') {
+                    loadLibraryBooks();
                 }
             });
         });
@@ -4931,6 +4944,44 @@
             });
             readingLogEntryModal.style.display = 'flex';
         }
+
+        async function loadLibraryBooks() {
+            const listEl = document.getElementById('library-book-list');
+            if (!listEl) return;
+            listEl.innerHTML = '';
+            const q = query(collection(db, 'Book'), where('isPublic', '==', true));
+            const snap = await getDocs(q);
+            for (const docSnap of snap.docs) {
+                const data = docSnap.data();
+                const item = document.createElement('button');
+                let coverUrl = '';
+                if (data.coverImage) {
+                    try {
+                        coverUrl = await getDownloadURL(storageRef(storage, `Book/${docSnap.id}/${data.coverImage}`));
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }
+                item.innerHTML = `<div class="w-32 h-40 bg-gray-200 bg-cover bg-center mb-2"${coverUrl ? ` style="background-image:url('${coverUrl}')"` : ''}></div>` +
+                                 `<div class="font-semibold">${data.title || '제목없음'}</div>` +
+                                 `<div class="text-xs text-gray-600">좋아요 ${data.likesCount || 0} · 댓글 ${data.commentsCount || 0}</div>` +
+                                 `<div class="text-xs text-gray-600">글쓴이: ${data.author || ''}</div>` +
+                                 `<div class="text-xs text-gray-600">코드: ${docSnap.id}</div>`;
+                item.className = 'text-left p-2 bg-gray-100 rounded-lg hover:bg-gray-200 flex-shrink-0';
+                item.addEventListener('click', () => openLibraryBook(docSnap.id));
+                listEl.appendChild(item);
+            }
+        }
+
+        function openLibraryBook(bookId) {
+            libraryBookIframe.src = `book.html?bookId=${bookId}`;
+            libraryBookModal.style.display = 'flex';
+        }
+
+        closeLibraryBookModalBtn.addEventListener('click', () => {
+            libraryBookModal.style.display = 'none';
+            libraryBookIframe.src = '';
+        });
 
         document.querySelectorAll('.edit-info-btn').forEach(btn => {
             btn.addEventListener('click', () => {
