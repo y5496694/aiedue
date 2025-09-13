@@ -340,7 +340,9 @@
                 <div id="library-book-list" class="flex items-center gap-2 overflow-x-auto"></div>
             </div>
             <div id="sketchbook-tab-content" class="tab-content">
-                <iframe id="sketchbook-iframe" src="" class="w-full h-[80vh] border rounded"></iframe>
+                <div class="flex items-end justify-end h-[80vh]">
+                    <button id="open-sketchbook-btn" class="btn btn-primary">에이두 스케치북 이동</button>
+                </div>
             </div>
             <div id="reading-log-tab-content" class="tab-content">
                 <div class="flex justify-between items-center mb-4">
@@ -1241,14 +1243,16 @@
                     renderReadingLog();
                 } else if (tab.dataset.tab === 'library') {
                     loadLibraryBooks();
-                } else if (tab.dataset.tab === 'sketchbook') {
-                    const iframe = document.getElementById('sketchbook-iframe');
-                    if (iframe && !iframe.src) {
-                        iframe.src = 'Sketch.html';
-                    }
                 }
             });
         });
+
+        const openSketchbookBtn = document.getElementById('open-sketchbook-btn');
+        if (openSketchbookBtn) {
+            openSketchbookBtn.addEventListener('click', () => {
+                window.location.href = 'Sketch.html';
+            });
+        }
         document.querySelectorAll('.admin-tab').forEach(tab => {
             tab.addEventListener('click', () => switchTab('admin', tab.dataset.tab));
         });
