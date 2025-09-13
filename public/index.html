@@ -84,7 +84,7 @@
         }
         .modal-content-full {
             max-width: 95%;
-            width: 95%;
+            width: 80%;
             height: 90vh;
         }
         .book-editor-container {
@@ -190,6 +190,7 @@
                     <button data-tab="learning-problems" id="learning-problems-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">학습 문제 관리</button>
                     <button data-tab="reading-log" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">에이두 독서기록장</button>
                     <button data-tab="library" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm ml-auto">에이두 도서관</button>
+                    <button data-tab="sketchbook" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">에이두 스케치북</button>
                 </nav>
             </div>
 
@@ -337,6 +338,9 @@
                     <a href="book.html" id="create-ai-book-btn" class="btn btn-primary flex items-center gap-2">📚 <span>에이두 북메이커</span></a>
                 </div>
                 <div id="library-book-list" class="flex items-center gap-2 overflow-x-auto"></div>
+            </div>
+            <div id="sketchbook-tab-content" class="tab-content">
+                <iframe id="sketchbook-iframe" src="" class="w-full h-[80vh] border rounded"></iframe>
             </div>
             <div id="reading-log-tab-content" class="tab-content">
                 <div class="flex justify-between items-center mb-4">
@@ -1237,6 +1241,11 @@
                     renderReadingLog();
                 } else if (tab.dataset.tab === 'library') {
                     loadLibraryBooks();
+                } else if (tab.dataset.tab === 'sketchbook') {
+                    const iframe = document.getElementById('sketchbook-iframe');
+                    if (iframe && !iframe.src) {
+                        iframe.src = 'Sketch.html';
+                    }
                 }
             });
         });
