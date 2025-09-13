@@ -84,7 +84,8 @@
                     if (user && excalidrawAPI && currentSketchId) {
                         (async () => {
                             try {
-                                const fileRef = storageRef(storage, `sketches/${user.uid}/${currentSketchId}.excalidraw`);
+                                // 사용자별 경로 대신 스케치 ID만으로 파일을 로드합니다
+                                const fileRef = storageRef(storage, `sketches/${currentSketchId}.excalidraw`);
                                 const blob = await getBlob(fileRef);
                                 const text = await blob.text();
                                 const data = JSON.parse(text);
@@ -110,7 +111,8 @@
                         type: 'excalidraw', version: 2, source: 'https://gemini.google.com',
                         elements, appState,
                     }, null, 2);
-                    const fileRef = storageRef(storage, `sketches/${user.uid}/${currentSketchId}.excalidraw`);
+                    // 사용자별 경로 대신 스케치 ID만으로 파일을 저장합니다
+                    const fileRef = storageRef(storage, `sketches/${currentSketchId}.excalidraw`);
                     await uploadBytes(fileRef, new Blob([data], { type: 'application/json' }));
                     alert('저장되었습니다.');
                 };
@@ -183,7 +185,8 @@
                     if (!confirm('정말 삭제하시겠습니까?')) return;
                     await deleteDoc(doc(db, 'users', user.uid, 'sketches', currentSketchId));
                     try {
-                        await deleteObject(storageRef(storage, `sketches/${user.uid}/${currentSketchId}.excalidraw`));
+                        // 사용자별 경로 대신 스케치 ID만으로 파일을 삭제합니다
+                        await deleteObject(storageRef(storage, `sketches/${currentSketchId}.excalidraw`));
                     } catch (e) {
                         console.error(e);
                     }

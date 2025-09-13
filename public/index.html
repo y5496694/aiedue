@@ -1296,7 +1296,8 @@
                     if (confirm('정말 삭제하시겠습니까?')) {
                         await deleteDoc(doc(db, 'users', currentAuthUser.uid, 'sketches', docSnap.id));
                         try {
-                            await deleteObject(storageRef(storage, `sketches/${currentAuthUser.uid}/${docSnap.id}.excalidraw`));
+                            // 사용자별 경로 대신 스케치 ID만으로 파일을 삭제합니다
+                            await deleteObject(storageRef(storage, `sketches/${docSnap.id}.excalidraw`));
                         } catch (err) {
                             console.error(err);
                         }
