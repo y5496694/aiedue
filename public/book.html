@@ -1895,6 +1895,8 @@
                 const params = new URLSearchParams(window.location.search);
                 const initialBook = params.get('bookId');
                 if (initialBook) {
+                    // 사용자가 에이두 도서관에서 선택한 책을 바로 볼 수 있도록
+                    libraryTab.click();
                     await loadBook(initialBook);
                 }
             } else {
