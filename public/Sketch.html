@@ -86,10 +86,16 @@
                                     if (files) {
                                         excalidrawAPI.addFiles(files);
                                     }
+                                    // collaborators는 Map 구조여야 하므로 JSON 데이터를 Map으로 변환
+                                    const appState = {
+                                        ...data.appState,
+                                        collaborators: new Map(
+                                            Object.entries(data.appState.collaborators || {})
+                                        ),
+                                    };
                                     excalidrawAPI.updateScene({
                                         elements: data.elements,
-                                        appState: data.appState,
-                                        ...(files ? { files } : {}),
+                                        appState,
                                         commitToHistory: true,
                                     });
                                 } else {
