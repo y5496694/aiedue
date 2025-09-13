@@ -1892,6 +1892,11 @@
                 await updateUserInfo();
                 await loadUserBooks();
                 await loadLibraryBooks();
+                const params = new URLSearchParams(window.location.search);
+                const initialBook = params.get('bookId');
+                if (initialBook) {
+                    await loadBook(initialBook);
+                }
             } else {
                 loginView.classList.remove('hidden');
                 registerView.classList.add('hidden');
