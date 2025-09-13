@@ -1263,6 +1263,8 @@
             snap.forEach(docSnap => {
                 const li = document.createElement('li');
                 li.className = 'p-2 bg-white rounded shadow flex justify-between items-center';
+                // 각 항목에 스케치 고유 코드를 저장합니다
+                li.dataset.sketchId = docSnap.id;
 
                 const nameSpan = document.createElement('span');
                 nameSpan.className = 'flex-1 cursor-pointer';
@@ -1296,8 +1298,8 @@
                     if (confirm('정말 삭제하시겠습니까?')) {
                         await deleteDoc(doc(db, 'users', currentAuthUser.uid, 'sketches', docSnap.id));
                         try {
-                            // 사용자별 경로 대신 스케치 ID만으로 파일을 삭제합니다
-                            await deleteObject(storageRef(storage, `sketches/${docSnap.id}.excalidraw`));
+                            // 사용자별 경로를 포함하여 파일을 삭제합니다
+                            await deleteObject(storageRef(storage, `sketch/${currentAuthUser.uid}/${docSnap.id}.excalidraw`));
                         } catch (err) {
                             console.error(err);
                         }
