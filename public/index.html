@@ -1091,7 +1091,7 @@
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, runTransaction, updateDoc, increment, deleteField, serverTimestamp, Timestamp, orderBy, addDoc, deleteDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
-        import { getStorage, ref as storageRef, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { getStorage, ref as storageRef, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // IMPORTANT: Replace with your actual Firebase config
         const firebaseConfig = {
@@ -1262,11 +1262,51 @@
             sketchbookListEl.innerHTML = '';
             snap.forEach(docSnap => {
                 const li = document.createElement('li');
-                li.className = 'p-2 bg-white rounded shadow cursor-pointer';
-                li.textContent = docSnap.data().name || '새 스케치북';
-                li.addEventListener('click', () => {
+                li.className = 'p-2 bg-white rounded shadow flex justify-between items-center';
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'flex-1 cursor-pointer';
+                nameSpan.textContent = docSnap.data().name || '새 스케치북';
+                nameSpan.addEventListener('click', () => {
                     window.open(`sketch.html?sketchId=${docSnap.id}`, '_blank');
                 });
+                li.appendChild(nameSpan);
+
+                const btnContainer = document.createElement('div');
+                btnContainer.className = 'flex space-x-2';
+
+                const renameBtn = document.createElement('button');
+                renameBtn.className = 'text-blue-500';
+                renameBtn.textContent = '이름 변경';
+                renameBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const newName = prompt('새 이름을 입력하세요', nameSpan.textContent);
+                    if (newName) {
+                        await updateDoc(doc(db, 'users', currentAuthUser.uid, 'sketches', docSnap.id), { name: newName });
+                        renderSketchbookList();
+                    }
+                });
+                btnContainer.appendChild(renameBtn);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'text-red-500';
+                deleteBtn.textContent = '삭제';
+                deleteBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    if (confirm('정말 삭제하시겠습니까?')) {
+                        await deleteDoc(doc(db, 'users', currentAuthUser.uid, 'sketches', docSnap.id));
+                        try {
+                            await deleteObject(storageRef(storage, `sketches/${currentAuthUser.uid}/${docSnap.id}.excalidraw`));
+                        } catch (err) {
+                            console.error(err);
+                        }
+                        renderSketchbookList();
+                    }
+                });
+                btnContainer.appendChild(deleteBtn);
+
+                li.appendChild(btnContainer);
+
                 sketchbookListEl.appendChild(li);
             });
         }

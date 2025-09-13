@@ -44,8 +44,8 @@
     <script type="text/babel" data-type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { getFirestore, collection, addDoc, getDocs, serverTimestamp, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDCeJPDQUNi-KmJ9DhkTRIu-9t2PGZCpt0",
@@ -168,6 +168,33 @@
                     window.location.href = `sketch.html?sketchId=${docRef.id}`;
                 };
 
+                const handleRenameSketch = async () => {
+                    if (!user || !currentSketchId) return;
+                    const current = sketches.find(s => s.id === currentSketchId);
+                    const newName = prompt('새 이름을 입력하세요', current?.name || '새 스케치북');
+                    if (newName) {
+                        await updateDoc(doc(db, 'users', user.uid, 'sketches', currentSketchId), { name: newName });
+                        setSketches(sketches.map(s => s.id === currentSketchId ? { ...s, name: newName } : s));
+                    }
+                };
+
+                const handleDeleteSketch = async () => {
+                    if (!user || !currentSketchId) return;
+                    if (!confirm('정말 삭제하시겠습니까?')) return;
+                    await deleteDoc(doc(db, 'users', user.uid, 'sketches', currentSketchId));
+                    try {
+                        await deleteObject(storageRef(storage, `sketches/${user.uid}/${currentSketchId}.excalidraw`));
+                    } catch (e) {
+                        console.error(e);
+                    }
+                    const remaining = sketches.filter(s => s.id !== currentSketchId);
+                    if (remaining.length > 0) {
+                        window.location.href = `sketch.html?sketchId=${remaining[0].id}`;
+                    } else {
+                        window.location.href = 'index.html';
+                    }
+                };
+
                 return (
                     <>
                         <header className="flex items-center justify-between p-2 shadow-md bg-white z-10">
@@ -180,6 +207,8 @@
                                     {sketches.map(s => <option key={s.id} value={s.id}>{s.name || '새 스케치북'}</option>)}
                                 </select>
                                 <button onClick={handleCreateSketch} className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg shadow-md transition-all">스케치북 만들기</button>
+                                <button onClick={handleRenameSketch} className="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-3 rounded-lg shadow-md transition-all">이름 변경</button>
+                                <button onClick={handleDeleteSketch} className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg shadow-md transition-all">삭제</button>
                                 <button onClick={handleSave} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all">저장하기</button>
                                 <button onClick={handleLoadFromFile} className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all">파일 불러오기</button>
                             </div>
