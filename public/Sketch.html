@@ -71,7 +71,8 @@
                 const handleLoadFromFile = () => {
                     const input = document.createElement('input');
                     input.type = 'file';
-                    input.accept = ".excalidraw, .json";
+                    // Excalidraw 또는 JSON 포맷의 파일만 선택하도록 제한
+                    input.accept = ".excalidraw,.json";
                     input.onchange = (event) => {
                         const file = event.target.files[0];
                         if (!file) return;
@@ -79,7 +80,11 @@
                         reader.onload = (e) => {
                             try {
                                 const data = JSON.parse(e.target.result);
-                                if (data.elements && data.appState && excalidrawAPI) {
+                                if (excalidrawAPI && data.elements && data.appState) {
+                                    // 이미지 등의 파일이 포함되어 있다면 먼저 추가
+                                    if (data.files) {
+                                        excalidrawAPI.addFiles(data.files);
+                                    }
                                     excalidrawAPI.updateScene({
                                         elements: data.elements,
                                         appState: data.appState,
@@ -93,7 +98,7 @@
                                 alert("파일을 불러오는 데 실패했습니다.");
                             }
                         };
-                        reader.readAsText(file);
+                        reader.readAsText(file, 'utf-8');
                     };
                     input.click();
                 };
