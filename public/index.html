@@ -340,8 +340,12 @@
                 <div id="library-book-list" class="flex items-center gap-2 overflow-x-auto"></div>
             </div>
             <div id="sketchbook-tab-content" class="tab-content">
-                <div class="flex items-start justify-end h-[80vh] p-4">
-                    <button id="open-sketchbook-btn" class="btn btn-primary">에이두 스케치북 이동</button>
+                <div class="p-4 h-[80vh] flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold">🎨 에이두 스케치북</h2>
+                        <button id="create-sketch-btn" class="btn btn-primary">스케치북 만들기</button>
+                    </div>
+                    <ul id="sketchbook-list" class="space-y-2 overflow-y-auto"></ul>
                 </div>
             </div>
             <div id="reading-log-tab-content" class="tab-content">
@@ -1243,14 +1247,39 @@
                     renderReadingLog();
                 } else if (tab.dataset.tab === 'library') {
                     loadLibraryBooks();
+                } else if (tab.dataset.tab === 'sketchbook') {
+                    renderSketchbookList();
                 }
             });
         });
 
-        const openSketchbookBtn = document.getElementById('open-sketchbook-btn');
-        if (openSketchbookBtn) {
-            openSketchbookBtn.addEventListener('click', () => {
-                window.location.href = 'Sketch.html';
+        const createSketchBtn = document.getElementById('create-sketch-btn');
+        const sketchbookListEl = document.getElementById('sketchbook-list');
+
+        async function renderSketchbookList() {
+            if (!currentAuthUser || !sketchbookListEl) return;
+            const snap = await getDocs(collection(db, 'users', currentAuthUser.uid, 'sketches'));
+            sketchbookListEl.innerHTML = '';
+            snap.forEach(docSnap => {
+                const li = document.createElement('li');
+                li.className = 'p-2 bg-white rounded shadow cursor-pointer';
+                li.textContent = docSnap.data().name || '새 스케치북';
+                li.addEventListener('click', () => {
+                    window.open(`sketch.html?sketchId=${docSnap.id}`, '_blank');
+                });
+                sketchbookListEl.appendChild(li);
+            });
+        }
+
+        if (createSketchBtn) {
+            createSketchBtn.addEventListener('click', async () => {
+                if (!currentAuthUser) return;
+                const docRef = await addDoc(collection(db, 'users', currentAuthUser.uid, 'sketches'), {
+                    name: '새 스케치북',
+                    createdAt: serverTimestamp()
+                });
+                await renderSketchbookList();
+                window.open(`sketch.html?sketchId=${docRef.id}`, '_blank');
             });
         }
         document.querySelectorAll('.admin-tab').forEach(tab => {
