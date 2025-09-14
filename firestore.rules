@@ -79,6 +79,11 @@ service cloud.firestore {
       match /ieps/{iepId} {
         allow read, write: if request.auth.uid == userId && isTeacher();
       }
+
+      // ✨ [에이두 스페셜] 성취 기준 기록
+      match /achievements/{achievementId} {
+        allow read, write: if request.auth.uid == userId && isTeacher();
+      }
     }
 
     // ──────────────────────────────────────────────────────────────
