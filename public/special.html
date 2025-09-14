@@ -124,11 +124,11 @@
                 <div id="my-class-view" class="hidden">
                     <h2 class="text-3xl font-bold mb-6">내 학급 관리</h2>
                     <div class="bg-white p-6 rounded-lg shadow-lg">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold">내 학급</h3>
+                        <div id="class-header" class="flex justify-between items-center mb-4">
+                            <h3 id="class-title" class="text-xl font-bold">내 학급</h3>
                             <button id="add-class-btn" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded">내 학급 만들기</button>
                         </div>
-                        <div id="class-list" class="space-y-4">
+                        <div id="class-list" class="space-y-3">
                             <!-- Class items will be dynamically inserted here -->
                         </div>
                     </div>
@@ -415,42 +415,47 @@
         // --- My Class View Logic ---
         const addClassBtn = document.getElementById('add-class-btn');
         const classListContainer = document.getElementById('class-list');
+        const classTitle = document.getElementById('class-title');
 
         async function loadClasses() {
             const user = auth.currentUser;
             if (!user) return;
-         classListContainer.innerHTML = '<p class="text-gray-500">로딩 중...</p>';
-         const classRef = doc(db, 'classes', user.uid);
-         try {
-             const classSnap = await getDoc(classRef);
-             classListContainer.innerHTML = '';
-             if (!classSnap.exists()) {
-                 classListContainer.innerHTML = `<p class="text-gray-500">생성된 학급이 없습니다.</p>`;
-                 return;
-             }
-             const data = classSnap.data();
-             const studentIds = data.students || [];
-             let listHtml = '';
-             for (const sid of studentIds) {
-                 try {
-                     const sd = await getDoc(doc(db, 'users', sid));
-                     if (sd.exists()) {
-                         const s = sd.data();
-                         listHtml += `<li class="flex justify-between items-center"><span>${s.name}</span></li>`;
-                     }
-                 } catch (err) {
-                     listHtml += `<li class="text-red-500">오류: ${err.message}</li>`;
-                 }
-             }
-             classListContainer.innerHTML = `
-                 <div class="flex justify-between items-center mb-2">
-                     <h4 class="text-lg font-bold">${data.name || '내 학급'}</h4>
-                 </div>
-                 <ul class="list-disc list-inside space-y-1">${listHtml || '<li class="text-sm text-gray-500">학생 없음</li>'}</ul>
-             `;
-         } catch (error) {
-             classListContainer.innerHTML = '<p class="text-red-500">학급 정보를 불러오지 못했습니다.</p>';
-         }
+            classListContainer.innerHTML = '<p class="text-gray-500">로딩 중...</p>';
+            const classRef = doc(db, 'classes', user.uid);
+            try {
+                const classSnap = await getDoc(classRef);
+                classListContainer.innerHTML = '';
+                if (!classSnap.exists()) {
+                    addClassBtn.classList.remove('hidden');
+                    classTitle.textContent = '내 학급';
+                    classListContainer.innerHTML = `<p class="text-gray-500">생성된 학급이 없습니다.</p>`;
+                    return;
+                }
+                const data = classSnap.data();
+                classTitle.textContent = data.name || '내 학급';
+                addClassBtn.classList.add('hidden');
+                const studentIds = data.students || [];
+                if (studentIds.length === 0) {
+                    classListContainer.innerHTML = '<p class="text-gray-500">학생이 없습니다.</p>';
+                } else {
+                    for (const sid of studentIds) {
+                        try {
+                            const sd = await getDoc(doc(db, 'users', sid));
+                            if (sd.exists()) {
+                                const s = sd.data();
+                                const studentEl = document.createElement('div');
+                                studentEl.className = 'p-3 border rounded-md';
+                                studentEl.textContent = s.name || sid;
+                                classListContainer.appendChild(studentEl);
+                            }
+                        } catch (err) {
+                            console.error(err);
+                        }
+                    }
+                }
+            } catch (error) {
+                classListContainer.innerHTML = '<p class="text-red-500">학급 정보를 불러오지 못했습니다.</p>';
+            }
         }
         
          addClassBtn.addEventListener('click', async () => {
