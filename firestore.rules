@@ -69,6 +69,16 @@ service cloud.firestore {
         allow read, write:
           if request.auth.uid == userId || isTeacher();
       }
+
+      // ✨ [에이두 스페셜] 학급 관리
+      match /classes/{classId} {
+        allow read, write: if request.auth.uid == userId && isTeacher();
+      }
+
+      // ✨ [에이두 스페셜] 개별화교육계획(IEP)
+      match /ieps/{iepId} {
+        allow read, write: if request.auth.uid == userId && isTeacher();
+      }
     }
 
     // ──────────────────────────────────────────────────────────────
