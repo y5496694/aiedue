@@ -422,12 +422,13 @@
             if (!table) return;
             const rows = table.querySelectorAll('tbody tr');
             const states = Array.from(rows).map(tr => {
-                const arr = [];
+                // Firestore does not support nested arrays, so store each row as an object
+                const rowObj = {};
                 for (let i = 1; i < tr.cells.length; i++) {
                     const btn = tr.cells[i].querySelector('button');
-                    arr.push(parseInt(btn.dataset.state || '0'));
+                    rowObj[i - 1] = parseInt(btn.dataset.state || '0');
                 }
-                return arr;
+                return rowObj;
             });
             const key = `${getActiveValue(levelButtons)}_${getActiveValue(subjectButtons)}`;
             currentAchievementData[key] = states;
