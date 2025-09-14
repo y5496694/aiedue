@@ -125,8 +125,8 @@
                     <h2 class="text-3xl font-bold mb-6">내 학급 관리</h2>
                     <div class="bg-white p-6 rounded-lg shadow-lg">
                         <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold">학급 목록</h3>
-                            <button id="add-class-btn" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded">새 학급 추가</button>
+                            <h3 class="text-xl font-bold">내 학급</h3>
+                            <button id="add-class-btn" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded">내 학급 만들기</button>
                         </div>
                         <div id="class-list" class="space-y-4">
                             <!-- Class items will be dynamically inserted here -->
@@ -234,7 +234,7 @@
         // Firebase v10 SDK
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, getDocs, doc, getDoc, deleteDoc, updateDoc, serverTimestamp, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, getDocs, doc, getDoc, setDoc, updateDoc, serverTimestamp, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         const firebaseConfig = {
             // Your web app's Firebase configuration
@@ -362,39 +362,50 @@
             const user = auth.currentUser;
             if (!user) return;
 
-            const classesRef = collection(db, "users", user.uid, "classes");
-            const iepsRef = collection(db, "users", user.uid, "ieps");
-            
-            const [classSnap, iepSnap] = await Promise.all([getDocs(classesRef), getDocs(iepsRef)]);
-            
-            const classes = [];
-            classSnap.forEach(doc => classes.push({ id: doc.id, ...doc.data() }));
+         const classRef = doc(db, "classes", user.uid);
+         const iepsRef = collection(db, "users", user.uid, "ieps");
 
-            // Update home class list
-            const homeClassList = document.getElementById('home-class-list');
-            homeClassList.innerHTML = '';
-             if (classes.length === 0) {
-                 homeClassList.innerHTML = `<p class="text-gray-500">아직 추가된 학급이 없습니다. '내 학급 관리'에서 추가해주세요.</p>`;
+         const [classSnap, iepSnap] = await Promise.all([getDoc(classRef), getDocs(iepsRef)]);
+
+         // Update home class list
+         const homeClassList = document.getElementById('home-class-list');
+         homeClassList.innerHTML = '';
+         if (!classSnap.exists()) {
+             homeClassList.innerHTML = `<p class="text-gray-500">아직 추가된 학급이 없습니다. '내 학급 관리'에서 추가해주세요.</p>`;
+         } else {
+             const data = classSnap.data();
+             const studentIds = data.students || [];
+             if (studentIds.length === 0) {
+                 homeClassList.innerHTML = '<p class="text-gray-500">학생이 없습니다.</p>';
              } else {
-                classes.forEach(c => {
-                    const classEl = document.createElement('div');
-                    classEl.className = 'p-3 border rounded-md';
-                    classEl.innerHTML = `<p class="font-semibold">${c.name} (${c.year}학년도)</p>`;
-                    homeClassList.appendChild(classEl);
-                });
-            }
+                 for (const sid of studentIds) {
+                     try {
+                         const sd = await getDoc(doc(db, 'users', sid));
+                         if (sd.exists()) {
+                             const s = sd.data();
+                             const studentEl = document.createElement('div');
+                             studentEl.className = 'p-3 border rounded-md';
+                             studentEl.textContent = s.name || sid;
+                             homeClassList.appendChild(studentEl);
+                         }
+                     } catch (err) {
+                         console.error(err);
+                     }
+                 }
+             }
+         }
 
 
             // Update stats chart
-            const statsData = {
-                labels: ['학급', 'IEP'],
-                datasets: [{
-                    label: '업무 수',
-                    data: [classSnap.size, iepSnap.size],
-                    backgroundColor: ['#38bdf8', '#fbbf24'], // sky-400, amber-400
-                    hoverOffset: 4
-                }]
-            };
+         const statsData = {
+             labels: ['학급', 'IEP'],
+             datasets: [{
+                 label: '업무 수',
+                 data: [classSnap.exists() ? 1 : 0, iepSnap.size],
+                 backgroundColor: ['#38bdf8', '#fbbf24'], // sky-400, amber-400
+                 hoverOffset: 4
+             }]
+         };
             updateChart('statsChart', 'statsChartInstance', 'doughnut', statsData, {
                 responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { position: 'bottom' } }
@@ -408,56 +419,56 @@
         async function loadClasses() {
             const user = auth.currentUser;
             if (!user) return;
-            const q = query(collection(db, "users", user.uid, "classes"), orderBy("createdAt", "desc"));
-            const querySnapshot = await getDocs(q);
-            classListContainer.innerHTML = '';
-            if (querySnapshot.empty) {
-                classListContainer.innerHTML = `<p class="text-gray-500">생성된 학급이 없습니다.</p>`;
-                return;
-            }
-            querySnapshot.forEach(doc => {
-                const classData = doc.data();
-                const classEl = document.createElement('div');
-                classEl.className = 'flex justify-between items-center p-4 border rounded-lg';
-                classEl.innerHTML = `
-                    <div>
-                        <p class="text-lg font-bold">${classData.name}</p>
-                        <p class="text-sm text-gray-500">${classData.year}학년도</p>
-                    </div>
-                    <div>
-                        <button class="delete-class-btn text-red-500 hover:text-red-700" data-id="${doc.id}">삭제</button>
-                    </div>
-                `;
-                classListContainer.appendChild(classEl);
-            });
-            
-            // Add event listeners to delete buttons
-            document.querySelectorAll('.delete-class-btn').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    const docId = e.target.dataset.id;
-                    if(confirm('정말로 이 학급을 삭제하시겠습니까?')) {
-                        await deleteDoc(doc(db, "users", user.uid, "classes", docId));
-                        loadClasses(); // Refresh list
-                    }
-                });
-            });
+         classListContainer.innerHTML = '<p class="text-gray-500">로딩 중...</p>';
+         const classRef = doc(db, 'classes', user.uid);
+         try {
+             const classSnap = await getDoc(classRef);
+             classListContainer.innerHTML = '';
+             if (!classSnap.exists()) {
+                 classListContainer.innerHTML = `<p class="text-gray-500">생성된 학급이 없습니다.</p>`;
+                 return;
+             }
+             const data = classSnap.data();
+             const studentIds = data.students || [];
+             let listHtml = '';
+             for (const sid of studentIds) {
+                 try {
+                     const sd = await getDoc(doc(db, 'users', sid));
+                     if (sd.exists()) {
+                         const s = sd.data();
+                         listHtml += `<li class="flex justify-between items-center"><span>${s.name}</span></li>`;
+                     }
+                 } catch (err) {
+                     listHtml += `<li class="text-red-500">오류: ${err.message}</li>`;
+                 }
+             }
+             classListContainer.innerHTML = `
+                 <div class="flex justify-between items-center mb-2">
+                     <h4 class="text-lg font-bold">${data.name || '내 학급'}</h4>
+                 </div>
+                 <ul class="list-disc list-inside space-y-1">${listHtml || '<li class="text-sm text-gray-500">학생 없음</li>'}</ul>
+             `;
+         } catch (error) {
+             classListContainer.innerHTML = '<p class="text-red-500">학급 정보를 불러오지 못했습니다.</p>';
+         }
         }
         
-        addClassBtn.addEventListener('click', async () => {
-            const user = auth.currentUser;
-            if (!user) return;
-            const className = prompt("새 학급의 이름을 입력하세요:");
-            const classYear = prompt("학년도를 입력하세요 (예: 2025):");
-
-            if (className && classYear) {
-                await addDoc(collection(db, "users", user.uid, "classes"), {
-                    name: className,
-                    year: classYear,
-                    createdAt: serverTimestamp()
-                });
-                loadClasses(); // Refresh list
-            }
-        });
+         addClassBtn.addEventListener('click', async () => {
+             const user = auth.currentUser;
+             if (!user) return;
+             const classRef = doc(db, 'classes', user.uid);
+             const classSnap = await getDoc(classRef);
+             if (classSnap.exists()) {
+                 alert('이미 학급이 존재합니다.');
+                 return;
+             }
+             const className = prompt('학급 이름을 입력하세요:');
+             if (className) {
+                 await setDoc(classRef, { name: className, students: [] });
+                 loadClasses();
+                 loadHomeData();
+             }
+         });
 
 
         // --- IEP View Logic ---
