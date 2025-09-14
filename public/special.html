@@ -243,7 +243,12 @@
                                     <button data-value="math" class="tab-btn py-1 px-3 rounded">수학</button>
                                 </div>
                             </div>
+                            <div>
+                                <span class="font-semibold mr-2">학년(군)</span>
+                                <div id="grade-buttons" class="inline-flex gap-2"></div>
+                            </div>
                         </div>
+                        <button id="save-achievement-btn" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded mb-4">저장</button>
                         <div id="achievement-table" class="overflow-x-auto"></div>
                     </div>
                 </div>
@@ -292,9 +297,12 @@
         const toast = document.getElementById('toast');
         const levelButtons = document.getElementById('level-buttons');
         const subjectButtons = document.getElementById('subject-buttons');
+        const gradeButtons = document.getElementById('grade-buttons');
+        const saveAchievementBtn = document.getElementById('save-achievement-btn');
         const achievementTableContainer = document.getElementById('achievement-table');
         const backToClassBtn = document.getElementById('back-to-class-btn');
         let currentAchievementStudent = '';
+        let currentAchievementData = {};
 
         // Views and Navs
         const views = {
@@ -395,6 +403,7 @@
         levelButtons.querySelectorAll('button').forEach(btn => {
             btn.addEventListener('click', () => {
                 setActiveButton(levelButtons, btn.dataset.value);
+                updateGradeButtons();
                 loadAchievementTable();
             });
         });
@@ -404,6 +413,32 @@
                 setActiveButton(subjectButtons, btn.dataset.value);
                 loadAchievementTable();
             });
+        });
+
+        saveAchievementBtn.addEventListener('click', async () => {
+            const user = auth.currentUser;
+            if (!user) return;
+            const table = achievementTableContainer.querySelector('table');
+            if (!table) return;
+            const rows = table.querySelectorAll('tbody tr');
+            const states = Array.from(rows).map(tr => {
+                const arr = [];
+                for (let i = 1; i < tr.cells.length; i++) {
+                    const btn = tr.cells[i].querySelector('button');
+                    arr.push(parseInt(btn.dataset.state || '0'));
+                }
+                return arr;
+            });
+            const key = `${getActiveValue(levelButtons)}_${getActiveValue(subjectButtons)}`;
+            currentAchievementData[key] = states;
+            try {
+                await setDoc(doc(db, 'users', user.uid, 'achievements', currentAchievementStudent), {
+                    data: currentAchievementData
+                }, { merge: true });
+                showToast('저장되었습니다');
+            } catch (e) {
+                console.error('Error saving achievement data', e);
+            }
         });
 
         // --- Home View Logic ---
@@ -644,22 +679,111 @@
             return html;
         }
 
+        function setButtonState(btn, state) {
+            btn.dataset.state = state;
+            btn.classList.remove('bg-yellow-200', 'bg-green-200', 'bg-opacity-50');
+            if (state === 1) {
+                btn.classList.add('bg-yellow-200', 'bg-opacity-50');
+            } else if (state === 2) {
+                btn.classList.add('bg-green-200', 'bg-opacity-50');
+            }
+        }
+
+        function makeAchievementTableInteractive() {
+            const table = achievementTableContainer.querySelector('table');
+            if (!table) return;
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(tr => {
+                for (let i = 1; i < tr.cells.length; i++) {
+                    const cell = tr.cells[i];
+                    const text = cell.textContent;
+                    cell.innerHTML = `<button type="button" class="w-full text-left px-1 py-0.5 rounded" data-state="0">${text}</button>`;
+                    const btn = cell.querySelector('button');
+                    btn.addEventListener('click', () => {
+                        let state = parseInt(btn.dataset.state);
+                        state = (state + 1) % 3;
+                        setButtonState(btn, state);
+                    });
+                }
+            });
+        }
+
+        function applyAchievementStates() {
+            const key = `${getActiveValue(levelButtons)}_${getActiveValue(subjectButtons)}`;
+            const stateRows = currentAchievementData[key];
+            if (!stateRows) return;
+            const rows = achievementTableContainer.querySelectorAll('tbody tr');
+            rows.forEach((tr, rowIdx) => {
+                for (let i = 1; i < tr.cells.length; i++) {
+                    const btn = tr.cells[i].querySelector('button');
+                    const state = stateRows[rowIdx]?.[i - 1] || 0;
+                    setButtonState(btn, state);
+                }
+            });
+        }
+
+        function applyGradeFilter() {
+            const grade = getActiveValue(gradeButtons);
+            const rows = achievementTableContainer.querySelectorAll('tbody tr');
+            rows.forEach(tr => {
+                const rowGrade = tr.cells[0].textContent.trim();
+                tr.style.display = (grade === 'all' || rowGrade === grade) ? '' : 'none';
+            });
+        }
+
+        function updateGradeButtons() {
+            const level = getActiveValue(levelButtons);
+            let options = [];
+            if (level === 'elementary') {
+                options = [
+                    { value: 'all', label: '전체' },
+                    { value: '1-2학년', label: '1-2학년' },
+                    { value: '3-4학년', label: '3-4학년' },
+                    { value: '5-6학년', label: '5-6학년' },
+                ];
+            } else {
+                options = [
+                    { value: 'all', label: '전체' },
+                    { value: '1', label: '1' },
+                    { value: '2', label: '2' },
+                    { value: '3', label: '3' },
+                ];
+            }
+            gradeButtons.innerHTML = options.map(o => `<button data-value="${o.value}" class="tab-btn py-1 px-3 rounded">${o.label}</button>`).join('');
+            gradeButtons.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    setActiveButton(gradeButtons, btn.dataset.value);
+                    applyGradeFilter();
+                });
+            });
+            setActiveButton(gradeButtons, 'all');
+        }
+
         function loadAchievementTable() {
             const level = getActiveValue(levelButtons);
             const subject = getActiveValue(subjectButtons);
             const md = achievementTables[level]?.[subject];
             if (md) {
                 achievementTableContainer.innerHTML = markdownTableToHtml(md);
+                makeAchievementTableInteractive();
+                applyAchievementStates();
+                applyGradeFilter();
             } else {
                 achievementTableContainer.innerHTML = '<p class="text-gray-500">준비 중입니다.</p>';
             }
         }
 
-        function openAchievementView(studentName) {
+        async function openAchievementView(studentName) {
+            const user = auth.currentUser;
+            if (!user) return;
             currentAchievementStudent = studentName;
+            const docRef = doc(db, 'users', user.uid, 'achievements', studentName);
+            const snap = await getDoc(docRef);
+            currentAchievementData = snap.exists() ? (snap.data().data || {}) : {};
             document.getElementById('achievement-student').textContent = `${studentName} 학생`;
             setActiveButton(levelButtons, 'elementary');
             setActiveButton(subjectButtons, 'korean');
+            updateGradeButtons();
             loadAchievementTable();
             switchView('achievement');
         }
