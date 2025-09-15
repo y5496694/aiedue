@@ -245,7 +245,7 @@
         // Firebase v10 SDK
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, getDocs, doc, getDoc, setDoc, updateDoc, serverTimestamp, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         const firebaseConfig = {
             // Your web app's Firebase configuration
@@ -861,14 +861,50 @@
                 snap.forEach(doc => {
                     const d = doc.data();
                     const date = d.createdAt?.toDate ? d.createdAt.toDate().toLocaleDateString() : '';
-                    html += `<li class="p-2 border rounded cursor-pointer hover:bg-sky-50" data-id="${doc.id}"><div class="flex justify-between"><span>${d.title}</span><span class="text-xs text-gray-500">${date}</span></div></li>`;
+                    html += `<li class="p-2 border rounded flex justify-between items-center hover:bg-sky-50 cursor-pointer" data-id="${doc.id}">
+                                <div class="flex flex-col flex-grow">
+                                    <span class="iep-title">${d.title}</span>
+                                    <span class="text-xs text-gray-500">${date}</span>
+                                </div>
+                                <div class="flex-shrink-0 space-x-1 ml-2">
+                                    <button class="iep-rename-btn text-xs text-sky-600">이름 편집</button>
+                                    <button class="iep-copy-btn text-xs text-green-600">복사</button>
+                                    <button class="iep-delete-btn text-xs text-red-600">삭제</button>
+                                </div>
+                              </li>`;
                 });
                 html += '</ul>';
             }
             iepOutputContainer.innerHTML = html;
             document.getElementById('add-iep-btn').addEventListener('click', () => addIep(studentName));
             iepOutputContainer.querySelectorAll('li[data-id]').forEach(el => {
-                el.addEventListener('click', () => openIepDocument(el.dataset.id, studentName));
+                el.addEventListener('click', (e) => {
+                    if (e.target.closest('button')) return;
+                    openIepDocument(el.dataset.id, studentName);
+                });
+            });
+            iepOutputContainer.querySelectorAll('.iep-delete-btn').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const id = btn.closest('li').dataset.id;
+                    deleteIep(id, studentName);
+                });
+            });
+            iepOutputContainer.querySelectorAll('.iep-rename-btn').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const li = btn.closest('li');
+                    const id = li.dataset.id;
+                    const title = li.querySelector('.iep-title').textContent;
+                    renameIep(id, studentName, title);
+                });
+            });
+            iepOutputContainer.querySelectorAll('.iep-copy-btn').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const id = btn.closest('li').dataset.id;
+                    copyIep(id, studentName);
+                });
             });
         }
 
@@ -888,6 +924,56 @@
             });
             showIepList(studentName);
             openIepDocument(docRef.id, studentName);
+        }
+
+        async function deleteIep(id, studentName) {
+            const user = auth.currentUser;
+            if (!user) return;
+            if (!confirm('삭제하시겠습니까?')) return;
+            await deleteDoc(doc(db, 'users', user.uid, 'ieps', id));
+            showIepList(studentName);
+            showToast('삭제되었습니다');
+        }
+
+        async function renameIep(id, studentName, oldTitle) {
+            const user = auth.currentUser;
+            if (!user) return;
+            const newTitle = prompt('새 이름을 입력하세요', oldTitle);
+            if (!newTitle || !newTitle.trim()) return;
+            await updateDoc(doc(db, 'users', user.uid, 'ieps', id), { title: newTitle.trim() });
+            showIepList(studentName);
+            showToast('이름이 변경되었습니다');
+        }
+
+        async function copyIep(id, studentName) {
+            const user = auth.currentUser;
+            if (!user) return;
+            const docRef = doc(db, 'users', user.uid, 'ieps', id);
+            const snap = await getDoc(docRef);
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const baseTitle = data.title;
+            const iepRef = collection(db, 'users', user.uid, 'ieps');
+            const q = query(iepRef, where('student', '==', studentName));
+            const all = await getDocs(q);
+            let maxCopy = 0;
+            all.forEach(d => {
+                const match = d.data().title.match(new RegExp(`^${baseTitle} - 복사본\\((\\d+)\\)$`));
+                if (match) {
+                    const num = parseInt(match[1]);
+                    if (num > maxCopy) maxCopy = num;
+                }
+            });
+            const newTitle = `${baseTitle} - 복사본(${maxCopy + 1})`;
+            const newDoc = await addDoc(iepRef, {
+                student: studentName,
+                title: newTitle,
+                createdAt: serverTimestamp(),
+                content: data.content || ''
+            });
+            showIepList(studentName);
+            openIepDocument(newDoc.id, studentName);
+            showToast('복사되었습니다!');
         }
 
         async function openIepDocument(id, studentName) {
