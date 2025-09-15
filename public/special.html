@@ -1007,8 +1007,10 @@
         function renderIepContent(id, studentName, data) {
             showModifySection();
             const titleMd = `| **${data.title}** |\n| --- |`;
-            const titleHtml = markdownTableToHtml(titleMd).replace('<th ', '<th class="text-center" ');
-            let html = `<div class="flex justify-between items-center mb-4"><div id="iep-title">${titleHtml}</div><div class="space-x-2"><button id="edit-iep-title" class="text-sm text-sky-600">편집</button><button id="save-iep-btn" class="bg-sky-600 hover:bg-sky-700 text-white text-sm px-3 py-1 rounded">저장</button><button id="save-pdf-btn" class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-3 py-1 rounded">PDF 저장</button></div></div><div id="iep-content">${data.content}</div>`;
+            let titleHtml = markdownTableToHtml(titleMd)
+                .replace('class="min-w-full border border-gray-300 text-sm"', 'class="mx-auto w-auto border border-gray-300 text-xl"')
+                .replace('<th class="border px-2 py-1 bg-gray-100">', '<th class="border px-4 py-2 bg-gray-100 text-center text-2xl">');
+            let html = `<div class="flex flex-col items-center mb-4"><div id="iep-title">${titleHtml}</div><div class="space-x-2 mt-2"><button id="edit-iep-title" class="text-sm text-sky-600">편집</button><button id="save-iep-btn" class="bg-sky-600 hover:bg-sky-700 text-white text-sm px-3 py-1 rounded">저장</button><button id="save-pdf-btn" class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-3 py-1 rounded">PDF 저장</button></div></div><div id="iep-content">${data.content}</div>`;
             iepOutputContainer.innerHTML = html;
             document.getElementById('iep-achievement-btn')?.addEventListener('click', () => openAchievementView(studentName));
             document.getElementById('generate-semester-goals-btn')?.addEventListener('click', async () => {
@@ -1036,7 +1038,9 @@
                     const input = container.querySelector('input');
                     const value = input.value.trim() || data.title;
                     const md = `| **${value}** |\n| --- |`;
-                    container.innerHTML = markdownTableToHtml(md).replace('<th ', '<th class="text-center" ');
+                    container.innerHTML = markdownTableToHtml(md)
+                        .replace('class="min-w-full border border-gray-300 text-sm"', 'class="mx-auto w-auto border border-gray-300 text-xl"')
+                        .replace('<th class="border px-2 py-1 bg-gray-100">', '<th class="border px-4 py-2 bg-gray-100 text-center text-2xl">');
                     editBtn.textContent = '편집';
                 }
             });
@@ -1093,6 +1097,13 @@
             }
         });
 
+        function sectionTitleTable(text) {
+            const md = `| **${text}** |\n| --- |`;
+            return markdownTableToHtml(md)
+                .replace('class="min-w-full border border-gray-300 text-sm"', 'class="mx-auto w-auto border border-gray-300 text-base"')
+                .replace('<th class="border px-2 py-1 bg-gray-100">', '<th class="border px-4 py-2 bg-gray-100 text-center text-lg">');
+        }
+
         async function buildIepContent(studentName) {
             const user = auth.currentUser;
             if (!user) return '';
@@ -1103,37 +1114,44 @@
             const mathList = collectYellowAchievements(data, 'math');
             lastKoreanList = koreanList;
             lastMathList = mathList;
-            return `<div class="space-y-4">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-xl font-bold">1. 학습이 필요한 성취기준</h3>
-                    <button id="iep-achievement-btn" class="text-sky-600 hover:underline text-sm">성취 기준 이동</button>
+            return `<div class="space-y-6">
+                <div>
+                    ${sectionTitleTable('1. 학습이 필요한 성취기준')}
+                    <div class="flex justify-end mb-2">
+                        <button id="iep-achievement-btn" class="text-sky-600 hover:underline text-sm">성취 기준 이동</button>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold mb-2">가. 국어</h4>
+                        ${buildAchievementTable(koreanList)}
+                    </div>
+                    <div>
+                        <h4 class="font-semibold mt-4 mb-2">나. 수학</h4>
+                        ${buildAchievementTable(mathList)}
+                    </div>
                 </div>
                 <div>
-                    <h4 class="font-semibold mt-4 mb-2">가. 국어</h4>
-                    ${buildAchievementTable(koreanList)}
+                    ${sectionTitleTable('2. 학기별 교육 목표')}
+                    <div class="flex justify-end mb-2">
+                        <button id="generate-semester-goals-btn" class="text-sky-600 hover:underline text-sm">생성</button>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold mt-4 mb-2">가. 국어</h4>
+                        <div id="korean-goals"></div>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold mt-4 mb-2">나. 수학</h4>
+                        <div id="math-goals"></div>
+                    </div>
+                    <div class="flex justify-end mt-4">
+                        <button id="generate-monthly-plan-btn" class="text-sky-600 hover:underline text-sm hidden">월별 교육목표/내용/방법 생성하기</button>
+                    </div>
                 </div>
                 <div>
-                    <h4 class="font-semibold mt-4 mb-2">나. 수학</h4>
-                    ${buildAchievementTable(mathList)}
-                </div>
-                <div class="flex justify-between items-center mt-6">
-                    <h3 class="text-xl font-bold">2. 학기 교육 목표</h3>
-                    <button id="generate-semester-goals-btn" class="text-sky-600 hover:underline text-sm">생성</button>
+                    ${sectionTitleTable('3. 월별 교육 목표')}
+                    <div id="monthly-plans" class="mt-2"></div>
                 </div>
                 <div>
-                    <h4 class="font-semibold mt-4 mb-2">가. 국어</h4>
-                    <div id="korean-goals"></div>
-                </div>
-                <div>
-                    <h4 class="font-semibold mt-4 mb-2">나. 수학</h4>
-                    <div id="math-goals"></div>
-                </div>
-                <div class="flex justify-end mt-4">
-                    <button id="generate-monthly-plan-btn" class="text-sky-600 hover:underline text-sm hidden">월별 교육목표/내용/방법 생성하기</button>
-                </div>
-                <div id="monthly-plans" class="mt-4"></div>
-                <div>
-                    <h3 class="text-xl font-bold mt-6 mb-2">향후 기술</h3>
+                    ${sectionTitleTable('향후 기술')}
                     <p class="text-gray-500">준비 중입니다.</p>
                 </div>
             </div>`;
@@ -1220,30 +1238,26 @@
             container.innerHTML = '<p class="text-gray-500">생성 중...</p>';
             let html = '';
             for (const month of months) {
-                html += `<h4 class="font-semibold mt-4 mb-2">${month}</h4>`;
                 for (const { name, list } of subjects) {
                     if (!list.length) {
                         html += `<p class="text-gray-500">${name} 학습이 필요한 성취기준이 없습니다.</p>`;
                         continue;
                     }
-                    html += `<h5 class="font-semibold mt-2">${name}</h5>`;
-                    html += `<div>${await generateMonthlyTable(month, name, list, '교육목표')}</div>`;
-                    html += `<div>${await generateMonthlyTable(month, name, list, '교육내용')}</div>`;
-                    html += `<div>${await generateMonthlyTable(month, name, list, '교육방법')}</div>`;
+                    const goals = await generateMonthlyLines(month, name, list, '교육목표', 3);
+                    const contents = await generateMonthlyLines(month, name, list, '교육내용', 4);
+                    const methods = await generateMonthlyLines(month, name, list, '교육방법', 4);
+                    let md = `| 구분 | 교육목표 | 교육내용 | 교육방법 |\n| --- | --- | --- | --- |\n| ${month} ${name} | ${goals.join('<br>')} | ${contents.join('<br>')} | ${methods.join('<br>')} |\n`;
+                    html += markdownTableToHtml(md);
                 }
             }
             container.innerHTML = html;
         }
 
-        async function generateMonthlyTable(month, subject, list, type) {
+        async function generateMonthlyLines(month, subject, list, type, maxLines) {
             const range = type === '교육목표' ? '2~3' : '3~4';
-            const maxLines = type === '교육목표' ? 3 : 4;
             const prompt = `다음 성취기준을 바탕으로 ${month} ${subject} 교과의 ${type}을 ${range}개의 문장으로 작성해줘. 각 문장은 '다.' 혹은 '한다.'로 끝나도록 하고 줄바꿈으로 구분해줘.\n\n성취기준:\n${list.map((item, idx) => `${idx + 1}. ${item.text}`).join('\n')}`;
             const result = await callGemini(prompt);
-            const lines = result.split(/\n+/).map(l => l.trim()).filter(Boolean).filter(line => !line.startsWith('다음은')).slice(0, maxLines);
-            let md = `| ${month} ${subject} ${type} |\n| --- |\n`;
-            lines.forEach(line => { md += `| ${line} |\n`; });
-            return markdownTableToHtml(md);
+            return result.split(/\n+/).map(l => l.trim()).filter(Boolean).filter(line => !line.startsWith('다음은')).slice(0, maxLines);
         }
 
         // --- Behavior Intervention Logic ---
