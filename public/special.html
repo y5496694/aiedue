@@ -786,10 +786,12 @@
         const iepStudentList = document.getElementById('iep-student-list');
         const iepOutputContainer = document.getElementById('iep-output');
         let currentIepStudent = '';
+        let isLoadingIepStudents = false;
 
         async function loadIepStudents() {
             const user = auth.currentUser;
-            if (!user) return;
+            if (!user || isLoadingIepStudents) return;
+            isLoadingIepStudents = true;
             iepStudentList.innerHTML = '<p class="text-gray-500">로딩 중...</p>';
             const classRef = doc(db, 'classes', user.uid);
             try {
@@ -821,6 +823,8 @@
                 }
             } catch (error) {
                 iepStudentList.innerHTML = '<p class="text-red-500">학급 정보를 불러오지 못했습니다.</p>';
+            } finally {
+                isLoadingIepStudents = false;
             }
         }
 
