@@ -836,16 +836,28 @@
             const mathList = collectYellowAchievements(data, 'math');
             let html = `<div class="space-y-4">
                 <div class="flex justify-between items-center">
-                    <h3 class="text-xl font-bold">성취 기준</h3>
+                    <h3 class="text-xl font-bold">1. 학습이 필요한 성취기준</h3>
                     <button id="iep-achievement-btn" class="text-sky-600 hover:underline text-sm">성취 기준 이동</button>
                 </div>
                 <div>
-                    <h4 class="font-semibold mt-4 mb-2">국어</h4>
+                    <h4 class="font-semibold mt-4 mb-2">가. 국어</h4>
                     ${buildAchievementTable(koreanList)}
                 </div>
                 <div>
-                    <h4 class="font-semibold mt-4 mb-2">수학</h4>
+                    <h4 class="font-semibold mt-4 mb-2">나. 수학</h4>
                     ${buildAchievementTable(mathList)}
+                </div>
+                <div class="flex justify-between items-center mt-6">
+                    <h3 class="text-xl font-bold">2. 학기 교육 목표</h3>
+                    <button id="generate-semester-goals-btn" class="text-sky-600 hover:underline text-sm">생성</button>
+                </div>
+                <div>
+                    <h4 class="font-semibold mt-4 mb-2">가. 국어</h4>
+                    <div id="korean-goals"></div>
+                </div>
+                <div>
+                    <h4 class="font-semibold mt-4 mb-2">나. 수학</h4>
+                    <div id="math-goals"></div>
                 </div>
                 <div>
                     <h3 class="text-xl font-bold mt-6 mb-2">향후 기술</h3>
@@ -854,6 +866,7 @@
             </div>`;
             iepOutputContainer.innerHTML = html;
             document.getElementById('iep-achievement-btn').addEventListener('click', () => openAchievementView(studentName));
+            document.getElementById('generate-semester-goals-btn').addEventListener('click', () => generateSemesterGoals(koreanList, mathList));
         }
 
         function buildAchievementTable(list) {
@@ -890,7 +903,42 @@
             }
             return result;
         }
-        
+
+        async function callGemini(prompt, json = false) {
+            const payload = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: json ? { responseMimeType: 'application/json' } : {} };
+            try {
+                const response = await fetch('/.netlify/functions/gemini-handler', { method: 'POST', body: JSON.stringify(payload) });
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                if (json) return JSON.parse(text);
+                return text;
+            } catch (e) {
+                console.error('AI error', e);
+                return json ? {} : '';
+            }
+        }
+
+        async function generateSemesterGoals(koreanList, mathList) {
+            const subjects = [
+                { name: '국어', list: koreanList, targetId: 'korean-goals' },
+                { name: '수학', list: mathList, targetId: 'math-goals' }
+            ];
+            for (const { name, list, targetId } of subjects) {
+                const target = document.getElementById(targetId);
+                if (!list.length) {
+                    target.innerHTML = '<p class="text-gray-500">학습이 필요한 성취기준이 없습니다.</p>';
+                    continue;
+                }
+                target.innerHTML = '<p class="text-gray-500">생성 중...</p>';
+                const prompt = `다음 성취기준을 바탕으로 ${name} 교과의 학기 교육목표를 1~5개의 문장으로 작성해줘. 각 문장은 '다.' 혹은 '한다.'로 끝나도록 하고 줄바꿈으로 구분해줘.\n\n성취기준:\n${list.map((item, idx) => `${idx + 1}. ${item.text}`).join('\n')}`;
+                const result = await callGemini(prompt);
+                const lines = result.split(/\n+/).map(l => l.trim()).filter(Boolean).slice(0, 5);
+                let md = `| ${name} 학기 교육목표 |\n| --- |\n`;
+                lines.forEach(line => { md += `| ${line} |\n`; });
+                target.innerHTML = markdownTableToHtml(md);
+            }
+        }
+
         // --- Behavior Intervention Logic ---
         const startObservationBtn = document.getElementById('start-observation-btn');
         const behaviorLoggingSection = document.getElementById('behavior-logging-section');
