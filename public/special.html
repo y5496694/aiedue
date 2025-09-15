@@ -140,8 +140,12 @@
                      <div class="flex flex-col lg:flex-row gap-6">
                         <aside class="w-full lg:w-1/3 bg-white p-6 rounded-lg shadow-lg h-fit lg:sticky top-24">
                             <h3 class="text-lg font-semibold mb-4">내 학급</h3>
-                            <div id="iep-student-list" class="space-y-3">
+                            <div id="iep-student-list" class="grid grid-cols-4 gap-2">
                                 <!-- 학생 목록이 여기에 표시됩니다. -->
+                            </div>
+                            <div id="iep-modify-section" class="mt-6 hidden">
+                                <h4 class="font-semibold mb-2">출력 내용 수정</h4>
+                                <textarea id="iep-modify-input" class="w-full border rounded-md p-2 text-sm" rows="3" placeholder="수정할 내용을 입력하고 Enter를 누르세요"></textarea>
                             </div>
                         </aside>
                         <section class="w-full lg:w-2/3">
@@ -786,6 +790,7 @@
         const iepStudentList = document.getElementById('iep-student-list');
         const iepOutputContainer = document.getElementById('iep-output');
         let currentIepStudent = '';
+        let currentIepDocId = '';
         let isLoadingIepStudents = false;
 
         async function loadIepStudents() {
@@ -813,7 +818,7 @@
                                 const studentEl = document.createElement('div');
                                 studentEl.className = 'p-3 border rounded-md cursor-pointer hover:bg-sky-50';
                                 studentEl.textContent = s.name || sid;
-                                studentEl.addEventListener('click', () => openIepView(s.name || sid));
+                                studentEl.addEventListener('click', () => showIepList(s.name || sid));
                                 iepStudentList.appendChild(studentEl);
                             }
                         } catch (err) {
@@ -828,17 +833,146 @@
             }
         }
 
-        async function openIepView(studentName) {
+        function showModifySection() {
+            document.getElementById('iep-modify-section').classList.remove('hidden');
+        }
+
+        function hideModifySection() {
+            document.getElementById('iep-modify-section').classList.add('hidden');
+        }
+
+        async function showIepList(studentName) {
             currentIepStudent = studentName;
+            currentIepDocId = '';
+            hideModifySection();
             iepOutputContainer.innerHTML = '<p class="text-gray-500">로딩 중...</p>';
             const user = auth.currentUser;
             if (!user) return;
+            const iepRef = collection(db, 'users', user.uid, 'ieps');
+            const q = query(iepRef, where('student', '==', studentName), orderBy('createdAt', 'desc'));
+            const snap = await getDocs(q);
+            let html = `<div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">${studentName} IEP 목록</h3><button id="add-iep-btn" class="bg-sky-600 hover:bg-sky-700 text-white text-sm px-3 py-1 rounded">+추가</button></div>`;
+            if (snap.empty) {
+                html += '<p class="text-gray-500">IEP가 없습니다.</p>';
+            } else {
+                html += '<ul class="space-y-2">';
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    const date = d.createdAt?.toDate ? d.createdAt.toDate().toLocaleDateString() : '';
+                    html += `<li class="p-2 border rounded cursor-pointer hover:bg-sky-50" data-id="${doc.id}"><div class="flex justify-between"><span>${d.title}</span><span class="text-xs text-gray-500">${date}</span></div></li>`;
+                });
+                html += '</ul>';
+            }
+            iepOutputContainer.innerHTML = html;
+            document.getElementById('add-iep-btn').addEventListener('click', () => addIep(studentName));
+            iepOutputContainer.querySelectorAll('li[data-id]').forEach(el => {
+                el.addEventListener('click', () => openIepDocument(el.dataset.id, studentName));
+            });
+        }
+
+        async function addIep(studentName) {
+            const user = auth.currentUser;
+            if (!user) return;
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1;
+            const semester = (month >= 8 || month <= 1) ? 2 : 1;
+            const title = `${year}학년도 ${semester}학기 개별화교육계획(${studentName})`;
+            const docRef = await addDoc(collection(db, 'users', user.uid, 'ieps'), {
+                student: studentName,
+                title,
+                createdAt: serverTimestamp(),
+                content: ''
+            });
+            showIepList(studentName);
+            openIepDocument(docRef.id, studentName);
+        }
+
+        async function openIepDocument(id, studentName) {
+            const user = auth.currentUser;
+            if (!user) return;
+            currentIepDocId = id;
+            const docRef = doc(db, 'users', user.uid, 'ieps', id);
+            let snap = await getDoc(docRef);
+            let data = snap.data();
+            if (!data.content) {
+                const content = await buildIepContent(studentName);
+                await updateDoc(docRef, { content });
+                snap = await getDoc(docRef);
+                data = snap.data();
+            }
+            renderIepContent(id, studentName, data);
+        }
+
+        function renderIepContent(id, studentName, data) {
+            showModifySection();
+            let html = `<div class="flex justify-between items-center mb-4"><div><span id="iep-title">${data.title}</span></div><div class="space-x-2"><button id="edit-iep-title" class="text-sm text-sky-600">편집</button><button id="save-iep-btn" class="bg-sky-600 hover:bg-sky-700 text-white text-sm px-3 py-1 rounded">저장</button></div></div><div id="iep-content">${data.content}</div>`;
+            iepOutputContainer.innerHTML = html;
+            document.getElementById('iep-achievement-btn')?.addEventListener('click', () => openAchievementView(studentName));
+            document.getElementById('generate-semester-goals-btn')?.addEventListener('click', async () => {
+                const content = await buildIepContent(studentName);
+                const temp = document.createElement('div');
+                temp.innerHTML = content;
+                document.getElementById('korean-goals').innerHTML = temp.querySelector('#korean-goals').innerHTML;
+                document.getElementById('math-goals').innerHTML = temp.querySelector('#math-goals').innerHTML;
+            });
+            const editBtn = document.getElementById('edit-iep-title');
+            editBtn.addEventListener('click', () => {
+                const existing = document.getElementById('iep-title');
+                if (editBtn.textContent === '편집') {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = existing.textContent;
+                    input.className = 'border rounded p-1 text-sm';
+                    existing.replaceWith(input);
+                    editBtn.textContent = '완료';
+                    input.focus();
+                    input.addEventListener('keydown', e => { if (e.key === 'Enter') editBtn.click(); });
+                } else {
+                    const input = iepOutputContainer.querySelector('input');
+                    const span = document.createElement('span');
+                    span.id = 'iep-title';
+                    span.textContent = input.value.trim() || data.title;
+                    input.replaceWith(span);
+                    editBtn.textContent = '편집';
+                }
+            });
+            document.getElementById('save-iep-btn').addEventListener('click', async () => {
+                const user = auth.currentUser;
+                if (!user) return;
+                const docRef = doc(db, 'users', user.uid, 'ieps', id);
+                const title = document.getElementById('iep-title').textContent;
+                const content = document.getElementById('iep-content').innerHTML;
+                await updateDoc(docRef, { title, content });
+                showIepList(studentName);
+                openIepDocument(id, studentName);
+                alert('저장되었습니다.');
+            });
+        }
+
+        const modifyInput = document.getElementById('iep-modify-input');
+        modifyInput.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const instruction = modifyInput.value.trim();
+                if (!instruction || !currentIepDocId) return;
+                modifyInput.value = '';
+                const currentContent = document.getElementById('iep-content').innerText;
+                const prompt = `다음 개별화교육계획을 사용자의 수정 요구에 맞게 수정해줘. HTML 형식을 유지해줘.\n\n원본:\n${currentContent}\n\n수정 요구:${instruction}`;
+                const result = await callGemini(prompt);
+                document.getElementById('iep-content').innerHTML = result;
+            }
+        });
+
+        async function buildIepContent(studentName) {
+            const user = auth.currentUser;
+            if (!user) return '';
             const docRef = doc(db, 'users', user.uid, 'achievements', studentName);
             const snap = await getDoc(docRef);
             const data = snap.exists() ? (snap.data().data || {}) : {};
             const koreanList = collectYellowAchievements(data, 'korean');
             const mathList = collectYellowAchievements(data, 'math');
-            let html = `<div class="space-y-4">
+            return `<div class="space-y-4">
                 <div class="flex justify-between items-center">
                     <h3 class="text-xl font-bold">1. 학습이 필요한 성취기준</h3>
                     <button id="iep-achievement-btn" class="text-sky-600 hover:underline text-sm">성취 기준 이동</button>
@@ -868,9 +1002,6 @@
                     <p class="text-gray-500">준비 중입니다.</p>
                 </div>
             </div>`;
-            iepOutputContainer.innerHTML = html;
-            document.getElementById('iep-achievement-btn').addEventListener('click', () => openAchievementView(studentName));
-            document.getElementById('generate-semester-goals-btn').addEventListener('click', () => generateSemesterGoals(koreanList, mathList));
         }
 
         function buildAchievementTable(list) {
