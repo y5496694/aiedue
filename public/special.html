@@ -139,42 +139,17 @@
                      <h2 class="text-3xl font-bold mb-6">개별화교육계획(IEP) 수립</h2>
                      <div class="flex flex-col lg:flex-row gap-6">
                         <aside class="w-full lg:w-1/3 bg-white p-6 rounded-lg shadow-lg h-fit lg:sticky top-24">
-                            <h3 class="text-lg font-semibold mb-4">학생 정보 입력</h3>
-                            <form id="iep-form" class="space-y-4">
-                                <div>
-                                    <label for="student-name" class="block text-sm font-medium text-gray-700">학생 이름</label>
-                                    <input type="text" id="student-name" class="mt-1 block w-full border border-gray-300 rounded-md p-2" required>
-                                </div>
-                                <div>
-                                    <label for="student-grade" class="block text-sm font-medium text-gray-700">학년</label>
-                                    <input type="text" id="student-grade" class="mt-1 block w-full border border-gray-300 rounded-md p-2">
-                                </div>
-                                <div>
-                                    <label for="iep-period" class="block text-sm font-medium text-gray-700">계획 기간</label>
-                                    <input type="text" id="iep-period" class="mt-1 block w-full border border-gray-300 rounded-md p-2" placeholder="예: 2025.03.01 ~ 2026.02.28">
-                                </div>
-                                 <div>
-                                    <label for="student-needs" class="block text-sm font-medium text-gray-700">학생 요구사항 및 강점</label>
-                                    <textarea id="student-needs" rows="4" class="mt-1 block w-full border border-gray-300 rounded-md p-2" placeholder="학생의 특별한 교육적 요구, 강점, 흥미 등을 입력하세요."></textarea>
-                                </div>
-                                <!-- IEP: generate draft for 개별화교육계획(IEP). Update here when modifying 'iep' features. -->
-                                <button type="submit" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-4 rounded-lg">AI 개별화교육계획(IEP) 초안 생성</button>
-                            </form>
+                            <h3 class="text-lg font-semibold mb-4">내 학급</h3>
+                            <div id="iep-student-list" class="space-y-3">
+                                <!-- 학생 목록이 여기에 표시됩니다. -->
+                            </div>
                         </aside>
                         <section class="w-full lg:w-2/3">
-                            <div id="iep-initial-message" class="bg-white p-8 rounded-lg shadow-lg text-center">
-                                <h2 class="text-2xl font-bold text-gray-800">AI가 생성한 IEP 초안이 여기에 표시됩니다.</h2>
-                                <p class="mt-2 text-gray-600">좌측에 학생 정보를 입력하고 생성 버튼을 눌러주세요.</p>
-                            </div>
-                             <div id="iep-loading" class="hidden flex-col items-center justify-center text-center py-16">
-                                <div class="loader"></div>
-                                <p class="mt-4 text-lg font-semibold text-gray-700">AI가 IEP 초안을 작성하고 있습니다...</p>
-                            </div>
-                            <div id="iep-output" class="hidden content-section">
-                                <!-- IEP content will be injected here -->
+                            <div id="iep-output" class="bg-white p-8 rounded-lg shadow-lg">
+                                <p class="text-gray-500">학생을 선택하면 IEP 정보가 표시됩니다.</p>
                             </div>
                         </section>
-                     </div>
+                    </div>
                 </div>
 
                 <!-- Behavior Intervention View -->
@@ -376,6 +351,11 @@
                     loadHomeData();
                 } else if (view === 'my-class') {
                     loadClasses();
+                } else if (view === 'iep') {
+                    loadIepStudents();
+                    if (iepOutputContainer) {
+                        iepOutputContainer.innerHTML = '<p class="text-gray-500">학생을 선택하면 IEP 정보가 표시됩니다.</p>';
+                    }
                 } else if (view === 'behavior') {
                     initBehaviorChart();
                 }
@@ -803,89 +783,113 @@
 
 
         // --- IEP View Logic ---
-        const iepForm = document.getElementById('iep-form');
+        const iepStudentList = document.getElementById('iep-student-list');
         const iepOutputContainer = document.getElementById('iep-output');
-        const iepInitialMessage = document.getElementById('iep-initial-message');
-        const iepLoading = document.getElementById('iep-loading');
+        let currentIepStudent = '';
 
-        iepForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
+        async function loadIepStudents() {
             const user = auth.currentUser;
             if (!user) return;
+            iepStudentList.innerHTML = '<p class="text-gray-500">로딩 중...</p>';
+            const classRef = doc(db, 'classes', user.uid);
+            try {
+                const classSnap = await getDoc(classRef);
+                iepStudentList.innerHTML = '';
+                if (!classSnap.exists()) {
+                    iepStudentList.innerHTML = '<p class="text-gray-500">생성된 학급이 없습니다.</p>';
+                    return;
+                }
+                const studentIds = classSnap.data().students || [];
+                if (studentIds.length === 0) {
+                    iepStudentList.innerHTML = '<p class="text-gray-500">학생이 없습니다.</p>';
+                } else {
+                    for (const sid of studentIds) {
+                        try {
+                            const sd = await getDoc(doc(db, 'users', sid));
+                            if (sd.exists()) {
+                                const s = sd.data();
+                                const studentEl = document.createElement('div');
+                                studentEl.className = 'p-3 border rounded-md cursor-pointer hover:bg-sky-50';
+                                studentEl.textContent = s.name || sid;
+                                studentEl.addEventListener('click', () => openIepView(s.name || sid));
+                                iepStudentList.appendChild(studentEl);
+                            }
+                        } catch (err) {
+                            console.error(err);
+                        }
+                    }
+                }
+            } catch (error) {
+                iepStudentList.innerHTML = '<p class="text-red-500">학급 정보를 불러오지 못했습니다.</p>';
+            }
+        }
 
-            const studentName = document.getElementById('student-name').value;
-            const studentNeeds = document.getElementById('student-needs').value;
+        async function openIepView(studentName) {
+            currentIepStudent = studentName;
+            iepOutputContainer.innerHTML = '<p class="text-gray-500">로딩 중...</p>';
+            const user = auth.currentUser;
+            if (!user) return;
+            const docRef = doc(db, 'users', user.uid, 'achievements', studentName);
+            const snap = await getDoc(docRef);
+            const data = snap.exists() ? (snap.data().data || {}) : {};
+            const koreanList = collectYellowAchievements(data, 'korean');
+            const mathList = collectYellowAchievements(data, 'math');
+            let html = `<div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold">성취 기준</h3>
+                    <button id="iep-achievement-btn" class="text-sky-600 hover:underline text-sm">성취 기준 이동</button>
+                </div>
+                <div>
+                    <h4 class="font-semibold mt-4 mb-2">국어</h4>
+                    ${buildAchievementTable(koreanList)}
+                </div>
+                <div>
+                    <h4 class="font-semibold mt-4 mb-2">수학</h4>
+                    ${buildAchievementTable(mathList)}
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold mt-6 mb-2">향후 기술</h3>
+                    <p class="text-gray-500">준비 중입니다.</p>
+                </div>
+            </div>`;
+            iepOutputContainer.innerHTML = html;
+            document.getElementById('iep-achievement-btn').addEventListener('click', () => openAchievementView(studentName));
+        }
 
-            iepInitialMessage.classList.add('hidden');
-            iepOutputContainer.classList.add('hidden');
-            iepLoading.classList.remove('hidden');
+        function buildAchievementTable(list) {
+            if (!list.length) {
+                return '<p class="text-gray-500">학습이 필요한 성취기준이 없습니다.</p>';
+            }
+            let html = '<table class="w-full border border-gray-300 text-sm"><thead><tr><th class="border px-2 py-1">학년(군)</th><th class="border px-2 py-1">성취기준</th></tr></thead><tbody>';
+            list.forEach(item => {
+                html += `<tr><td class="border px-2 py-1">${item.grade}</td><td class="border px-2 py-1">${item.text}</td></tr>`;
+            });
+            html += '</tbody></table>';
+            return html;
+        }
 
-            // Simplified prompt for generating IEP structure
-            const prompt = `
-                특수교육대상학생 '${studentName}'의 개별화교육계획(IEP) 초안을 작성해줘.
-                학생의 요구사항 및 강점: ${studentNeeds}.
-                
-                다음 목차에 따라 구체적인 내용을 포함하여 작성해줘:
-                1. 학생 인적사항
-                2. 현재 학습 수행 수준 (학업, 신체, 의사소통, 사회성 등 영역별로 기술)
-                3. 장기 교육 목표 (1년 단위)
-                4. 단기 교육 목표 (학기 단위, 장기 목표와 연계)
-                5. 평가 계획
-                6. 특수교육 관련 서비스 (치료지원, 보조공학기기 등)
-
-                각 항목은 h3 제목(###)으로 구분하고, 내용은 줄 바꿈과 글머리 기호를 사용해서 가독성 있게 작성해줘.
-            `;
-            
-            // This is a placeholder for the actual API call.
-            // In a real implementation, you would call your backend/serverless function here.
-            setTimeout(() => {
-                const mockResponse = `
-                    ### 1. 학생 인적사항
-                    - 성명: ${studentName}
-                    - 학년: ${document.getElementById('student-grade').value || '미입력'}
-                    - 계획 기간: ${document.getElementById('iep-period').value || '미입력'}
-
-                    ### 2. 현재 학습 수행 수준
-                    - **학업**: 기초적인 읽기 및 쓰기 가능. 두 자리 수 덧셈에 어려움을 보임.
-                    - **의사소통**: 간단한 문장으로 자신의 의사를 표현할 수 있으나, 복잡한 대화 참여에 소극적임.
-                    - **사회성**: 또래와 어울리고 싶어하지만, 관계 형성 기술이 미숙하여 도움이 필요함.
-
-                    ### 3. 장기 교육 목표
-                    - 1) 두 자리 수 덧셈과 뺄셈 문제를 80% 이상의 정확도로 해결할 수 있다.
-                    - 2) 세 문장 이상의 연결된 문장으로 자신의 경험을 이야기할 수 있다.
-                    - 3) 친구의 놀이 제안에 긍정적으로 반응하고, 5분 이상 놀이를 지속할 수 있다.
-
-                    ### 4. 단기 교육 목표
-                    - **1학기**:
-                      - 가) 받아올림이 없는 두 자리 수 덧셈을 90% 정확도로 해결한다.
-                      - 나) 그림을 보고 두 문장으로 상황을 설명할 수 있다.
-                      - 다) 교사의 지원 하에 친구에게 놀이를 제안할 수 있다.
-                    - **2학기**:
-                      - 가) 받아내림이 없는 두 자리 수 뺄셈을 90% 정확도로 해결한다.
-                      - 나) 질문에 두 문장 이상으로 대답할 수 있다.
-                      - 다) 스스로 친구의 놀이에 참여하여 5분 이상 상호작용한다.
-
-                    ### 5. 평가 계획
-                    - **방법**: 관찰, 포트폴리오, 수행평가
-                    - **시기**: 매월 말, 학기 말
-
-                    ### 6. 특수교육 관련 서비스
-                    - 언어치료: 주 2회 (회당 40분)
-                    - 보조공학기기: 학습용 태블릿 PC 및 소리펜 지원
-                `;
-                iepOutputContainer.innerHTML = mockResponse.replace(/\n/g, '<br>');
-                iepLoading.classList.add('hidden');
-                iepOutputContainer.classList.remove('hidden');
-                
-                // Save to Firestore
-                 addDoc(collection(db, "users", user.uid, "ieps"), {
-                    studentName: studentName,
-                    content: mockResponse,
-                    createdAt: serverTimestamp()
+        function collectYellowAchievements(data, subject) {
+            const result = [];
+            for (const level of Object.keys(achievementTables)) {
+                const table = achievementTables[level]?.[subject];
+                if (!table) continue;
+                const key = `${level}_${subject}`;
+                const states = data[key] || [];
+                const temp = document.createElement('div');
+                temp.innerHTML = markdownTableToHtml(table);
+                const rows = temp.querySelectorAll('tbody tr');
+                rows.forEach((tr, rowIdx) => {
+                    const grade = tr.cells[0].textContent.trim();
+                    for (let i = 1; i < tr.cells.length; i++) {
+                        if (states[rowIdx]?.[i - 1] === 1) {
+                            const text = tr.cells[i].textContent.trim();
+                            result.push({ grade, text });
+                        }
+                    }
                 });
-
-            }, 2000); // Simulating network delay
-        });
+            }
+            return result;
+        }
         
         // --- Behavior Intervention Logic ---
         const startObservationBtn = document.getElementById('start-observation-btn');
