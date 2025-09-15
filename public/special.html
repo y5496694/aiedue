@@ -792,6 +792,8 @@
         let currentIepStudent = '';
         let currentIepDocId = '';
         let isLoadingIepStudents = false;
+        let lastKoreanList = [];
+        let lastMathList = [];
 
         async function loadIepStudents() {
             const user = auth.currentUser;
@@ -910,11 +912,11 @@
             iepOutputContainer.innerHTML = html;
             document.getElementById('iep-achievement-btn')?.addEventListener('click', () => openAchievementView(studentName));
             document.getElementById('generate-semester-goals-btn')?.addEventListener('click', async () => {
-                const content = await buildIepContent(studentName);
-                const temp = document.createElement('div');
-                temp.innerHTML = content;
-                document.getElementById('korean-goals').innerHTML = temp.querySelector('#korean-goals').innerHTML;
-                document.getElementById('math-goals').innerHTML = temp.querySelector('#math-goals').innerHTML;
+                await generateSemesterGoals(lastKoreanList, lastMathList);
+                document.getElementById('generate-monthly-plan-btn')?.classList.remove('hidden');
+            });
+            document.getElementById('generate-monthly-plan-btn')?.addEventListener('click', async () => {
+                await generateMonthlyPlans(lastKoreanList, lastMathList);
             });
             const editBtn = document.getElementById('edit-iep-title');
             editBtn.addEventListener('click', () => {
@@ -972,6 +974,8 @@
             const data = snap.exists() ? (snap.data().data || {}) : {};
             const koreanList = collectYellowAchievements(data, 'korean');
             const mathList = collectYellowAchievements(data, 'math');
+            lastKoreanList = koreanList;
+            lastMathList = mathList;
             return `<div class="space-y-4">
                 <div class="flex justify-between items-center">
                     <h3 class="text-xl font-bold">1. 학습이 필요한 성취기준</h3>
@@ -997,6 +1001,10 @@
                     <h4 class="font-semibold mt-4 mb-2">나. 수학</h4>
                     <div id="math-goals"></div>
                 </div>
+                <div class="flex justify-end mt-4">
+                    <button id="generate-monthly-plan-btn" class="text-sky-600 hover:underline text-sm hidden">월별 교육목표/내용/방법 생성하기</button>
+                </div>
+                <div id="monthly-plans" class="mt-4"></div>
                 <div>
                     <h3 class="text-xl font-bold mt-6 mb-2">향후 기술</h3>
                     <p class="text-gray-500">준비 중입니다.</p>
@@ -1072,6 +1080,41 @@
                 lines.forEach(line => { md += `| ${line} |\n`; });
                 target.innerHTML = markdownTableToHtml(md);
             }
+        }
+
+        async function generateMonthlyPlans(koreanList, mathList) {
+            const months = ['7월', '8월'];
+            const subjects = [
+                { name: '국어', list: koreanList },
+                { name: '수학', list: mathList }
+            ];
+            const container = document.getElementById('monthly-plans');
+            if (!container) return;
+            container.innerHTML = '<p class="text-gray-500">생성 중...</p>';
+            let html = '';
+            for (const month of months) {
+                html += `<h4 class="font-semibold mt-4 mb-2">${month}</h4>`;
+                for (const { name, list } of subjects) {
+                    if (!list.length) {
+                        html += `<p class="text-gray-500">${name} 학습이 필요한 성취기준이 없습니다.</p>`;
+                        continue;
+                    }
+                    html += `<h5 class="font-semibold mt-2">${name}</h5>`;
+                    html += `<div>${await generateMonthlyTable(month, name, list, '교육목표')}</div>`;
+                    html += `<div>${await generateMonthlyTable(month, name, list, '교육내용')}</div>`;
+                    html += `<div>${await generateMonthlyTable(month, name, list, '교육방법')}</div>`;
+                }
+            }
+            container.innerHTML = html;
+        }
+
+        async function generateMonthlyTable(month, subject, list, type) {
+            const prompt = `다음 성취기준을 바탕으로 ${month} ${subject} 교과의 ${type}을 1~5개의 문장으로 작성해줘. 각 문장은 '다.' 혹은 '한다.'로 끝나도록 하고 줄바꿈으로 구분해줘.\n\n성취기준:\n${list.map((item, idx) => `${idx + 1}. ${item.text}`).join('\n')}`;
+            const result = await callGemini(prompt);
+            const lines = result.split(/\n+/).map(l => l.trim()).filter(Boolean).slice(0, 5);
+            let md = `| ${month} ${subject} ${type} |\n| --- |\n`;
+            lines.forEach(line => { md += `| ${line} |\n`; });
+            return markdownTableToHtml(md);
         }
 
         // --- Behavior Intervention Logic ---
