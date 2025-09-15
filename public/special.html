@@ -6,6 +6,7 @@
     <title>에이두 스페셜 - 특수교사 업무 보조</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -144,8 +145,19 @@
                                 <!-- 학생 목록이 여기에 표시됩니다. -->
                             </div>
                             <div id="iep-modify-section" class="mt-6 hidden">
-                                <h4 class="font-semibold mb-2">출력 내용 수정</h4>
-                                <textarea id="iep-modify-input" class="w-full border rounded-md p-2 text-sm" rows="3" placeholder="수정할 내용을 입력하고 Enter를 누르세요"></textarea>
+                                <h4 class="font-semibold mb-2">수정 테이블</h4>
+                                <div class="mb-2">
+                                    <label for="iep-modify-target" class="text-sm font-medium mr-2">수정 항목</label>
+                                    <select id="iep-modify-target" class="border rounded p-1 text-sm">
+                                        <option value="semester">학기 교육 목표</option>
+                                        <option value="monthly">월별교육목표</option>
+                                        <option value="all">전체</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-start gap-2">
+                                    <textarea id="iep-modify-input" class="w-full border rounded-md p-2 text-sm" rows="3" placeholder="수정할 내용을 입력하세요"></textarea>
+                                    <button id="iep-modify-btn" class="bg-sky-600 hover:bg-sky-700 text-white text-sm px-3 py-1 rounded h-9">수정</button>
+                                </div>
                             </div>
                         </aside>
                         <section class="w-full lg:w-2/3">
@@ -994,7 +1006,9 @@
 
         function renderIepContent(id, studentName, data) {
             showModifySection();
-            let html = `<div class="flex justify-between items-center mb-4"><div><span id="iep-title">${data.title}</span></div><div class="space-x-2"><button id="edit-iep-title" class="text-sm text-sky-600">편집</button><button id="save-iep-btn" class="bg-sky-600 hover:bg-sky-700 text-white text-sm px-3 py-1 rounded">저장</button></div></div><div id="iep-content">${data.content}</div>`;
+            const titleMd = `| **${data.title}** |\n| --- |`;
+            const titleHtml = markdownTableToHtml(titleMd).replace('<th ', '<th class="text-center" ');
+            let html = `<div class="flex justify-between items-center mb-4"><div id="iep-title">${titleHtml}</div><div class="space-x-2"><button id="edit-iep-title" class="text-sm text-sky-600">편집</button><button id="save-iep-btn" class="bg-sky-600 hover:bg-sky-700 text-white text-sm px-3 py-1 rounded">저장</button><button id="save-pdf-btn" class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-3 py-1 rounded">PDF 저장</button></div></div><div id="iep-content">${data.content}</div>`;
             iepOutputContainer.innerHTML = html;
             document.getElementById('iep-achievement-btn')?.addEventListener('click', () => openAchievementView(studentName));
             document.getElementById('generate-semester-goals-btn')?.addEventListener('click', async () => {
@@ -1006,22 +1020,23 @@
             });
             const editBtn = document.getElementById('edit-iep-title');
             editBtn.addEventListener('click', () => {
-                const existing = document.getElementById('iep-title');
+                const container = document.getElementById('iep-title');
                 if (editBtn.textContent === '편집') {
+                    const current = container.textContent.trim();
                     const input = document.createElement('input');
                     input.type = 'text';
-                    input.value = existing.textContent;
+                    input.value = current;
                     input.className = 'border rounded p-1 text-sm';
-                    existing.replaceWith(input);
+                    container.innerHTML = '';
+                    container.appendChild(input);
                     editBtn.textContent = '완료';
                     input.focus();
                     input.addEventListener('keydown', e => { if (e.key === 'Enter') editBtn.click(); });
                 } else {
-                    const input = iepOutputContainer.querySelector('input');
-                    const span = document.createElement('span');
-                    span.id = 'iep-title';
-                    span.textContent = input.value.trim() || data.title;
-                    input.replaceWith(span);
+                    const input = container.querySelector('input');
+                    const value = input.value.trim() || data.title;
+                    const md = `| **${value}** |\n| --- |`;
+                    container.innerHTML = markdownTableToHtml(md).replace('<th ', '<th class="text-center" ');
                     editBtn.textContent = '편집';
                 }
             });
@@ -1029,26 +1044,52 @@
                 const user = auth.currentUser;
                 if (!user) return;
                 const docRef = doc(db, 'users', user.uid, 'ieps', id);
-                const title = document.getElementById('iep-title').textContent;
+                const title = document.getElementById('iep-title').textContent.trim();
                 const content = document.getElementById('iep-content').innerHTML;
                 await updateDoc(docRef, { title, content });
                 showIepList(studentName);
                 openIepDocument(id, studentName);
                 alert('저장되었습니다.');
             });
+            document.getElementById('save-pdf-btn').addEventListener('click', saveIepPdf);
+        }
+
+        function saveIepPdf() {
+            const titleEl = document.getElementById('iep-title').cloneNode(true);
+            const contentEl = document.getElementById('iep-content').cloneNode(true);
+            contentEl.querySelectorAll('button').forEach(btn => btn.remove());
+            const container = document.createElement('div');
+            container.appendChild(titleEl);
+            container.appendChild(contentEl);
+            html2pdf().set({
+                filename: `${titleEl.textContent.trim()}.pdf`,
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).from(container).save();
         }
 
         const modifyInput = document.getElementById('iep-modify-input');
+        const modifyBtn = document.getElementById('iep-modify-btn');
+        const modifyTarget = document.getElementById('iep-modify-target');
+
+        async function applyModification() {
+            const instruction = modifyInput.value.trim();
+            const target = modifyTarget.value;
+            if (!instruction || !currentIepDocId) return;
+            modifyInput.value = '';
+            const currentContent = document.getElementById('iep-content').innerHTML;
+            const targetText = target === 'semester' ? '학기 교육 목표' : target === 'monthly' ? '월별교육목표' : '전체';
+            const prompt = `다음 개별화교육계획 중 '${targetText}' 부분을 사용자의 수정 요구에 맞게 수정해줘. 다른 부분은 변경하지 말고 HTML 형식을 유지하며 마크다운 표는 유지해줘.\n\n원본:\n${currentContent}\n\n수정 요구:${instruction}`;
+            let result = await callGemini(prompt);
+            result = result.split(/\n+/).filter(line => !line.includes('다음은') && !line.includes('수정했습니다') && !line.includes('수정되었습니다')).join('\n');
+            document.getElementById('iep-content').innerHTML = result;
+        }
+
+        modifyBtn.addEventListener('click', applyModification);
         modifyInput.addEventListener('keydown', async (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                const instruction = modifyInput.value.trim();
-                if (!instruction || !currentIepDocId) return;
-                modifyInput.value = '';
-                const currentContent = document.getElementById('iep-content').innerText;
-                const prompt = `다음 개별화교육계획을 사용자의 수정 요구에 맞게 수정해줘. HTML 형식을 유지해줘.\n\n원본:\n${currentContent}\n\n수정 요구:${instruction}`;
-                const result = await callGemini(prompt);
-                document.getElementById('iep-content').innerHTML = result;
+                await applyModification();
             }
         });
 
@@ -1161,7 +1202,7 @@
                 target.innerHTML = '<p class="text-gray-500">생성 중...</p>';
                 const prompt = `다음 성취기준을 바탕으로 ${name} 교과의 학기 교육목표를 1~5개의 문장으로 작성해줘. 각 문장은 '다.' 혹은 '한다.'로 끝나도록 하고 줄바꿈으로 구분해줘.\n\n성취기준:\n${list.map((item, idx) => `${idx + 1}. ${item.text}`).join('\n')}`;
                 const result = await callGemini(prompt);
-                const lines = result.split(/\n+/).map(l => l.trim()).filter(Boolean).slice(0, 5);
+                const lines = result.split(/\n+/).map(l => l.trim()).filter(Boolean).filter(line => !line.startsWith('다음은')).slice(0, 5);
                 let md = `| ${name} 학기 교육목표 |\n| --- |\n`;
                 lines.forEach(line => { md += `| ${line} |\n`; });
                 target.innerHTML = markdownTableToHtml(md);
@@ -1195,9 +1236,11 @@
         }
 
         async function generateMonthlyTable(month, subject, list, type) {
-            const prompt = `다음 성취기준을 바탕으로 ${month} ${subject} 교과의 ${type}을 1~5개의 문장으로 작성해줘. 각 문장은 '다.' 혹은 '한다.'로 끝나도록 하고 줄바꿈으로 구분해줘.\n\n성취기준:\n${list.map((item, idx) => `${idx + 1}. ${item.text}`).join('\n')}`;
+            const range = type === '교육목표' ? '2~3' : '3~4';
+            const maxLines = type === '교육목표' ? 3 : 4;
+            const prompt = `다음 성취기준을 바탕으로 ${month} ${subject} 교과의 ${type}을 ${range}개의 문장으로 작성해줘. 각 문장은 '다.' 혹은 '한다.'로 끝나도록 하고 줄바꿈으로 구분해줘.\n\n성취기준:\n${list.map((item, idx) => `${idx + 1}. ${item.text}`).join('\n')}`;
             const result = await callGemini(prompt);
-            const lines = result.split(/\n+/).map(l => l.trim()).filter(Boolean).slice(0, 5);
+            const lines = result.split(/\n+/).map(l => l.trim()).filter(Boolean).filter(line => !line.startsWith('다음은')).slice(0, maxLines);
             let md = `| ${month} ${subject} ${type} |\n| --- |\n`;
             lines.forEach(line => { md += `| ${line} |\n`; });
             return markdownTableToHtml(md);
