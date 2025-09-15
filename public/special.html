@@ -321,6 +321,7 @@
         
         let statsChartInstance = null;
         let behaviorChartInstance = null;
+        let isLoadingHomeData = false;
 
         // --- AUTHENTICATION ---
         onAuthStateChanged(auth, user => {
@@ -445,8 +446,9 @@
         // --- Home View Logic ---
         async function loadHomeData() {
             const user = auth.currentUser;
-            if (!user) return;
-
+            if (!user || isLoadingHomeData) return;
+            isLoadingHomeData = true;
+            try {
          const classRef = doc(db, "classes", user.uid);
          const iepsRef = collection(db, "users", user.uid, "ieps");
 
@@ -498,16 +500,22 @@
                 responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { position: 'bottom' } }
             });
+        } catch (error) {
+            console.error(error);
+        } finally {
+            isLoadingHomeData = false;
         }
         
         // --- My Class View Logic ---
         const addClassBtn = document.getElementById('add-class-btn');
         const classListContainer = document.getElementById('class-list');
         const classTitle = document.getElementById('class-title');
+        let isLoadingClasses = false;
 
         async function loadClasses() {
             const user = auth.currentUser;
-            if (!user) return;
+            if (!user || isLoadingClasses) return;
+            isLoadingClasses = true;
             classListContainer.innerHTML = '<p class="text-gray-500">로딩 중...</p>';
             const classRef = doc(db, 'classes', user.uid);
             try {
@@ -546,6 +554,8 @@
                 }
             } catch (error) {
                 classListContainer.innerHTML = '<p class="text-red-500">학급 정보를 불러오지 못했습니다.</p>';
+            } finally {
+                isLoadingClasses = false;
             }
         }
         
