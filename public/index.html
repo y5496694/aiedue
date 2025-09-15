@@ -1127,6 +1127,7 @@
         let currentDictationTemplate = null; // For student dictation homework
         let currentMathTemplate = null;    // For student-generated math homework
         let currentWordChainProblem = null; // 현재 끝말잇기 문제 템플릿
+        let isLibraryLoading = false;
 
         // --- DOM Elements ---
         const views = {
@@ -2630,20 +2631,29 @@
             document.querySelectorAll('.complete-rule-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     if (isAdminViewing) return;
-                    const ruleId = e.target.dataset.ruleid;
-                    const reward = Number(e.target.dataset.reward);
+                    const button = e.currentTarget;
+                    if (button.disabled) return;
+                    button.disabled = true;
+                    button.textContent = '완료됨';
+                    button.classList.remove('bg-green-500', 'hover:bg-green-600');
+                    button.classList.add('bg-gray-300');
+                    const ruleId = button.dataset.ruleid;
+                    const reward = Number(button.dataset.reward);
                     const userRef = doc(db, "users", currentUserData.id);
                     const ruleRef = doc(db, `users/${currentUserData.id}/assignedLifeRules`, ruleId);
 
-                      await updateDoc(userRef, { balance: increment(reward) });
-                      await updateDoc(ruleRef, { lastCompletedAt: serverTimestamp() });
+                    try {
+                        await updateDoc(userRef, { balance: increment(reward) });
+                        await updateDoc(ruleRef, { lastCompletedAt: serverTimestamp() });
 
-                      const userDoc = await getDoc(userRef);
-                      currentUserData = { id: userDoc.id, ...userDoc.data() };
-                      viewedUserData = currentUserData;
-                      showModal('참 잘했어요!', `${formatCurrency(reward)}을 획득했습니다!`);
-                      updateDashboardDisplay();
-                      renderLifeRulesForStudent();
+                        const userDoc = await getDoc(userRef);
+                        currentUserData = { id: userDoc.id, ...userDoc.data() };
+                        viewedUserData = currentUserData;
+                        showModal('참 잘했어요!', `${formatCurrency(reward)}을 획득했습니다!`);
+                    } finally {
+                        updateDashboardDisplay();
+                        renderLifeRulesForStudent();
+                    }
                 });
             });
 
@@ -5031,30 +5041,36 @@
         }
 
         async function loadLibraryBooks() {
-            const listEl = document.getElementById('library-book-list');
-            if (!listEl) return;
-            listEl.innerHTML = '';
-            const q = query(collection(db, 'Book'), where('isPublic', '==', true));
-            const snap = await getDocs(q);
-            for (const docSnap of snap.docs) {
-                const data = docSnap.data();
-                const item = document.createElement('button');
-                let coverUrl = '';
-                if (data.coverImage) {
-                    try {
-                        coverUrl = await getDownloadURL(storageRef(storage, `Book/${docSnap.id}/${data.coverImage}`));
-                    } catch (e) {
-                        console.error(e);
+            if (isLibraryLoading) return;
+            isLibraryLoading = true;
+            try {
+                const listEl = document.getElementById('library-book-list');
+                if (!listEl) return;
+                listEl.innerHTML = '';
+                const q = query(collection(db, 'Book'), where('isPublic', '==', true));
+                const snap = await getDocs(q);
+                for (const docSnap of snap.docs) {
+                    const data = docSnap.data();
+                    const item = document.createElement('button');
+                    let coverUrl = '';
+                    if (data.coverImage) {
+                        try {
+                            coverUrl = await getDownloadURL(storageRef(storage, `Book/${docSnap.id}/${data.coverImage}`));
+                        } catch (e) {
+                            console.error(e);
+                        }
                     }
+                    item.innerHTML = `<div class="w-32 h-40 bg-gray-200 bg-cover bg-center mb-2"${coverUrl ? ` style="background-image:url('${coverUrl}')"` : ''}></div>` +
+                                     `<div class="font-semibold">${data.title || '제목없음'}</div>` +
+                                     `<div class="text-xs text-gray-600">좋아요 ${data.likesCount || 0} · 댓글 ${data.commentsCount || 0}</div>` +
+                                     `<div class="text-xs text-gray-600">글쓴이: ${data.author || ''}</div>` +
+                                     `<div class="text-xs text-gray-600">코드: ${docSnap.id}</div>`;
+                    item.className = 'text-left p-2 bg-gray-100 rounded-lg hover:bg-gray-200 flex-shrink-0';
+                    item.addEventListener('click', () => openLibraryBook(docSnap.id));
+                    listEl.appendChild(item);
                 }
-                item.innerHTML = `<div class="w-32 h-40 bg-gray-200 bg-cover bg-center mb-2"${coverUrl ? ` style="background-image:url('${coverUrl}')"` : ''}></div>` +
-                                 `<div class="font-semibold">${data.title || '제목없음'}</div>` +
-                                 `<div class="text-xs text-gray-600">좋아요 ${data.likesCount || 0} · 댓글 ${data.commentsCount || 0}</div>` +
-                                 `<div class="text-xs text-gray-600">글쓴이: ${data.author || ''}</div>` +
-                                 `<div class="text-xs text-gray-600">코드: ${docSnap.id}</div>`;
-                item.className = 'text-left p-2 bg-gray-100 rounded-lg hover:bg-gray-200 flex-shrink-0';
-                item.addEventListener('click', () => openLibraryBook(docSnap.id));
-                listEl.appendChild(item);
+            } finally {
+                isLibraryLoading = false;
             }
         }
 
