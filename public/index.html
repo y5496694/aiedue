@@ -1165,7 +1165,14 @@
         let currentWordChainProblem = null; // 현재 끝말잇기 문제 템플릿
         let isLibraryLoading = false;
 
-        const hasTeacherRole = (role) => role === 'teacher' || role === 'superTeacher';
+        const normalizeRole = (role) => typeof role === 'string' ? role.toLowerCase() : '';
+        const hasTeacherRole = (role) => {
+            if (role === 'superTeacher') {
+                return true;
+            }
+            const normalized = normalizeRole(role);
+            return normalized === 'teacher' || normalized === 'superteacher';
+        };
         const isSuperTeacher = (role) => role === 'superTeacher';
 
         // --- DOM Elements ---
@@ -1530,7 +1537,7 @@
 
             const readingLogFilterBtn = document.getElementById('reading-log-filter-btn');
             if (readingLogFilterBtn) {
-                const canFilter = role === 'teacher';
+                const canFilter = hasTeacherRole(role);
                 readingLogFilterBtn.classList.toggle('hidden', !canFilter);
                 if (!canFilter) {
                     showOnlyMyClassReadingLogs = false;
@@ -1544,7 +1551,7 @@
 
 
             if (hasTeacherRole(role)) {
-                if (role === 'superTeacher') {
+                if (isSuperTeacher(role)) {
                     titleEl.textContent = `${dataToShow.name || '슈퍼 관리자'} 슈퍼 관리자 대시보드`;
                 } else {
                     titleEl.textContent = `${dataToShow.name || '교사'} 대시보드`;
@@ -2234,7 +2241,7 @@
 
                 let classStudentSet = new Set();
                 const superTeacher = isSuperTeacher(currentUserData?.role);
-                if (!superTeacher && currentUserData?.role === 'teacher') {
+                if (!superTeacher && hasTeacherRole(currentUserData?.role)) {
                     const classIds = await ensureMyClassStudentIds();
                     classStudentSet = new Set(classIds);
                 }
@@ -2255,7 +2262,7 @@
                     teachers.forEach(teacher => {
                         const li = document.createElement('li');
                         li.className = 'flex justify-between items-center py-2 border-b';
-                        const isTeacherSuper = teacher.role === 'superTeacher';
+                        const isTeacherSuper = isSuperTeacher(teacher.role);
                         const badgeClasses = isTeacherSuper ? 'bg-purple-100 text-purple-800' : 'bg-red-100 text-red-800';
                         const badgeLabel = isTeacherSuper ? '슈퍼 관리자' : '교사';
                         const actions = [];
@@ -5348,7 +5355,7 @@
                 const qSnap = await getDocs(query(collection(db, 'readingLogs'), orderBy('createdAt', 'desc')));
                 let entries = qSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
 
-                if (showOnlyMyClassReadingLogs && currentUserData?.role === 'teacher') {
+                if (showOnlyMyClassReadingLogs && hasTeacherRole(currentUserData?.role)) {
                     if (!myClassStudentIds.length) {
                         const classSnap = await getDoc(doc(db, 'classes', currentUserData.id));
                         myClassStudentIds = classSnap.exists() ? classSnap.data().students || [] : [];
@@ -5390,7 +5397,7 @@
                     rightContainer.className = 'flex items-center ml-2 space-x-2';
                     rightContainer.appendChild(info);
 
-                    if (currentUserData?.role === 'teacher') {
+                    if (hasTeacherRole(currentUserData?.role)) {
                         const delBtn = document.createElement('button');
                         delBtn.textContent = '삭제';
                         delBtn.className = 'text-red-500 text-sm';
