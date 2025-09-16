@@ -264,6 +264,7 @@
         let canEditBook = false;
         let bookIsPublic = false;
         let imagesGenerated = false;
+        const BOOK_STORAGE_ROOT = 'Book';
         // 로그인한 사용자 이름을 저장하고 책의 저자 영역을 동기화합니다.
         window.authorName = '';
         window.syncBookAuthor = function() {
@@ -298,11 +299,16 @@
             if (!bookId) return '';
             const cleaned = cleanStorageValue(value);
             if (!cleaned) return '';
-            if (cleaned.startsWith('Book/')) {
-                return cleaned;
+
+            const folderLower = `${BOOK_STORAGE_ROOT.toLowerCase()}/`;
+            const cleanedLower = cleaned.toLowerCase();
+            if (cleanedLower.startsWith(folderLower)) {
+                const remainder = cleaned.substring(folderLower.length).replace(/^\/+/, '');
+                return remainder ? `${BOOK_STORAGE_ROOT}/${remainder}` : `${BOOK_STORAGE_ROOT}/${bookId}`;
             }
+
             const fileName = extractImageFileName(cleaned);
-            return fileName ? `Book/${bookId}/${fileName}` : '';
+            return fileName ? `${BOOK_STORAGE_ROOT}/${bookId}/${fileName}` : '';
         }
 
         // TTS 함수
@@ -1132,7 +1138,7 @@
                     const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
                     if (match) {
                         coverPage.dataset.imageName = 'cover.webp';
-                        const imgRef = storageRef(storage, `Book/${bookCode}/cover.webp`);
+                        const imgRef = storageRef(storage, `${BOOK_STORAGE_ROOT}/${bookCode}/cover.webp`);
                         uploads.push(uploadDataUrl(imgRef, match[1]));
                         data.coverImage = coverPage.dataset.imageName;
                     } else if (coverPage.dataset.imageName) {
@@ -1156,7 +1162,7 @@
                           const imageName = `character${charIndex}.webp`;
                           if (match) {
                               imgBox.dataset.imageName = imageName;
-                              const imgRef = storageRef(storage, `Book/${bookCode}/${imageName}`);
+                              const imgRef = storageRef(storage, `${BOOK_STORAGE_ROOT}/${bookCode}/${imageName}`);
                               uploads.push(uploadDataUrl(imgRef, match[1]));
                               data[`character${charIndex}Image`] = imageName;
                           } else if (imgBox.dataset.imageName) {
@@ -1192,7 +1198,7 @@
                         const imageName = `story${storyIndex}.webp`;
                         if (match) {
                             imagePage.dataset.imageName = imageName;
-                            const imgRef = storageRef(storage, `Book/${bookCode}/${imageName}`);
+                            const imgRef = storageRef(storage, `${BOOK_STORAGE_ROOT}/${bookCode}/${imageName}`);
                             uploads.push(uploadDataUrl(imgRef, match[1]));
                             data[`story${storyIndex}Image`] = imageName;
                         } else if (imagePage.dataset.imageName) {
