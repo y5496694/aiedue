@@ -270,6 +270,41 @@
             document.querySelectorAll('.book-author-sync').forEach(el => el.textContent = window.authorName);
         };
 
+        // Firebase Storage에 저장된 이미지 경로 호환을 위한 유틸 함수들
+        function cleanStorageValue(value) {
+            if (!value) return '';
+            let result = String(value).split('?')[0];
+            while (true) {
+                try {
+                    const decoded = decodeURIComponent(result);
+                    if (decoded === result) {
+                        return decoded;
+                    }
+                    result = decoded;
+                } catch (err) {
+                    return result;
+                }
+            }
+        }
+
+        function extractImageFileName(value) {
+            const cleaned = cleanStorageValue(value);
+            if (!cleaned) return '';
+            const segments = cleaned.split('/');
+            return segments[segments.length - 1] || cleaned;
+        }
+
+        function resolveStoragePath(bookId, value) {
+            if (!bookId) return '';
+            const cleaned = cleanStorageValue(value);
+            if (!cleaned) return '';
+            if (cleaned.startsWith('Book/')) {
+                return cleaned;
+            }
+            const fileName = extractImageFileName(cleaned);
+            return fileName ? `Book/${bookId}/${fileName}` : '';
+        }
+
         // TTS 함수
         function speak(text) {
             if (window.speechSynthesis) {
@@ -399,16 +434,21 @@
                 listEl.appendChild(item);
 
                 if (data.coverImage) {
-                    const coverPromise = getDownloadURL(storageRef(storage, `Book/${docSnap.id}/${data.coverImage}`))
-                        .then((url) => {
-                            coverDiv.style.backgroundImage = `url('${url}')`;
-                            coverDiv.textContent = '';
-                        })
-                        .catch((error) => {
-                            console.error('표지 불러오기 실패:', error);
-                            coverDiv.textContent = '표지를 불러올 수 없어요';
-                        });
-                    coverFetches.push(coverPromise);
+                    const coverPath = resolveStoragePath(docSnap.id, data.coverImage);
+                    if (coverPath) {
+                        const coverPromise = getDownloadURL(storageRef(storage, coverPath))
+                            .then((url) => {
+                                coverDiv.style.backgroundImage = `url('${url}')`;
+                                coverDiv.textContent = '';
+                            })
+                            .catch((error) => {
+                                console.error('표지 불러오기 실패:', error);
+                                coverDiv.textContent = '표지를 불러올 수 없어요';
+                            });
+                        coverFetches.push(coverPromise);
+                    } else {
+                        coverDiv.textContent = '표지를 불러올 수 없어요';
+                    }
                 }
             }
 
@@ -591,16 +631,20 @@
             if (data.coverImage) {
                 const coverPage = document.querySelector('#spread-0 .book-page:nth-child(2)');
                 if (coverPage) {
-                    const coverRef = storageRef(storage, `Book/${bookCode}/${data.coverImage}`);
-                    coverPage.dataset.imageName = data.coverImage;
-                    const coverPromise = getDownloadURL(coverRef)
-                        .then((url) => {
-                            coverPage.style.backgroundImage = `url('${url}')`;
-                        })
-                        .catch((error) => {
-                            console.error('표지 불러오기 실패:', error);
-                        });
-                    imagePromises.push(coverPromise);
+                    const coverPath = resolveStoragePath(bookCode, data.coverImage);
+                    const coverImageName = extractImageFileName(data.coverImage) || data.coverImage;
+                    coverPage.dataset.imageName = coverImageName;
+                    if (coverPath) {
+                        const coverRef = storageRef(storage, coverPath);
+                        const coverPromise = getDownloadURL(coverRef)
+                            .then((url) => {
+                                coverPage.style.backgroundImage = `url('${url}')`;
+                            })
+                            .catch((error) => {
+                                console.error('표지 불러오기 실패:', error);
+                            });
+                        imagePromises.push(coverPromise);
+                    }
                 }
             }
 
@@ -622,17 +666,21 @@
                 if (imgName) {
                     const box = page.querySelector('.character-image-box');
                     if (box) {
-                        const charRef = storageRef(storage, `Book/${bookCode}/${imgName}`);
-                        box.dataset.imageName = imgName;
-                        const charPromise = getDownloadURL(charRef)
-                            .then((url) => {
-                                box.style.backgroundImage = `url('${url}')`;
-                                box.textContent = '';
-                            })
-                            .catch((error) => {
-                                console.error('등장인물 이미지 불러오기 실패:', error);
-                            });
-                        imagePromises.push(charPromise);
+                        const charPath = resolveStoragePath(bookCode, imgName);
+                        const characterImageName = extractImageFileName(imgName) || imgName;
+                        box.dataset.imageName = characterImageName;
+                        if (charPath) {
+                            const charRef = storageRef(storage, charPath);
+                            const charPromise = getDownloadURL(charRef)
+                                .then((url) => {
+                                    box.style.backgroundImage = `url('${url}')`;
+                                    box.textContent = '';
+                                })
+                                .catch((error) => {
+                                    console.error('등장인물 이미지 불러오기 실패:', error);
+                                });
+                            imagePromises.push(charPromise);
+                        }
                     }
                 }
             });
@@ -663,18 +711,22 @@
                 if (imgName) {
                     const imagePage = spread.querySelector('.book-page:first-child');
                     if (imagePage) {
-                        const storyRef = storageRef(storage, `Book/${bookCode}/${imgName}`);
+                        const storyPath = resolveStoragePath(bookCode, imgName);
                         const pageNumHTML = imagePage.querySelector('.page-number')?.outerHTML || '';
-                        imagePage.dataset.imageName = imgName;
-                        const storyPromise = getDownloadURL(storyRef)
-                            .then((url) => {
-                                imagePage.style.backgroundImage = `url('${url}')`;
-                                imagePage.innerHTML = pageNumHTML;
-                            })
-                            .catch((error) => {
-                                console.error('이야기 이미지 불러오기 실패:', error);
-                            });
-                        imagePromises.push(storyPromise);
+                        const storyImageName = extractImageFileName(imgName) || imgName;
+                        imagePage.dataset.imageName = storyImageName;
+                        if (storyPath) {
+                            const storyRef = storageRef(storage, storyPath);
+                            const storyPromise = getDownloadURL(storyRef)
+                                .then((url) => {
+                                    imagePage.style.backgroundImage = `url('${url}')`;
+                                    imagePage.innerHTML = pageNumHTML;
+                                })
+                                .catch((error) => {
+                                    console.error('이야기 이미지 불러오기 실패:', error);
+                                });
+                            imagePromises.push(storyPromise);
+                        }
                     }
                 }
             });
