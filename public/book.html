@@ -333,28 +333,87 @@
 
         async function loadLibraryBooks() {
             const listEl = document.getElementById('library-book-list');
+            if (!listEl) return;
+
             listEl.innerHTML = '';
-            const q = query(collection(db, 'Book'), where('isPublic', '==', true));
-            const snap = await getDocs(q);
+            const loadingCard = document.createElement('div');
+            loadingCard.className = 'px-4 py-2 bg-white text-sm text-gray-500 rounded-lg shadow-sm flex-shrink-0';
+            loadingCard.textContent = '도서관 책을 불러오는 중입니다...';
+            listEl.appendChild(loadingCard);
+
+            let snap;
+            try {
+                const q = query(collection(db, 'Book'), where('isPublic', '==', true));
+                snap = await getDocs(q);
+            } catch (error) {
+                console.error('도서관 책 불러오기 실패:', error);
+                loadingCard.textContent = '도서관 책을 불러오지 못했습니다.';
+                loadingCard.classList.remove('text-gray-500');
+                loadingCard.classList.add('text-red-500');
+                return;
+            }
+
+            listEl.innerHTML = '';
+
+            if (snap.empty) {
+                const emptyCard = document.createElement('div');
+                emptyCard.className = 'px-4 py-2 bg-white text-sm text-gray-500 rounded-lg shadow-sm flex-shrink-0';
+                emptyCard.textContent = '아직 공개된 책이 없습니다.';
+                listEl.appendChild(emptyCard);
+                return;
+            }
+
+            const coverFetches = [];
+
             for (const docSnap of snap.docs) {
                 const data = docSnap.data();
                 const item = document.createElement('button');
-                let coverUrl = '';
-                if (data.coverImage) {
-                    try {
-                        coverUrl = await getDownloadURL(storageRef(storage, `Book/${docSnap.id}/${data.coverImage}`));
-                    } catch (e) {
-                        console.error(e);
-                    }
-                }
-                item.innerHTML = `<div class="w-32 h-40 bg-gray-200 bg-cover bg-center mb-2"${coverUrl ? ` style="background-image:url('${coverUrl}')"` : ''}></div>` +
-                                  `<div class="font-semibold">${data.title || '제목없음'}</div>` +
-                                  `<div class="text-xs text-gray-600">좋아요 ${data.likesCount || 0} · 댓글 ${data.commentsCount || 0}</div>` +
-                                  `<div class="text-xs text-gray-600">글쓴이: ${data.author || ''}</div>` +
-                                  `<div class="text-xs text-gray-600">코드: ${docSnap.id}</div>`;
                 item.className = 'text-left p-2 bg-gray-100 rounded-lg hover:bg-gray-200 flex-shrink-0';
                 item.addEventListener('click', () => loadBook(docSnap.id));
+
+                const coverDiv = document.createElement('div');
+                coverDiv.className = 'w-32 h-40 bg-gray-200 bg-cover bg-center mb-2 rounded-md flex items-center justify-center text-xs text-gray-500';
+                coverDiv.textContent = data.coverImage ? '표지 불러오는 중...' : '표지 없음';
+                item.appendChild(coverDiv);
+
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'font-semibold truncate';
+                titleDiv.textContent = data.title || '제목없음';
+                item.appendChild(titleDiv);
+
+                const statsDiv = document.createElement('div');
+                statsDiv.className = 'text-xs text-gray-600';
+                statsDiv.textContent = `좋아요 ${data.likesCount || 0} · 댓글 ${data.commentsCount || 0}`;
+                item.appendChild(statsDiv);
+
+                const authorDiv = document.createElement('div');
+                authorDiv.className = 'text-xs text-gray-600';
+                authorDiv.textContent = `글쓴이: ${data.author || ''}`;
+                item.appendChild(authorDiv);
+
+                const codeDiv = document.createElement('div');
+                codeDiv.className = 'text-xs text-gray-600';
+                codeDiv.textContent = `코드: ${docSnap.id}`;
+                item.appendChild(codeDiv);
+
                 listEl.appendChild(item);
+
+                if (data.coverImage) {
+                    const coverPromise = getDownloadURL(storageRef(storage, `Book/${docSnap.id}/${data.coverImage}`))
+                        .then((url) => {
+                            coverDiv.style.backgroundImage = `url('${url}')`;
+                            coverDiv.textContent = '';
+                        })
+                        .catch((error) => {
+                            console.error('표지 불러오기 실패:', error);
+                            coverDiv.textContent = '표지를 불러올 수 없어요';
+                        });
+                    coverFetches.push(coverPromise);
+                }
+            }
+
+            if (coverFetches.length > 0) {
+                Promise.allSettled(coverFetches);
             }
         }
 
@@ -474,19 +533,32 @@
         }
 
         async function loadBook(id) {
-            const bookRef = doc(db, 'Book', id);
-            const bookDoc = await getDoc(bookRef);
-            if (!bookDoc.exists()) {
-                alert('책을 불러올 수 없습니다.');
+            setViewerLoading(true);
+            let bookDoc;
+            try {
+                const bookRef = doc(db, 'Book', id);
+                bookDoc = await getDoc(bookRef);
+            } catch (error) {
+                console.error('책 불러오기 실패:', error);
+                setViewerLoading(false);
+                showNotification('책을 불러올 수 없습니다. 잠시 후 다시 시도해주세요.');
                 return;
             }
+
+            if (!bookDoc.exists()) {
+                setViewerLoading(false);
+                showNotification('책을 불러올 수 없습니다.');
+                return;
+            }
+
             bookCode = id;
             const data = bookDoc.data();
-            bookOwnerUid = data.owner || data.authorId || auth.currentUser.uid;
+            bookOwnerUid = data.owner || data.authorId || (auth.currentUser ? auth.currentUser.uid : null);
             bookIsPublic = !!data.isPublic;
             imagesGenerated = !!data.coverImage;
-            canEditBook = auth.currentUser && auth.currentUser.uid === bookOwnerUid;
+            canEditBook = !!(auth.currentUser && auth.currentUser.uid === bookOwnerUid);
             buildBookViewer();
+            setViewerLoading(true);
 
             for (let i = 1; i < (data.characterSpreadCount || 1); i++) {
                 addCharacterPage();
@@ -506,38 +578,64 @@
             window.authorName = data.author || window.authorName;
             window.syncBookAuthor();
 
+            const viewerPage = document.getElementById('book-viewer-page');
+            const listSection = document.getElementById('book-list-section');
+            if (viewerPage) viewerPage.classList.remove('hidden');
+            if (listSection) listSection.classList.add('hidden');
+
+            bookCurrentPage = 0;
+            setViewMode(bookIsPublic);
+
+            const imagePromises = [];
+
             if (data.coverImage) {
-                try {
-                    const url = await getDownloadURL(storageRef(storage, `Book/${bookCode}/${data.coverImage}`));
-                    const coverPage = document.querySelector('#spread-0 .book-page:nth-child(2)');
-                    coverPage.style.backgroundImage = `url('${url}')`;
+                const coverPage = document.querySelector('#spread-0 .book-page:nth-child(2)');
+                if (coverPage) {
+                    const coverRef = storageRef(storage, `Book/${bookCode}/${data.coverImage}`);
                     coverPage.dataset.imageName = data.coverImage;
-                } catch (e) {
-                    console.error(e);
+                    const coverPromise = getDownloadURL(coverRef)
+                        .then((url) => {
+                            coverPage.style.backgroundImage = `url('${url}')`;
+                        })
+                        .catch((error) => {
+                            console.error('표지 불러오기 실패:', error);
+                        });
+                    imagePromises.push(coverPromise);
                 }
             }
 
             const charPages = document.querySelectorAll('.book-spread[data-page-type="character"] .book-page');
-            for (let i = 0; i < charPages.length; i++) {
-                const idx = i + 1;
-                const page = charPages[i];
+            charPages.forEach((page, index) => {
+                const idx = index + 1;
                 const imgName = data[`character${idx}Image`];
+                const nameVal = data[`character${idx}Name`];
+                const descVal = data[`character${idx}Desc`];
+
+                if (nameVal) {
+                    const nameEl = page.querySelector('.editable-text');
+                    if (nameEl) nameEl.textContent = nameVal;
+                }
+                if (descVal) {
+                    const descEl = page.querySelector('textarea.manual-text-area');
+                    if (descEl) descEl.value = descVal;
+                }
                 if (imgName) {
-                    try {
-                        const url = await getDownloadURL(storageRef(storage, `Book/${bookCode}/${imgName}`));
-                        const box = page.querySelector('.character-image-box');
-                        box.style.backgroundImage = `url('${url}')`;
+                    const box = page.querySelector('.character-image-box');
+                    if (box) {
+                        const charRef = storageRef(storage, `Book/${bookCode}/${imgName}`);
                         box.dataset.imageName = imgName;
-                        box.textContent = '';
-                    } catch (e) {
-                        console.error(e);
+                        const charPromise = getDownloadURL(charRef)
+                            .then((url) => {
+                                box.style.backgroundImage = `url('${url}')`;
+                                box.textContent = '';
+                            })
+                            .catch((error) => {
+                                console.error('등장인물 이미지 불러오기 실패:', error);
+                            });
+                        imagePromises.push(charPromise);
                     }
                 }
-                const nameVal = data[`character${idx}Name`];
-                if (nameVal) page.querySelector('.editable-text').textContent = nameVal;
-                const descVal = data[`character${idx}Desc`];
-                if (descVal) page.querySelector('textarea.manual-text-area').value = descVal;
-            }
+            });
 
             const charSpreads = document.querySelectorAll('.book-spread[data-page-type="character"]');
             charSpreads.forEach((spread, idx) => {
@@ -549,32 +647,44 @@
             });
 
             const storySpreads = document.querySelectorAll('.book-spread[data-page-type="story"]');
-            for (let i = 0; i < storySpreads.length; i++) {
-                const idx = i + 1;
-                const spread = storySpreads[i];
+            storySpreads.forEach((spread, index) => {
+                const idx = index + 1;
                 const imgName = data[`story${idx}Image`];
+                const textVal = data[`story${idx}Text`];
+                const promptVal = data[`story${idx}Prompt`];
+
+                if (textVal) {
+                    const textArea = spread.querySelector('.book-page:last-child textarea.manual-text-area');
+                    if (textArea) textArea.value = textVal;
+                }
+                if (promptVal !== undefined) {
+                    spread.dataset.prompt = promptVal;
+                }
                 if (imgName) {
-                    try {
-                        const url = await getDownloadURL(storageRef(storage, `Book/${bookCode}/${imgName}`));
-                        const imagePage = spread.querySelector('.book-page:first-child');
+                    const imagePage = spread.querySelector('.book-page:first-child');
+                    if (imagePage) {
+                        const storyRef = storageRef(storage, `Book/${bookCode}/${imgName}`);
                         const pageNumHTML = imagePage.querySelector('.page-number')?.outerHTML || '';
-                        imagePage.style.backgroundImage = `url('${url}')`;
-                        imagePage.innerHTML = pageNumHTML;
                         imagePage.dataset.imageName = imgName;
-                    } catch (e) {
-                        console.error(e);
+                        const storyPromise = getDownloadURL(storyRef)
+                            .then((url) => {
+                                imagePage.style.backgroundImage = `url('${url}')`;
+                                imagePage.innerHTML = pageNumHTML;
+                            })
+                            .catch((error) => {
+                                console.error('이야기 이미지 불러오기 실패:', error);
+                            });
+                        imagePromises.push(storyPromise);
                     }
                 }
-                const textVal = data[`story${idx}Text`];
-                if (textVal) spread.querySelector('.book-page:last-child textarea.manual-text-area').value = textVal;
-                const promptVal = data[`story${idx}Prompt`];
-                if (promptVal !== undefined) spread.dataset.prompt = promptVal;
+            });
+
+            if (imagePromises.length > 0) {
+                Promise.allSettled(imagePromises).finally(() => setViewerLoading(false));
+            } else {
+                setViewerLoading(false);
             }
 
-            document.getElementById('book-viewer-page').classList.remove('hidden');
-            document.getElementById('book-list-section').classList.add('hidden');
-            bookCurrentPage = 0;
-            setViewMode(bookIsPublic);
             await loadBookLikes();
             await loadComments();
         }
@@ -791,13 +901,25 @@
 
             viewer.innerHTML = spread0 + spread1 + spread2 + navButtons;
 
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.id = 'book-viewer-loading';
+            loadingOverlay.className = 'absolute inset-0 flex items-center justify-center bg-white/80 hidden';
+            loadingOverlay.innerHTML = '<div class="loader"></div><span class="ml-3 text-gray-600 font-semibold">책을 불러오는 중...</span>';
+            viewer.appendChild(loadingOverlay);
+
             bookCurrentPage = 0;
             document.getElementById('spread-0').classList.add('active'); // 첫 페이지 활성화
             updateBookView();
             // 빌드 후 로그인한 사용자의 이름을 저자 영역에 반영합니다.
             window.syncBookAuthor();
         }
-        
+
+        function setViewerLoading(isLoading) {
+            const overlay = document.getElementById('book-viewer-loading');
+            if (!overlay) return;
+            overlay.classList.toggle('hidden', !isLoading);
+        }
+
         // ID 및 페이지 번호 재정렬
         function updatePageNumbersAndIDs() {
             const spreads = document.querySelectorAll("#book-viewer .book-spread");
