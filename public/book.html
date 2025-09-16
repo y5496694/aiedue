@@ -67,8 +67,9 @@
             <button id="book-teacher-login-btn" class="w-full py-2 rounded-md btn btn-primary">교사 로그인</button>
             <button id="book-teacher-google-login-btn" class="w-full py-2 mt-2 rounded-md btn btn-secondary"><i class="fab fa-google mr-2"></i>Google로 로그인</button>
         </div>
-        <div class="mt-6 text-center">
+        <div class="mt-6 text-center space-y-2">
             <button id="book-show-student-register-btn" class="w-full text-center text-sm text-amber-600 hover:underline">처음이신가요? 학생 등록하기</button>
+            <button id="book-show-teacher-register-btn" class="w-full text-center text-sm text-amber-600 hover:underline">교사이신가요? 회원가입하기</button>
         </div>
     </div>
 
@@ -80,6 +81,24 @@
         </div>
         <button id="book-student-register-btn" class="w-full py-2 rounded-md btn btn-primary mb-4">등록하고 코드 받기</button>
         <button id="book-back-to-login-btn" class="w-full text-center text-sm text-gray-600 hover:underline">로그인 화면으로 돌아가기</button>
+    </div>
+
+    <div id="book-teacher-register-view" class="max-w-md mx-auto mb-8 bg-white p-6 rounded-lg shadow-lg hidden">
+        <h2 class="text-2xl font-bold mb-6 text-center">🧑‍🏫 교사 회원가입</h2>
+        <div class="mb-4">
+            <label for="book-teacher-name" class="block text-sm font-medium text-gray-700 mb-1">이름</label>
+            <input type="text" id="book-teacher-name" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="이름을 입력하세요">
+        </div>
+        <div class="mb-4">
+            <label for="book-teacher-register-email" class="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+            <input type="email" id="book-teacher-register-email" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="example@email.com">
+        </div>
+        <div class="mb-6">
+            <label for="book-teacher-register-password" class="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+            <input type="password" id="book-teacher-register-password" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="6자리 이상 비밀번호를 입력하세요">
+        </div>
+        <button id="book-teacher-register-btn" class="w-full py-2 rounded-md btn btn-primary mb-4">회원가입</button>
+        <button id="book-teacher-back-to-login-btn" class="w-full text-center text-sm text-gray-600 hover:underline">로그인 화면으로 돌아가기</button>
     </div>
 
     <div id="book-content" class="hidden">
@@ -1536,18 +1555,38 @@
         teacherLoginTab.addEventListener('click', () => switchLoginTab('teacher'));
         switchLoginTab('student');
 
-        const registerView = document.getElementById('book-student-register-view');
-        const showRegisterBtn = document.getElementById('book-show-student-register-btn');
-        const backToLoginBtn = document.getElementById('book-back-to-login-btn');
+        const loginView = document.getElementById('book-login-view');
+        const studentRegisterView = document.getElementById('book-student-register-view');
+        const teacherRegisterView = document.getElementById('book-teacher-register-view');
+        const showStudentRegisterBtn = document.getElementById('book-show-student-register-btn');
+        const showTeacherRegisterBtn = document.getElementById('book-show-teacher-register-btn');
+        const studentBackToLoginBtn = document.getElementById('book-back-to-login-btn');
+        const teacherBackToLoginBtn = document.getElementById('book-teacher-back-to-login-btn');
 
-        showRegisterBtn.addEventListener('click', () => {
-            document.getElementById('book-login-view').classList.add('hidden');
-            registerView.classList.remove('hidden');
+        showStudentRegisterBtn.addEventListener('click', () => {
+            loginView.classList.add('hidden');
+            teacherRegisterView.classList.add('hidden');
+            studentRegisterView.classList.remove('hidden');
+            switchLoginTab('student');
         });
 
-        backToLoginBtn.addEventListener('click', () => {
-            registerView.classList.add('hidden');
-            document.getElementById('book-login-view').classList.remove('hidden');
+        showTeacherRegisterBtn.addEventListener('click', () => {
+            loginView.classList.add('hidden');
+            studentRegisterView.classList.add('hidden');
+            teacherRegisterView.classList.remove('hidden');
+            switchLoginTab('teacher');
+        });
+
+        studentBackToLoginBtn.addEventListener('click', () => {
+            studentRegisterView.classList.add('hidden');
+            loginView.classList.remove('hidden');
+            switchLoginTab('student');
+        });
+
+        teacherBackToLoginBtn.addEventListener('click', () => {
+            teacherRegisterView.classList.add('hidden');
+            loginView.classList.remove('hidden');
+            switchLoginTab('teacher');
         });
 
         document.getElementById('book-student-register-btn').addEventListener('click', async () => {
@@ -1590,13 +1629,100 @@
                 });
 
                 alert(`환영합니다, ${name} 학생! 고유 코드는 ${newCode} 입니다.`);
-                registerView.classList.add('hidden');
-                document.getElementById('book-login-view').classList.remove('hidden');
+                studentRegisterView.classList.add('hidden');
+                loginView.classList.remove('hidden');
             } catch (e) {
                 console.error('Error adding document: ', e);
                 alert('학생 등록 중 문제가 발생했습니다.');
             }
         });
+
+        document.getElementById('book-teacher-register-btn').addEventListener('click', async () => {
+            const name = document.getElementById('book-teacher-name').value.trim();
+            const email = document.getElementById('book-teacher-register-email').value.trim();
+            const password = document.getElementById('book-teacher-register-password').value;
+
+            if (!name || !email || !password) {
+                alert('이름, 이메일, 비밀번호를 모두 입력해주세요.');
+                return;
+            }
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+                await setDoc(doc(db, 'users', userCredential.user.uid), {
+                    uid: userCredential.user.uid,
+                    name,
+                    email,
+                    role: 'teacher',
+                    userCode: null,
+                    coins: 0,
+                    balance: 0,
+                    portfolio: {},
+                    aeduTokens: 0,
+                    createdAt: serverTimestamp()
+                }, { merge: true });
+
+                await addDoc(collection(db, 'signupLog'), {
+                    name,
+                    email,
+                    role: 'teacher',
+                    signedUpAt: serverTimestamp()
+                });
+
+                document.getElementById('book-teacher-name').value = '';
+                document.getElementById('book-teacher-register-email').value = '';
+                document.getElementById('book-teacher-register-password').value = '';
+
+                alert(`환영합니다, ${name} 선생님!`);
+                teacherRegisterView.classList.add('hidden');
+                loginView.classList.remove('hidden');
+                switchLoginTab('teacher');
+            } catch (e) {
+                console.error('Teacher registration failed:', e);
+                if (e.code === 'auth/email-already-in-use') {
+                    alert('이미 사용 중인 이메일입니다. 다른 이메일을 사용해주세요.');
+                } else if (e.code === 'auth/invalid-email') {
+                    alert('유효한 이메일 주소를 입력해주세요.');
+                } else if (e.code === 'auth/weak-password') {
+                    alert('비밀번호는 6자 이상이어야 합니다.');
+                } else {
+                    alert('교사 회원가입 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.');
+                }
+            }
+        });
+
+        async function ensureUserDocument(user) {
+            const userRef = doc(db, 'users', user.uid);
+            const existingDoc = await getDoc(userRef);
+
+            if (existingDoc.exists()) {
+                return existingDoc;
+            }
+
+            const providerData = user.providerData && user.providerData.length > 0 ? user.providerData[0] : null;
+            const displayName = (user.displayName || '').trim();
+            const inferredName = providerData?.displayName ? providerData.displayName.trim() : '';
+            const fallbackName = user.email ? user.email.split('@')[0] : '';
+            const finalName = displayName || inferredName || fallbackName || '새 사용자';
+
+            const newUserData = {
+                uid: user.uid,
+                name: finalName,
+                email: user.email || providerData?.email || '',
+                role: 'student',
+                userCode: null,
+                coins: 0,
+                balance: 0,
+                portfolio: {},
+                aeduTokens: 0,
+                createdAt: serverTimestamp()
+            };
+
+            await setDoc(userRef, newUserData, { merge: true });
+
+            return await getDoc(userRef);
+        }
 
         const addBookModal = document.getElementById('add-book-modal');
         const cancelAddBookBtn = document.getElementById('cancel-add-book');
@@ -1878,13 +2004,23 @@
         });
 
         onAuthStateChanged(auth, async (user) => {
-            const loginView = document.getElementById('book-login-view');
             const contentView = document.getElementById('book-content');
             const viewerPage = document.getElementById('book-viewer-page');
             const listSection = document.getElementById('book-list-section');
+
             if (user) {
+                try {
+                    await ensureUserDocument(user);
+                } catch (error) {
+                    console.error('Error ensuring user document:', error);
+                    alert('계정 정보를 불러오는 중 문제가 발생했습니다. 다시 로그인해주세요.');
+                    await signOut(auth);
+                    return;
+                }
+
                 loginView.classList.add('hidden');
-                registerView.classList.add('hidden');
+                studentRegisterView.classList.add('hidden');
+                teacherRegisterView.classList.add('hidden');
                 contentView.classList.remove('hidden');
                 viewerPage.classList.add('hidden');
                 listSection.classList.remove('hidden');
@@ -1901,7 +2037,8 @@
                 }
             } else {
                 loginView.classList.remove('hidden');
-                registerView.classList.add('hidden');
+                studentRegisterView.classList.add('hidden');
+                teacherRegisterView.classList.add('hidden');
                 contentView.classList.add('hidden');
             }
         });
