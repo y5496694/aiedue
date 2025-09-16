@@ -1,32 +1,51 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+
+    // 공통: 사용자 역할 조회
+    function userRole() {
+      return request.auth != null
+        ? firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role
+        : null;
+    }
+
     function isTeacher() {
-      return request.auth != null &&
-             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'teacher';
+      return userRole() == 'teacher';
     }
 
     function isStudent() {
-      return request.auth != null &&
-             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'student';
+      return userRole() == 'student';
     }
 
     function isPreflight() {
       return request.method == 'OPTIONS';
     }
 
+    // Book 문서 헬퍼
+    function bookData(bookId) {
+      return firestore.get(/databases/(default)/documents/Book/$(bookId)).data;
+    }
+
+    function isBookAuthor(bookId) {
+      return request.auth != null && bookData(bookId).authorId == request.auth.uid;
+    }
+
+    function isBookPublic(bookId) {
+      return bookData(bookId).isPublic == true;
+    }
+
     // Book 파일: 공개 책은 교사/학생이 읽기 가능, 작성자만 쓰기 가능
     match /Book/{bookId}/{allPaths=**} {
-      allow read: if isPreflight();
-      allow read: if request.auth != null && (
-        let bookDoc = firestore.get(/databases/(default)/documents/Book/$(bookId));
-        bookDoc.data.authorId == request.auth.uid ||
-        isTeacher() ||
-        (bookDoc.data.isPublic == true && isStudent())
-      );
+      // CORS preflight 허용
+      allow read: if isPreflight()
+                  || (request.auth != null && (
+                        isBookAuthor(bookId) ||
+                        isTeacher() ||
+                        (isStudent() && isBookPublic(bookId))
+                     ));
 
-      allow write: if request.auth != null &&
-        firestore.get(/databases/(default)/documents/Book/$(bookId)).data.authorId == request.auth.uid;
+      // 작성자만 쓰기
+      allow write: if isBookAuthor(bookId);
     }
 
     // 스케치북 파일 (스케치 ID 기반)
