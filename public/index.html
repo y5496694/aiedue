@@ -199,7 +199,7 @@
                     <div class="lg:col-span-2 space-y-6">
                         <div id="wallet-section" class="bg-white p-6 rounded-lg shadow-md">
                             <h2 id="wallet-title" class="text-xl font-bold mb-4">💰 내 지갑 현황</h2>
-                              <div id="wallet-financial-info" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                              <div id="wallet-financial-info" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                                   <div>
                                       <p class="text-sm text-gray-500">현재 잔액</p>
                                       <p id="currentBalance" class="text-3xl font-bold text-sky-600">0 원</p>
@@ -212,6 +212,11 @@
                                   <div>
                                       <p class="text-sm text-gray-500">에이두 토큰</p>
                                       <p id="aedu-token-balance" class="text-3xl font-bold text-purple-600">0 토큰</p>
+                                  </div>
+                                  <div>
+                                      <p class="text-sm text-gray-500">주의 토큰</p>
+                                      <p id="warning-token-balance" class="text-3xl font-bold text-rose-600">0개</p>
+                                      <p class="text-xs text-rose-500">주의 토큰이 많을수록 상점 가격이 올라갑니다.</p>
                                   </div>
                               </div>
                             <hr class="my-4">
@@ -460,6 +465,10 @@
                     <div class="flex items-center space-x-2 mt-1">
                         <input type="number" id="token-adjustment-amount" class="w-full p-2 border rounded-md form-input" placeholder="조정할 토큰 (예: 5, -5)">
                         <button id="adjust-token-btn" class="btn btn-primary px-4 py-2 whitespace-nowrap">토큰 조정</button>
+                    </div>
+                    <div class="flex items-center space-x-2 mt-1">
+                        <input type="number" id="warning-token-adjustment-amount" class="w-full p-2 border rounded-md form-input" placeholder="조정할 주의 토큰 (예: 1, -1)">
+                        <button id="adjust-warning-token-btn" class="btn btn-primary px-4 py-2 whitespace-nowrap">주의 토큰 조정</button>
                     </div>
                 </div>
                 <div>
@@ -1174,7 +1183,24 @@
 
         // --- Utility & Modal Functions ---
         const formatCurrency = (amount) => new Intl.NumberFormat('ko-KR').format(amount) + ' 원';
-        
+
+        const getWarningTokenCount = (user) => {
+            const rawTokens = Number(user?.warningTokens ?? 0);
+            if (!Number.isFinite(rawTokens) || rawTokens <= 0) {
+                return 0;
+            }
+            return Math.floor(rawTokens);
+        };
+
+        const calculatePriceWithWarningTokens = (basePrice, user) => {
+            const safeBasePrice = Number(basePrice);
+            const normalizedBasePrice = Number.isFinite(safeBasePrice) ? Math.max(0, safeBasePrice) : 0;
+            const warningTokenCount = getWarningTokenCount(user);
+            const multiplier = 1 + warningTokenCount;
+            const adjustedPrice = Math.round(normalizedBasePrice * multiplier);
+            return { basePrice: normalizedBasePrice, warningTokenCount, multiplier, adjustedPrice };
+        };
+
         function showModal(title, message, onConfirm = null) {
             modalTitle.textContent = title;
             modalMessage.innerHTML = message;
@@ -1476,6 +1502,11 @@
               document.getElementById('currentBalance').textContent = formatCurrency(balance);
               const tokenBalance = dataToShow.aeduTokens || 0;
               document.getElementById('aedu-token-balance').textContent = `${tokenBalance} 토큰`;
+              const warningTokenBalance = getWarningTokenCount(dataToShow);
+              const warningTokenEl = document.getElementById('warning-token-balance');
+              if (warningTokenEl) {
+                  warningTokenEl.textContent = `${warningTokenBalance}개`;
+              }
             let stockValue = 0;
             if (dataToShow.portfolio) {
                 for (const stockId in dataToShow.portfolio) {
@@ -2087,19 +2118,30 @@
                     const item = { id: docSnap.id, ...docSnap.data() };
                     const card = document.createElement('div');
                     card.className = "bg-white p-4 rounded-lg shadow flex flex-col";
-                    
-                    const imageHtml = item.imageUrl 
+
+                    const imageHtml = item.imageUrl
                         ? `<img src="${item.imageUrl}" alt="${item.name}" class="w-full h-32 object-cover rounded-md mb-3" onerror="this.onerror=null;this.src='https://placehold.co/400x300/F59E0B/FFFFFF?text=Image';">`
                         : `<div class="w-full h-32 bg-gray-200 rounded-md mb-3 flex items-center justify-center"><span class="text-gray-500 text-sm">No Image</span></div>`;
+
+                    const pricing = calculatePriceWithWarningTokens(item.price, viewedUserData);
+                    const priceInfoHtml = pricing.warningTokenCount > 0
+                        ? `<div class="flex flex-col text-sm leading-tight">
+                                <span class="text-gray-500 line-through">원래 가격 ${formatCurrency(pricing.basePrice)}</span>
+                                <span class="text-lg font-bold text-red-600">현재 가격 ${formatCurrency(pricing.adjustedPrice)}</span>
+                                <span class="text-xs text-gray-600">주의 토큰 ${pricing.warningTokenCount}개로 ${pricing.multiplier}배</span>
+                           </div>`
+                        : `<span class="font-bold text-amber-600">${formatCurrency(pricing.basePrice)}</span>`;
 
                     card.innerHTML = `
                         ${imageHtml}
                         <div class="flex flex-col flex-grow">
                             <h3 class="text-lg font-bold">${item.name}</h3>
                             <p class="text-sm text-gray-500 flex-grow my-2">${item.description || ''}</p>
-                            <div class="flex justify-between items-center mt-4">
-                                <span class="font-bold text-amber-600">${formatCurrency(item.price)}</span>
-                                <button data-itemid="${item.id}" data-itemname="${item.name}" data-itemprice="${item.price}" class="buy-item-btn btn btn-primary px-3 py-1 text-sm" ${isAdminViewing ? 'disabled' : ''}>구매</button>
+                            <div class="flex justify-between items-center mt-4 gap-2">
+                                <div class="flex-1 text-left">
+                                    ${priceInfoHtml}
+                                </div>
+                                <button data-itemid="${item.id}" data-itemname="${item.name}" data-itemprice="${pricing.basePrice}" class="buy-item-btn btn btn-primary px-3 py-1 text-sm" ${isAdminViewing ? 'disabled' : ''}>구매</button>
                             </div>
                             ${currentUserData.role === 'teacher' ? `
                             <div class="mt-2 flex justify-end space-x-2">
@@ -2130,8 +2172,12 @@
 
         async function handleBuyItem(itemId, itemName, itemPrice) {
             if (isAdminViewing) return;
-            const price = Number(itemPrice);
-            showModal('구매 확인', `'${itemName}'을(를) ${formatCurrency(price)}에 구매하시겠습니까?`, async () => {
+            if (!currentUserData) return;
+            const pricing = calculatePriceWithWarningTokens(itemPrice, currentUserData);
+            const confirmationMessage = pricing.warningTokenCount > 0
+                ? `"${itemName}"을(를) ${formatCurrency(pricing.adjustedPrice)}에 구매하시겠습니까?<br><span class="text-sm text-gray-600">원래 가격 ${formatCurrency(pricing.basePrice)} · 주의 토큰 ${pricing.warningTokenCount}개 → ${pricing.multiplier}배</span>`
+                : `"${itemName}"을(를) ${formatCurrency(pricing.adjustedPrice)}에 구매하시겠습니까?`;
+            showModal('구매 확인', confirmationMessage, async () => {
                 modal.style.display = 'none';
                 const userRef = doc(db, "users", currentUserData.id);
                 try {
@@ -2139,10 +2185,10 @@
                         const userSnap = await transaction.get(userRef);
                         const userData = userSnap.data();
                         const balance = userData.balance || userData.coins || 0;
-                        if (balance < price) {
+                        if (balance < pricing.adjustedPrice) {
                             throw new Error('잔액이 부족합니다.');
                         }
-                        transaction.update(userRef, { balance: increment(-price) });
+                        transaction.update(userRef, { balance: increment(-pricing.adjustedPrice) });
                     });
 
                     await addDoc(collection(db, 'purchaseLog'), {
@@ -2150,7 +2196,10 @@
                         studentName: currentUserData.name,
                         itemId: itemId,
                         itemName: itemName,
-                        price: price,
+                        price: pricing.adjustedPrice,
+                        basePrice: pricing.basePrice,
+                        warningTokenCount: pricing.warningTokenCount,
+                        priceMultiplier: pricing.multiplier,
                         purchasedAt: serverTimestamp()
                     });
 
@@ -2334,6 +2383,45 @@
                 await updateDoc(doc(db, "users", studentToAdjustId), { aeduTokens: increment(amount) });
                 showModal('성공', '토큰 조정이 완료되었습니다.');
                 document.getElementById('token-adjustment-amount').value = '';
+            });
+
+            document.getElementById('adjust-warning-token-btn').addEventListener('click', async () => {
+                const rawAmount = Number(document.getElementById('warning-token-adjustment-amount').value);
+                if (!Number.isFinite(rawAmount) || rawAmount === 0) {
+                    showModal('오류', '정확한 주의 토큰 수를 입력하세요.');
+                    return;
+                }
+                if (!Number.isInteger(rawAmount)) {
+                    showModal('오류', '주의 토큰은 정수로만 조정할 수 있습니다.');
+                    return;
+                }
+                const amount = rawAmount;
+                const userRef = doc(db, "users", studentToAdjustId);
+                try {
+                    await runTransaction(db, async (transaction) => {
+                        const userSnap = await transaction.get(userRef);
+                        if (!userSnap.exists()) {
+                            throw new Error('학생 정보를 찾을 수 없습니다.');
+                        }
+                        const currentTokensRaw = Number(userSnap.data().warningTokens ?? 0);
+                        const currentTokens = Number.isFinite(currentTokensRaw) ? Math.floor(currentTokensRaw) : 0;
+                        const updatedTokens = Math.max(0, currentTokens + amount);
+                        transaction.update(userRef, { warningTokens: updatedTokens });
+                    });
+                    showModal('성공', '주의 토큰 조정이 완료되었습니다.');
+                    document.getElementById('warning-token-adjustment-amount').value = '';
+                    const updatedSnap = await getDoc(userRef);
+                    if (updatedSnap.exists() && viewedUserData && viewedUserData.id === studentToAdjustId) {
+                        viewedUserData = { id: updatedSnap.id, ...updatedSnap.data() };
+                        if (currentUserData && currentUserData.id === studentToAdjustId) {
+                            currentUserData = viewedUserData;
+                        }
+                        updateDashboardDisplay();
+                        await loadAndRenderShopItems();
+                    }
+                } catch (error) {
+                    showModal('오류', error.message || '주의 토큰 조정 중 오류가 발생했습니다.');
+                }
             });
 
             document.querySelectorAll('.reset-stock-btn').forEach(btn => btn.addEventListener('click', async (e) => {
@@ -4254,8 +4342,27 @@
                     const log = logDoc.data();
                     const li = document.createElement('li');
                     li.className = "border-b pb-2 mb-2";
+                    const finalPrice = Number(log.price);
+                    const hasFinalPrice = Number.isFinite(finalPrice);
+                    const basePrice = Number(log.basePrice);
+                    const hasBasePrice = Number.isFinite(basePrice);
+                    const warningCount = Number(log.warningTokenCount);
+                    const hasWarningPenalty = Number.isFinite(warningCount) && warningCount > 0;
+                    const multiplier = Number(log.priceMultiplier);
+                    const hasMultiplier = Number.isFinite(multiplier) && multiplier > 0;
+                    let priceDetails = '';
+                    if (hasFinalPrice) {
+                        let detailText = `결제 금액: ${formatCurrency(finalPrice)}`;
+                        if (hasWarningPenalty && hasBasePrice && hasMultiplier) {
+                            detailText += ` (원래 ${formatCurrency(basePrice)}, ${multiplier}배)`;
+                        } else if (hasBasePrice && basePrice !== finalPrice) {
+                            detailText += ` (원래 ${formatCurrency(basePrice)})`;
+                        }
+                        priceDetails = `<p class="text-xs text-gray-600">${detailText}</p>`;
+                    }
                     li.innerHTML = `
                         <p><span class="font-semibold">${log.studentName}</span> 학생이 <span class="font-semibold">${log.itemName}</span> 구매</p>
+                        ${priceDetails}
                         <p class="text-xs text-gray-500">${log.purchasedAt.toDate().toLocaleString('ko-KR')}</p>
                     `;
                     logEl.appendChild(li);
