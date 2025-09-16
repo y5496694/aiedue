@@ -1,7 +1,7 @@
 [
   {
     "origin": ["https://aiedue.netlify.app"],
-    "method": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"],
+    "method": ["GET", "POST", "PUT", "DELETE", "HEAD"],
     "responseHeader": ["Content-Type", "x-goog-resumable", "Authorization"],
     "maxAgeSeconds": 3600
   }
