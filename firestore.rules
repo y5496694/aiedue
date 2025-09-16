@@ -5,14 +5,12 @@ service cloud.firestore {
     // 교사 역할 확인
     function isSuperTeacher() {
       return request.auth != null &&
-             ['superTeacher', 'superteacher'].has(
-               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
-             );
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superTeacher';
     }
 
     function isTeacher() {
       return request.auth != null &&
-             ['teacher', 'superTeacher', 'superteacher'].has(
+             ['teacher', 'superTeacher'].has(
                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
              );
     }
