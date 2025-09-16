@@ -1365,17 +1365,27 @@
             document.getElementById('back-to-home-btn').classList.add('hidden');
 
             if (user && !user.isAnonymous) {
-                const userDoc = await getDoc(doc(db, "users", user.uid));
-                if (userDoc.exists()) {
-                    currentUserData = { id: user.uid, ...userDoc.data() };
-                    viewedUserData = currentUserData; // By default, you view your own data
-                    showDashboard(currentUserData.role);
-                } else {
+                try {
+                    const userDoc = await ensureUserDocument(user);
+
+                    if (userDoc && userDoc.exists()) {
+                        currentUserData = { id: user.uid, ...userDoc.data() };
+                        viewedUserData = currentUserData; // By default, you view your own data
+                        showDashboard(currentUserData.role);
+                    } else {
+                        currentUserData = null;
+                        viewedUserData = null;
+                        switchView('login');
+                    }
+                } catch (error) {
+                    console.error('Error initializing user after authentication:', error);
+                    showModal('로그인 오류', '계정 정보를 불러오는 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.');
                     currentUserData = null;
                     viewedUserData = null;
+                    await signOut(auth);
                     switchView('login');
                 }
-            } else { 
+            } else {
                 if (!isAdminViewing) {
                     currentUserData = null;
                     viewedUserData = null;
@@ -1388,6 +1398,37 @@
 
         async function initializeAuthentication() {
             // Kept for potential future use
+        }
+
+        async function ensureUserDocument(user) {
+            const userRef = doc(db, 'users', user.uid);
+            const existingDoc = await getDoc(userRef);
+
+            if (existingDoc.exists()) {
+                return existingDoc;
+            }
+
+            const providerData = user.providerData && user.providerData.length > 0 ? user.providerData[0] : null;
+            const displayName = (user.displayName || '').trim();
+            const inferredName = providerData && providerData.displayName ? providerData.displayName.trim() : '';
+            const fallbackName = user.email ? user.email.split('@')[0] : '';
+            const finalName = displayName || inferredName || fallbackName || '새 사용자';
+
+            const newUserData = {
+                uid: user.uid,
+                name: finalName,
+                email: user.email || (providerData ? providerData.email || '' : ''),
+                role: 'student',
+                userCode: null,
+                coins: 0,
+                balance: 0,
+                portfolio: {},
+                createdAt: serverTimestamp()
+            };
+
+            await setDoc(userRef, newUserData, { merge: true });
+
+            return await getDoc(userRef);
         }
 
         // --- Dashboard Logic ---
