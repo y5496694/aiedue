@@ -485,7 +485,7 @@
             bookOwnerUid = data.owner || data.authorId || auth.currentUser.uid;
             bookIsPublic = !!data.isPublic;
             imagesGenerated = !!data.coverImage;
-            canEditBook = auth.currentUser && (auth.currentUser.uid === bookOwnerUid || window.currentUserRole === 'teacher');
+            canEditBook = auth.currentUser && auth.currentUser.uid === bookOwnerUid;
             buildBookViewer();
 
             for (let i = 1; i < (data.characterSpreadCount || 1); i++) {

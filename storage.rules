@@ -6,20 +6,25 @@ service firebase.storage {
              firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'teacher';
     }
 
-    // Book 파일: 공개 책은 누구나 읽기 가능, 작성자 또는 교사만 쓰기 가능
+    function isStudent() {
+      return request.auth != null &&
+             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'student';
+    }
+
+    // Book 파일: 공개 책은 교사/학생이 읽기 가능, 작성자만 쓰기 가능
     match /Book/{bookId}/{allPaths=**} {
       allow read: if request.auth != null &&
         (
-          firestore.get(/databases/(default)/documents/Book/$(bookId)).data.isPublic == true ||
           firestore.get(/databases/(default)/documents/Book/$(bookId)).data.authorId == request.auth.uid ||
-          isTeacher()
+          isTeacher() ||
+          (
+            firestore.get(/databases/(default)/documents/Book/$(bookId)).data.isPublic == true &&
+            isStudent()
+          )
         );
 
       allow write: if request.auth != null &&
-        (
-          firestore.get(/databases/(default)/documents/Book/$(bookId)).data.authorId == request.auth.uid ||
-          isTeacher()
-        );
+        firestore.get(/databases/(default)/documents/Book/$(bookId)).data.authorId == request.auth.uid;
     }
 
     // 스케치북 파일 (스케치 ID 기반)

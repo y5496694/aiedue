@@ -8,6 +8,12 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher';
     }
 
+    // 학생 역할 확인
+    function isStudent() {
+      return request.auth != null &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
+    }
+
     // ──────────────────────────────────────────────────────────────
     // 사용자 정보 및 하위 데이터
     // ──────────────────────────────────────────────────────────────
@@ -94,19 +100,19 @@ service cloud.firestore {
       allow create: if request.auth != null &&
                     request.resource.data.authorId == request.auth.uid;
 
-      // 읽기: 공개 책은 모두, 비공개는 작성자 또는 교사만
+      // 읽기: 공개 책은 교사/학생 모두, 비공개는 작성자 또는 교사만
       allow read: if request.auth != null &&
-                  (resource.data.isPublic == true ||
-                   resource.data.authorId == request.auth.uid || isTeacher());
+                  (resource.data.authorId == request.auth.uid ||
+                   isTeacher() ||
+                   (resource.data.isPublic == true && isStudent()));
 
-      // 수정: 작성자 또는 교사이며, authorId를 변경할 수 없음
+      // 수정: 작성자만 가능하며 authorId를 변경할 수 없음
       // 또한, 좋아요/댓글 수 증가를 위해 likesCount 또는 commentsCount 를
       // +1만큼 증가시키는 업데이트는 모든 인증된 사용자에게 허용
       allow update: if request.auth != null &&
         (
           (resource.data.authorId == request.auth.uid &&
            request.resource.data.authorId == request.auth.uid)
-          || isTeacher()
           || (
             request.resource.data.diff(resource.data).changedKeys().hasOnly(['likesCount']) &&
             request.resource.data.likesCount == resource.data.likesCount + 1
@@ -153,6 +159,12 @@ service cloud.firestore {
           allow create, delete: if request.auth != null && request.auth.uid == userId;
         }
       }
+    }
+
+    // 관리자용 가입 로그
+    match /signupLog/{logId} {
+      allow create: if request.auth != null;
+      allow read: if isTeacher();
     }
 
     // ──────────────────────────────────────────────────────────────
