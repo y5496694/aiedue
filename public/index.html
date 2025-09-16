@@ -1165,15 +1165,12 @@
         let currentWordChainProblem = null; // 현재 끝말잇기 문제 템플릿
         let isLibraryLoading = false;
 
-        const normalizeRole = (role) => typeof role === 'string' ? role.toLowerCase() : '';
+        const normalizeRole = (role) => typeof role === 'string' ? role.trim().toLowerCase() : '';
         const hasTeacherRole = (role) => {
-            if (role === 'superTeacher') {
-                return true;
-            }
             const normalized = normalizeRole(role);
             return normalized === 'teacher' || normalized === 'superteacher';
         };
-        const isSuperTeacher = (role) => role === 'superTeacher';
+        const isSuperTeacher = (role) => normalizeRole(role) === 'superteacher';
 
         // --- DOM Elements ---
         const views = {

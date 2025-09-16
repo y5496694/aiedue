@@ -5,7 +5,9 @@ service cloud.firestore {
     // 교사 역할 확인
     function isSuperTeacher() {
       return request.auth != null &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superTeacher';
+             ['superTeacher', 'superteacher'].has(
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+             );
     }
 
     function isTeacher() {
