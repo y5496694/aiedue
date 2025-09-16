@@ -1427,15 +1427,38 @@
             const userRef = doc(db, 'users', user.uid);
             const existingDoc = await getDoc(userRef);
 
-            if (existingDoc.exists()) {
-                return existingDoc;
-            }
-
             const providerData = user.providerData && user.providerData.length > 0 ? user.providerData[0] : null;
             const displayName = (user.displayName || '').trim();
             const inferredName = providerData && providerData.displayName ? providerData.displayName.trim() : '';
             const fallbackName = user.email ? user.email.split('@')[0] : '';
             const finalName = displayName || inferredName || fallbackName || '새 사용자';
+
+            if (existingDoc.exists()) {
+                const data = existingDoc.data() || {};
+                const updates = {};
+                const normalizedRole = typeof data.role === 'string' ? data.role.toLowerCase() : '';
+                if (normalizedRole === 'teacher' && data.role !== 'teacher') {
+                    updates.role = 'teacher';
+                } else if (normalizedRole === 'student' && data.role !== 'student') {
+                    updates.role = 'student';
+                } else if (!['teacher', 'student'].includes(normalizedRole)) {
+                    updates.role = 'student';
+                }
+                if (!data.name) {
+                    updates.name = finalName;
+                }
+                if (!data.email && (user.email || (providerData && providerData.email))) {
+                    updates.email = user.email || (providerData ? providerData.email || '' : '');
+                }
+                if (!data.uid) {
+                    updates.uid = user.uid;
+                }
+                if (Object.keys(updates).length > 0) {
+                    await setDoc(userRef, updates, { merge: true });
+                    return await getDoc(userRef);
+                }
+                return existingDoc;
+            }
 
             const newUserData = {
                 uid: user.uid,
