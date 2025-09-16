@@ -279,13 +279,14 @@
                                 <button id="edit-student-info-btn" class="edit-info-btn text-2xl leading-none">⚙️</button>
                             </div>
                             <p>고유 코드: <strong id="dashboard-code" class="text-lg"></strong></p>
+                            <button id="teacher-role-request-btn" class="mt-4 w-full py-2 rounded-md btn btn-primary hidden">교사 권한 신청</button>
                         </div>
                         <div id="my-class-section" class="hidden bg-white p-6 rounded-lg shadow-md"></div>
                         <div id="teacher-admin-panel" class="hidden bg-white p-6 rounded-lg shadow-md">
                             <h2 class="text-xl font-bold mb-4 text-red-600">⚙️ 관리자 메뉴</h2>
                             <button id="assign-homework-start-btn" class="w-full py-2 mb-2 rounded-md btn bg-amber-500 hover:bg-amber-600 text-white">숙제 배부하기</button>
                             <button id="assign-life-rule-start-btn" class="w-full py-2 mb-2 rounded-md btn bg-green-500 hover:bg-green-600 text-white">생활 규칙 배부하기</button>
-                            <button id="admin-page-btn" class="w-full py-2 rounded-md btn bg-red-500 hover:bg-red-600 text-white">관리자 페이지로 이동</button>
+                            <button id="admin-page-btn" class="w-full py-2 rounded-md btn bg-red-500 hover:bg-red-600 text-white">교사 페이지로 이동</button>
                             <div id="teacher-info-panel" class="mt-6 border-t pt-4">
                                 <div class="flex items-center justify-between mb-2">
                                     <h3 class="text-lg font-bold">내 정보</h3>
@@ -403,7 +404,7 @@
                         <ul id="adminUserList" class="space-y-2 text-sm max-h-96 overflow-y-auto"><li>불러오는 중...</li></ul>
                     </div>
                     <div class="space-y-6">
-                        <div class="bg-white p-6 rounded-xl shadow-lg">
+                        <div id="admin-market-controls-card" class="bg-white p-6 rounded-xl shadow-lg">
                             <h3 class="text-xl font-semibold text-red-600 mb-2">시장 관리</h3>
                             <button id="randomizePricesBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg text-sm">주가 임의 변경</button>
                         </div>
@@ -437,6 +438,27 @@
             <h3 id="modal-title" class="text-xl font-bold mb-4"></h3>
             <p id="modal-message" class="mb-6"></p>
             <button id="modal-confirm-btn" class="py-2 px-6 rounded-md btn btn-primary">확인</button>
+        </div>
+    </div>
+    <div id="teacher-request-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" id="close-teacher-request-modal">&times;</span>
+            <h3 class="text-xl font-bold mb-4">교사 권한 신청</h3>
+            <form id="teacher-request-form" class="space-y-4 text-left">
+                <div>
+                    <label for="teacher-request-school" class="block text-sm font-medium text-gray-700 mb-1">어느 학교이신가요?</label>
+                    <input type="text" id="teacher-request-school" class="w-full p-2 border rounded-md form-input" placeholder="학교명을 입력해주세요" required>
+                </div>
+                <div>
+                    <label for="teacher-request-name" class="block text-sm font-medium text-gray-700 mb-1">성함이 어떻게 되시나요?</label>
+                    <input type="text" id="teacher-request-name" class="w-full p-2 border rounded-md form-input" placeholder="실명을 입력해주세요" required>
+                </div>
+                <p id="teacher-request-status" class="text-sm text-gray-500 hidden"></p>
+                <div class="flex justify-end space-x-2">
+                    <button type="button" id="cancel-teacher-request-btn" class="btn btn-secondary px-4 py-2">취소</button>
+                    <button type="submit" id="submit-teacher-request-btn" class="btn btn-primary px-4 py-2">신청하기</button>
+                </div>
+            </form>
         </div>
     </div>
     <div id="library-book-modal" class="modal-overlay hidden">
@@ -504,23 +526,6 @@
                 <div>
                     <h4 class="font-bold text-lg border-b pb-1 mb-2">📜 배부된 생활 규칙</h4>
                     <div id="adjust-modal-liferules" class="mt-1 space-y-2 text-sm"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div id="assign-code-modal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <span class="close-button" id="close-assign-code-modal-btn">&times;</span>
-            <h3 id="assign-code-modal-title" class="text-xl font-bold mb-4">고유 코드 부여/수정</h3>
-            <p class="mb-4 text-gray-600">새로운 고유 코드를 입력하세요. 이 코드는 학생의 새 비밀번호가 됩니다.</p>
-            <div class="text-left space-y-3">
-                <input type="hidden" id="assign-code-userid">
-                <div>
-                    <label for="new-user-code" class="block text-sm font-medium">새 고유 숫자 코드</label>
-                    <input type="number" id="new-user-code" required class="w-full p-2 border rounded-md form-input">
-                </div>
-                <div class="text-right">
-                    <button id="save-new-code-btn" class="btn btn-primary">저장</button>
                 </div>
             </div>
         </div>
@@ -1160,6 +1165,9 @@
         let currentWordChainProblem = null; // 현재 끝말잇기 문제 템플릿
         let isLibraryLoading = false;
 
+        const hasTeacherRole = (role) => role === 'teacher' || role === 'superTeacher';
+        const isSuperTeacher = (role) => role === 'superTeacher';
+
         // --- DOM Elements ---
         const views = {
             login: document.getElementById('login-view'),
@@ -1186,7 +1194,6 @@
         const homeworkModal = document.getElementById('homework-modal');
         const problemCreationModal = document.getElementById('problem-creation-modal');
         const assignmentModal = document.getElementById('assignment-modal');
-        const assignCodeModal = document.getElementById('assign-code-modal');
         const dictationCreationModal = document.getElementById('dictation-creation-modal');
         const dictationModal = document.getElementById('dictation-modal');
         const manualProblemCreationModal = document.getElementById('manual-problem-creation-modal');
@@ -1201,6 +1208,14 @@
         const closeLibraryBookModalBtn = document.getElementById('close-library-book-modal');
         const readingLogEntryModal = document.getElementById('reading-log-entry-modal');
         const editInfoModal = document.getElementById('edit-info-modal');
+        const teacherRequestModal = document.getElementById('teacher-request-modal');
+        const teacherRequestForm = document.getElementById('teacher-request-form');
+        const teacherRequestStatusText = document.getElementById('teacher-request-status');
+        const teacherRequestSchoolInput = document.getElementById('teacher-request-school');
+        const teacherRequestNameInput = document.getElementById('teacher-request-name');
+        const closeTeacherRequestModalBtn = document.getElementById('close-teacher-request-modal');
+        const cancelTeacherRequestBtn = document.getElementById('cancel-teacher-request-btn');
+        const teacherRoleRequestBtn = document.getElementById('teacher-role-request-btn');
         let studentToAdjustId = null;
 
 
@@ -1476,7 +1491,7 @@
 
             const walletInfo = document.getElementById('wallet-financial-info');
             const walletTitle = document.getElementById('wallet-title');
-            if (role === 'teacher') {
+            if (hasTeacherRole(role)) {
                 walletSection.classList.remove('hidden');
                 marketSection.classList.add('hidden');
                 assetSection.classList.add('hidden');
@@ -1503,19 +1518,21 @@
                 editStudentInfoBtn.classList.toggle('hidden', role !== 'student' || isAdminViewing || !currentUserData || currentUserData.id !== dataToShow.id);
             }
             if (editTeacherInfoBtn) {
-                editTeacherInfoBtn.classList.toggle('hidden', role !== 'teacher' || isAdminViewing || !currentUserData || currentUserData.id !== dataToShow.id);
+                const showTeacherEdit = hasTeacherRole(role) && !isAdminViewing && currentUserData && currentUserData.id === dataToShow.id;
+                editTeacherInfoBtn.classList.toggle('hidden', !showTeacherEdit);
             }
 
             // Show/hide tabs based on the *actual logged-in user's role*
             document.getElementById('homework-dashboard-tab').style.display = dataToShow.role === 'student' ? 'inline-block' : 'none';
-            document.getElementById('learning-problems-dashboard-tab').style.display = currentUserData.role === 'teacher' ? 'inline-block' : 'none';
-            document.getElementById('life-rules-management-dashboard-tab').style.display = currentUserData.role === 'teacher' ? 'inline-block' : 'none';
-            document.getElementById('teacher-admin-panel').style.display = currentUserData.role === 'teacher' ? 'block' : 'none';
+            document.getElementById('learning-problems-dashboard-tab').style.display = hasTeacherRole(currentUserData.role) ? 'inline-block' : 'none';
+            document.getElementById('life-rules-management-dashboard-tab').style.display = hasTeacherRole(currentUserData.role) ? 'inline-block' : 'none';
+            document.getElementById('teacher-admin-panel').style.display = hasTeacherRole(currentUserData.role) ? 'block' : 'none';
 
             const readingLogFilterBtn = document.getElementById('reading-log-filter-btn');
             if (readingLogFilterBtn) {
-                readingLogFilterBtn.classList.toggle('hidden', role !== 'teacher');
-                if (role !== 'teacher') {
+                const canFilter = role === 'teacher';
+                readingLogFilterBtn.classList.toggle('hidden', !canFilter);
+                if (!canFilter) {
                     showOnlyMyClassReadingLogs = false;
                     readingLogFilterBtn.textContent = '내 반만 보기';
                 }
@@ -1526,8 +1543,12 @@
             document.querySelectorAll('.buy-item-btn, #main-dashboard-bottom-content button').forEach(el => el.disabled = isReadOnly);
 
 
-            if (role === 'teacher') {
-                titleEl.textContent = `${dataToShow.name || '교사'} 대시보드`;
+            if (hasTeacherRole(role)) {
+                if (role === 'superTeacher') {
+                    titleEl.textContent = `${dataToShow.name || '슈퍼 관리자'} 슈퍼 관리자 대시보드`;
+                } else {
+                    titleEl.textContent = `${dataToShow.name || '교사'} 대시보드`;
+                }
                 studentPanel.classList.add('hidden');
                 teacherPanel.classList.remove('hidden');
                 if (teacherEmailEl) {
@@ -1542,6 +1563,11 @@
                 studentPanel.classList.remove('hidden');
                 teacherPanel.classList.add('hidden');
             }
+            const teacherRequestBtn = document.getElementById('teacher-role-request-btn');
+            if (teacherRequestBtn) {
+                const canRequest = currentUserData && viewedUserData && currentUserData.id === viewedUserData.id && !hasTeacherRole(currentUserData.role) && !isAdminViewing;
+                teacherRequestBtn.classList.toggle('hidden', !canRequest);
+            }
             switchView('dashboard');
             switchTab('dashboard', 'main');
             updateDashboardDisplay();
@@ -1552,12 +1578,12 @@
                 renderHomework();
                 renderLifeRulesForStudent();
             }
-            if (currentUserData.role === 'teacher') {
+            if (hasTeacherRole(currentUserData.role)) {
                 loadLearningProblems();
                 loadLifeRules();
             }
             startStockUpdates();
-            document.getElementById('teacher-add-shop-item-btn').classList.toggle('hidden', currentUserData.role !== 'teacher');
+            document.getElementById('teacher-add-shop-item-btn').classList.toggle('hidden', !hasTeacherRole(currentUserData.role));
         }
         
         function updateDashboardDisplay() {
@@ -1951,19 +1977,21 @@
                     uid: userCredential.user.uid,
                     name,
                     email,
-                    role: 'teacher',
+                    role: 'student',
                     userCode: null,
                     coins: 0,
                     balance: 0,
                     portfolio: {},
                     aeduTokens: 0,
-                    createdAt: serverTimestamp()
+                    createdAt: serverTimestamp(),
+                    teacherSignupIntent: true
                 }, { merge: true });
 
                 await addDoc(collection(db, 'signupLog'), {
                     name,
                     email,
-                    role: 'teacher',
+                    role: 'student',
+                    requestedRole: 'teacher',
                     signedUpAt: serverTimestamp()
                 });
 
@@ -1971,7 +1999,7 @@
                 document.getElementById('teacher-register-email').value = '';
                 document.getElementById('teacher-register-password').value = '';
 
-                showModal('가입 완료', `환영합니다, ${name} 선생님!<br>이제 교사용 기능을 이용해보세요.`);
+                showModal('가입 완료', `환영합니다, ${name} 선생님!<br>현재는 학생 권한으로 가입되었으며, 교사 권한 신청을 통해 승인을 요청해주세요.`);
                 switchView('login');
                 switchLoginTab('teacher');
             } catch (error) {
@@ -2092,8 +2120,101 @@
             }
         });
         
+        // Teacher request modal logic
+        async function openTeacherRequestModal() {
+            if (!teacherRequestModal || !teacherRequestForm) return;
+            if (!currentAuthUser) {
+                showModal('오류', '교사 권한 신청을 하려면 먼저 로그인해주세요.');
+                return;
+            }
+
+            teacherRequestSchoolInput.value = '';
+            teacherRequestNameInput.value = currentUserData?.name || '';
+            if (teacherRequestStatusText) {
+                teacherRequestStatusText.textContent = '';
+                teacherRequestStatusText.classList.add('hidden');
+            }
+
+            try {
+                const existingDoc = await getDoc(doc(db, 'teacherRoleRequests', currentAuthUser.uid));
+                if (existingDoc.exists()) {
+                    const data = existingDoc.data();
+                    if (teacherRequestSchoolInput) {
+                        teacherRequestSchoolInput.value = data.school || '';
+                    }
+                    if (teacherRequestNameInput) {
+                        teacherRequestNameInput.value = data.realName || currentUserData?.name || '';
+                    }
+                    if (teacherRequestStatusText) {
+                        const status = data.status || 'pending';
+                        const statusLabel = status === 'approved' ? '승인됨' : (status === 'rejected' || status === 'denied') ? '거절됨' : '검토 중';
+                        const submittedAt = data.requestedAt && typeof data.requestedAt.toDate === 'function'
+                            ? data.requestedAt.toDate().toLocaleString('ko-KR')
+                            : '';
+                        teacherRequestStatusText.textContent = submittedAt
+                            ? `현재 상태: ${statusLabel} (신청일: ${submittedAt})`
+                            : `현재 상태: ${statusLabel}`;
+                        teacherRequestStatusText.classList.remove('hidden');
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load teacher request info:', error);
+            }
+
+            teacherRequestModal.style.display = 'flex';
+        }
+
+        if (teacherRoleRequestBtn) {
+            teacherRoleRequestBtn.addEventListener('click', () => openTeacherRequestModal());
+        }
+        if (closeTeacherRequestModalBtn) {
+            closeTeacherRequestModalBtn.addEventListener('click', () => {
+                teacherRequestModal.style.display = 'none';
+            });
+        }
+        if (cancelTeacherRequestBtn) {
+            cancelTeacherRequestBtn.addEventListener('click', () => {
+                teacherRequestModal.style.display = 'none';
+            });
+        }
+        if (teacherRequestForm) {
+            teacherRequestForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!currentAuthUser) {
+                    showModal('오류', '교사 권한 신청을 하려면 먼저 로그인해주세요.');
+                    return;
+                }
+                const school = teacherRequestSchoolInput.value.trim();
+                const realName = teacherRequestNameInput.value.trim();
+                if (!school || !realName) {
+                    showModal('오류', '모든 질문에 답변을 입력해주세요.');
+                    return;
+                }
+                try {
+                    await setDoc(doc(db, 'teacherRoleRequests', currentAuthUser.uid), {
+                        userId: currentAuthUser.uid,
+                        userName: currentUserData?.name || realName,
+                        userEmail: currentUserData?.email || currentAuthUser.email || '',
+                        school,
+                        realName,
+                        status: 'pending',
+                        requestedAt: serverTimestamp()
+                    }, { merge: true });
+                    teacherRequestModal.style.display = 'none';
+                    showModal('신청 완료', '교사 권한 신청이 접수되었습니다. 슈퍼 관리자가 확인 후 안내드릴 예정입니다.');
+                } catch (error) {
+                    console.error('Teacher request error:', error);
+                    showModal('오류', `교사 권한 신청 중 문제가 발생했습니다: ${error.message}`);
+                }
+            });
+        }
+
         // Admin page logic
         document.getElementById('randomizePricesBtn').addEventListener('click', async () => {
+            if (!isSuperTeacher(currentUserData?.role)) {
+                showModal('권한 없음', '주식 시장 관리는 슈퍼 관리자만 가능합니다.');
+                return;
+            }
             showModal("진행 중", "주가 변경 중...");
             await updateNormalStockPrices();
             showModal('알림', '주식 가격이 임의로 변경되었습니다.');
@@ -2103,29 +2224,50 @@
             const listEl = document.getElementById('adminUserList');
             listEl.innerHTML = '<li>사용자 정보 로딩 중...</li>';
             try {
-                const usersSnapshot = await getDocs(collection(db, "users"));
+                if (!hasTeacherRole(currentUserData?.role)) {
+                    listEl.innerHTML = '<li>교사 권한이 필요합니다.</li>';
+                    updateAdminViewAccess();
+                    return;
+                }
+
+                updateAdminViewAccess();
+
+                let classStudentSet = new Set();
+                const superTeacher = isSuperTeacher(currentUserData?.role);
+                if (!superTeacher && currentUserData?.role === 'teacher') {
+                    const classIds = await ensureMyClassStudentIds();
+                    classStudentSet = new Set(classIds);
+                }
+
+                const usersSnapshot = await getDocs(collection(db, 'users'));
+                const users = usersSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                const teachers = users.filter(u => hasTeacherRole(u.role));
+                const students = users.filter(u => u.role === 'student');
 
                 listEl.innerHTML = '';
-                
-                const users = usersSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                const teachers = users.filter(u => u.role === 'teacher');
-                const students = users.filter(u => u.role === 'student');
 
                 if (teachers.length > 0) {
                     const teacherHeader = document.createElement('h4');
-                    teacherHeader.className = "text-lg font-semibold text-gray-700 mt-4 mb-2 border-b pb-1";
-                    teacherHeader.textContent = "교사 목록";
+                    teacherHeader.className = 'text-lg font-semibold text-gray-700 mt-4 mb-2 border-b pb-1';
+                    teacherHeader.textContent = '교사 목록';
                     listEl.appendChild(teacherHeader);
 
                     teachers.forEach(teacher => {
                         const li = document.createElement('li');
-                        li.className = "flex justify-between items-center py-2 border-b";
+                        li.className = 'flex justify-between items-center py-2 border-b';
+                        const isTeacherSuper = teacher.role === 'superTeacher';
+                        const badgeClasses = isTeacherSuper ? 'bg-purple-100 text-purple-800' : 'bg-red-100 text-red-800';
+                        const badgeLabel = isTeacherSuper ? '슈퍼 관리자' : '교사';
+                        const actions = [];
+                        if (superTeacher && !isTeacherSuper) {
+                            actions.push(`<button data-userid="${teacher.id}" data-username="${teacher.name}" class="convert-to-student-btn btn bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 text-xs">학생으로 전환</button>`);
+                        }
                         li.innerHTML = `
                             <div>
                                 <span class="font-medium">${teacher.name}</span> <span class="text-xs text-gray-500">(${teacher.email || '이메일 없음'})</span>
-                                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">교사</span>
+                                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClasses}">${badgeLabel}</span>
                             </div>
-                            <button data-userid="${teacher.id}" data-username="${teacher.name}" class="convert-to-student-btn btn bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 text-xs">학생으로 전환</button>
+                            <div class="space-x-1 flex items-center">${actions.join('')}</div>
                         `;
                         listEl.appendChild(li);
                     });
@@ -2133,26 +2275,29 @@
 
                 if (students.length > 0) {
                     const studentHeader = document.createElement('h4');
-                    studentHeader.className = "text-lg font-semibold text-gray-700 mt-6 mb-2 border-b pb-1";
-                    studentHeader.textContent = "학생 목록";
+                    studentHeader.className = 'text-lg font-semibold text-gray-700 mt-6 mb-2 border-b pb-1';
+                    studentHeader.textContent = '학생 목록';
                     listEl.appendChild(studentHeader);
-                    
-                    students.sort((a,b) => (a.userCode || 0) - (b.userCode || 0));
+
+                    students.sort((a, b) => (a.userCode || 0) - (b.userCode || 0));
 
                     students.forEach(student => {
                         const li = document.createElement('li');
-                        li.className = "flex justify-between items-center py-2 border-b";
+                        li.className = 'flex justify-between items-center py-2 border-b';
+                        const actionButtons = [`<button data-userid="${student.id}" class="view-student-dashboard-btn btn bg-sky-500 hover:bg-sky-600 text-white px-2 py-1 text-xs">조회</button>`];
+                        if (superTeacher) {
+                            actionButtons.push(`<button data-userid="${student.id}" data-username="${student.name}" class="convert-to-teacher-btn btn bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 text-xs">교사로</button>`);
+                        }
+                        const canAdjust = superTeacher || classStudentSet.has(student.id);
+                        if (canAdjust) {
+                            actionButtons.push(`<button data-studentid="${student.id}" class="adjust-student-btn btn btn-secondary px-2 py-1 text-xs">조정</button>`);
+                        }
                         li.innerHTML = `
                             <div>
                                 <span class="font-medium">${student.name}</span> <span class="text-xs text-gray-500">(코드: ${student.userCode || '없음'})</span>
                                 <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">학생</span>
                             </div>
-                            <div class="space-x-1">
-                                <button data-userid="${student.id}" class="view-student-dashboard-btn btn bg-sky-500 hover:bg-sky-600 text-white px-2 py-1 text-xs">조회</button>
-                                <button data-userid="${student.id}" data-username="${student.name}" class="convert-to-teacher-btn btn bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 text-xs">교사로</button>
-                                <button data-userid="${student.id}" data-username="${student.name}" class="assign-code-btn btn bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 text-xs">코드</button>
-                                <button data-studentid="${student.id}" class="adjust-student-btn btn btn-secondary px-2 py-1 text-xs">조정</button>
-                            </div>
+                            <div class="space-x-1 flex items-center">${actionButtons.join('')}</div>
                         `;
                         listEl.appendChild(li);
                     });
@@ -2160,33 +2305,49 @@
 
                 document.querySelectorAll('.view-student-dashboard-btn').forEach(btn => btn.addEventListener('click', (e) => viewStudentDashboard(e.target.dataset.userid)));
                 document.querySelectorAll('.adjust-student-btn').forEach(btn => btn.addEventListener('click', (e) => openAdjustModal(e.target.dataset.studentid)));
-                document.querySelectorAll('.convert-to-student-btn').forEach(btn => btn.addEventListener('click', (e) => handleRoleSwitch(e.target.dataset.userid, e.target.dataset.username, 'student')));
-                document.querySelectorAll('.convert-to-teacher-btn').forEach(btn => btn.addEventListener('click', (e) => handleRoleSwitch(e.target.dataset.userid, e.target.dataset.username, 'teacher')));
-                document.querySelectorAll('.assign-code-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignCodeModal(e.target.dataset.userid, e.target.dataset.username)));
+                if (superTeacher) {
+                    document.querySelectorAll('.convert-to-student-btn').forEach(btn => btn.addEventListener('click', (e) => handleRoleSwitch(e.target.dataset.userid, e.target.dataset.username, 'student')));
+                    document.querySelectorAll('.convert-to-teacher-btn').forEach(btn => btn.addEventListener('click', (e) => handleRoleSwitch(e.target.dataset.userid, e.target.dataset.username, 'teacher')));
+                }
 
-                document.getElementById('admin-user-search').addEventListener('input', (e) => {
-                    const searchTerm = e.target.value.toLowerCase();
-                    const userItems = document.querySelectorAll('#adminUserList > li');
-                    userItems.forEach(item => {
-                        const itemText = item.textContent.toLowerCase();
-                        if (itemText.includes(searchTerm)) {
-                            item.style.display = 'flex';
-                        } else {
-                            item.style.display = 'none';
-                        }
-                    });
-                });
+                const searchInput = document.getElementById('admin-user-search');
+                if (searchInput) {
+                    searchInput.oninput = (e) => {
+                        const searchTerm = e.target.value.toLowerCase();
+                        const userItems = document.querySelectorAll('#adminUserList > li');
+                        userItems.forEach(item => {
+                            const itemText = item.textContent.toLowerCase();
+                            item.style.display = itemText.includes(searchTerm) ? 'flex' : 'none';
+                        });
+                    };
+                }
 
             } catch (error) {
-                console.error("Error loading admin data:", error);
+                console.error('Error loading admin data:', error);
                 listEl.innerHTML = `<li>사용자 정보 로드 실패: ${error.message}</li>`;
             }
             loadPurchaseLog();
             loadSignupLog();
-            loadAdminMarket();
+            if (isSuperTeacher(currentUserData?.role)) {
+                loadAdminMarket();
+            }
         }
-        
+        function updateAdminViewAccess() {
+            const isSuper = isSuperTeacher(currentUserData?.role);
+            const marketControlsCard = document.getElementById('admin-market-controls-card');
+            if (marketControlsCard) {
+                marketControlsCard.classList.toggle('hidden', !isSuper);
+            }
+            const adminMarketSection = document.getElementById('admin-market-section');
+            if (adminMarketSection) {
+                adminMarketSection.classList.toggle('hidden', !isSuper);
+            }
+        }
         async function handleRoleSwitch(userId, userName, toRole) {
+            if (!isSuperTeacher(currentUserData?.role)) {
+                showModal('권한 없음', '교사 권한 변경은 슈퍼 관리자만 가능합니다.');
+                return;
+            }
             showModal(`${toRole === 'student' ? '학생' : '교사'}으로 전환 확인`, `정말로 '${userName}'님을 ${toRole === 'student' ? '학생' : '교사'}으로 전환하시겠습니까?`, async () => {
                 modal.style.display = 'none';
                 try {
@@ -2202,41 +2363,6 @@
             });
         }
 
-        function openAssignCodeModal(userId, userName) {
-            assignCodeModal.style.display = 'flex';
-            document.getElementById('assign-code-modal-title').textContent = `'${userName}' 학생 코드 부여/수정`;
-            document.getElementById('assign-code-userid').value = userId;
-            document.getElementById('new-user-code').value = '';
-        }
-
-        document.getElementById('close-assign-code-modal-btn').addEventListener('click', () => assignCodeModal.style.display = 'none');
-        document.getElementById('save-new-code-btn').addEventListener('click', async () => {
-            const userId = document.getElementById('assign-code-userid').value;
-            const newCode = document.getElementById('new-user-code').value;
-
-            if (!newCode || !/^\d+$/.test(newCode)) {
-                showModal('오류', '유효한 숫자 코드를 입력해주세요.');
-                return;
-            }
-
-            const newCodeInt = parseInt(newCode, 10);
-
-            try {
-                const userRef = doc(db, "users", userId);
-                await updateDoc(userRef, {
-                    userCode: newCodeInt,
-                    email: `${newCodeInt}@abc.com`
-                });
-                
-                assignCodeModal.style.display = 'none';
-                showModal('코드 변경 완료', `고유 코드가 ${newCodeInt}(으)로 변경되었습니다.<br><strong class="text-red-500">매우 중요: Firebase Console의 Authentication 탭에서 해당 학생의 이메일을 '${newCodeInt}@abc.com'으로, 비밀번호를 '${newCodeInt}qwerty'(으)로 직접 변경해야만 새 코드로 로그인이 가능합니다.</strong>`);
-                loadAdminData();
-            } catch (error) {
-                console.error("Error assigning new code:", error);
-                showModal('오류', '코드 변경 중 오류가 발생했습니다.');
-            }
-        });
-        
         // --- Shop Logic ---
         async function loadAndRenderShopItems() {
             const container = document.getElementById('shop-item-list');
@@ -2277,7 +2403,7 @@
                                 </div>
                                 <button data-itemid="${item.id}" data-itemname="${item.name}" data-itemprice="${pricing.basePrice}" class="buy-item-btn btn btn-primary px-3 py-1 text-sm" ${isAdminViewing ? 'disabled' : ''}>구매</button>
                             </div>
-                            ${currentUserData.role === 'teacher' ? `
+                            ${hasTeacherRole(currentUserData.role) ? `
                             <div class="mt-2 flex justify-end space-x-2">
                                 <button data-itemid="${item.id}" class="edit-item-btn btn bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1">수정</button>
                                 <button data-itemid="${item.id}" class="delete-item-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>
@@ -2290,7 +2416,7 @@
                 document.querySelectorAll('.buy-item-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => handleBuyItem(e.target.dataset.itemid, e.target.dataset.itemname, e.target.dataset.itemprice));
                 });
-                if (currentUserData.role === 'teacher') {
+                if (hasTeacherRole(currentUserData.role)) {
                     container.querySelectorAll('.edit-item-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => openShopItemModal(e.target.dataset.itemid));
                     });
@@ -2600,7 +2726,7 @@
                 lifeRules.classList.remove('hidden');
                 quickLinksSection.classList.add('hidden');
                 renderLifeRulesForStudent();
-            } else if (role === 'teacher') {
+            } else if (hasTeacherRole(role)) {
                 lifeRules.classList.add('hidden');
                 quickLinksSection.classList.remove('hidden');
                 loadQuickLinks();
@@ -2910,6 +3036,26 @@
             }
         }
 
+        async function ensureMyClassStudentIds(force = false) {
+            if (!currentUserData || !hasTeacherRole(currentUserData.role) || isSuperTeacher(currentUserData.role)) {
+                if (force) {
+                    myClassStudentIds = [];
+                }
+                return [];
+            }
+            if (!force && myClassStudentIds.length) {
+                return myClassStudentIds;
+            }
+            try {
+                const classSnap = await getDoc(doc(db, 'classes', currentUserData.id));
+                myClassStudentIds = classSnap.exists() ? classSnap.data().students || [] : [];
+            } catch (error) {
+                console.error('Error loading class membership:', error);
+                myClassStudentIds = [];
+            }
+            return myClassStudentIds;
+        }
+
         // --- My Class Management ---
         async function loadMyClass() {
             const container = document.getElementById('my-class-section');
@@ -2919,6 +3065,7 @@
             try {
                 const docSnap = await getDoc(docRef);
                 if (!docSnap.exists()) {
+                    myClassStudentIds = [];
                     container.innerHTML = '<h2 class="text-xl font-bold mb-4">🏫 내 학급</h2><button id="create-class-btn" class="btn btn-primary w-full">내 학급 만들기</button>';
                     document.getElementById('create-class-btn').onclick = async () => {
                         const name = prompt('학급 이름을 입력하세요');
@@ -2936,6 +3083,7 @@
                 }
                 const data = docSnap.data();
                 const studentIds = data.students || [];
+                myClassStudentIds = studentIds;
                 let listHtml = '';
                 for (const sid of studentIds) {
                     try {
@@ -4467,13 +4615,24 @@
             try {
                 const q = query(collection(db, 'purchaseLog'), orderBy('purchasedAt', 'desc'));
                 const logSnapshot = await getDocs(q);
-                if (logSnapshot.empty) {
+                let logs = logSnapshot.docs.map(logDoc => ({ id: logDoc.id, ...logDoc.data() }));
+
+                if (hasTeacherRole(currentUserData?.role) && !isSuperTeacher(currentUserData?.role)) {
+                    const classIds = await ensureMyClassStudentIds();
+                    if (!classIds.length) {
+                        logEl.innerHTML = '<li>내 학급 학생의 구매 기록이 없습니다.</li>';
+                        return;
+                    }
+                    const classSet = new Set(classIds);
+                    logs = logs.filter(log => classSet.has(log.studentId));
+                }
+
+                if (!logs.length) {
                     logEl.innerHTML = '<li>구매 기록이 없습니다.</li>';
                     return;
                 }
                 logEl.innerHTML = '';
-                logSnapshot.forEach(logDoc => {
-                    const log = logDoc.data();
+                logs.forEach(log => {
                     const li = document.createElement('li');
                     li.className = "border-b pb-2 mb-2";
                     const finalPrice = Number(log.price);
