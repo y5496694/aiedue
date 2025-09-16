@@ -289,7 +289,14 @@
         let canEditBook = false;
         let bookIsPublic = false;
         let imagesGenerated = false;
-        const hasTeacherRole = (role) => role === 'teacher' || role === 'superTeacher';
+        const normalizeRole = (role) => typeof role === 'string' ? role.toLowerCase() : '';
+        const hasTeacherRole = (role) => {
+            if (role === 'superTeacher') {
+                return true;
+            }
+            const normalized = normalizeRole(role);
+            return normalized === 'teacher' || normalized === 'superteacher';
+        };
         const isSuperTeacher = (role) => role === 'superTeacher';
         // 로그인한 사용자 이름을 저장하고 책의 저자 영역을 동기화합니다.
         window.authorName = '';
@@ -622,7 +629,7 @@
             const teacherRequestBtn = document.getElementById('book-teacher-request-btn');
             if (hasTeacherRole(data.role)) {
                 roleBadgeEl.classList.remove('hidden');
-                roleBadgeEl.textContent = data.role === 'superTeacher' ? '슈퍼 관리자' : '교사';
+                roleBadgeEl.textContent = isSuperTeacher(data.role) ? '슈퍼 관리자' : '교사';
                 myClassBtn.classList.remove('hidden');
                 tokenGiveBtn.classList.remove('hidden');
             } else {

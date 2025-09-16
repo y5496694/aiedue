@@ -10,7 +10,7 @@ service cloud.firestore {
 
     function isTeacher() {
       return request.auth != null &&
-             ['teacher', 'superTeacher'].has(
+             ['teacher', 'superTeacher', 'superteacher'].has(
                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
              );
     }
