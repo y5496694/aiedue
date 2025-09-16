@@ -3,9 +3,7 @@ service firebase.storage {
   match /b/{bucket}/o {
     function isTeacher() {
       return request.auth != null &&
-             ['teacher', 'superTeacher', 'superteacher'].has(
-               firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role
-             );
+             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'teacher';
     }
 
     // Book 파일: 공개 책은 누구나 읽기 가능, 작성자 또는 교사만 쓰기 가능
@@ -35,4 +33,3 @@ service firebase.storage {
     }
   }
 }
-
