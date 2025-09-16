@@ -111,7 +111,6 @@
             <button id="my-class-btn" class="bg-amber-500 text-white px-2 py-1 rounded text-sm hidden">내 학급</button>
             <span class="text-sm text-gray-700">내 지갑: <span id="display-user-tokens">0</span>토큰</span>
             <button id="my-info-btn" class="text-sm text-gray-500 underline">내 정보</button>
-            <button id="book-teacher-request-btn" class="text-sm text-amber-600 underline hidden">교사 권한 신청</button>
             <button id="book-logout-btn" class="text-sm text-gray-500 underline">로그아웃</button>
         </div>
     </div>
@@ -165,30 +164,6 @@
     </div>
 
     <div id="notification"></div>
-
-    <div id="book-teacher-request-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
-        <div class="bg-white p-6 rounded-lg shadow-lg w-80">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-semibold">교사 권한 신청</h2>
-                <button id="close-book-teacher-request-modal" class="text-xl">&times;</button>
-            </div>
-            <form id="book-teacher-request-form" class="space-y-4 text-left">
-                <div>
-                    <label for="book-teacher-request-school" class="block text-sm font-medium text-gray-700 mb-1">어느 학교이신가요?</label>
-                    <input type="text" id="book-teacher-request-school" class="w-full p-2 border rounded-md form-input" placeholder="학교명을 입력해주세요" required>
-                </div>
-                <div>
-                    <label for="book-teacher-request-name" class="block text-sm font-medium text-gray-700 mb-1">성함이 어떻게 되시나요?</label>
-                    <input type="text" id="book-teacher-request-name" class="w-full p-2 border rounded-md form-input" placeholder="실명을 입력해주세요" required>
-                </div>
-                <p id="book-teacher-request-status" class="text-sm text-gray-500 hidden"></p>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" id="cancel-book-teacher-request" class="btn btn-secondary px-4 py-2">취소</button>
-                    <button type="submit" class="btn btn-primary px-4 py-2">신청하기</button>
-                </div>
-            </form>
-        </div>
-    </div>
 
     <!-- 새 책 추가 팝업 -->
     <div id="add-book-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
@@ -289,8 +264,6 @@
         let canEditBook = false;
         let bookIsPublic = false;
         let imagesGenerated = false;
-        const hasTeacherRole = (role) => role === 'teacher' || role === 'superTeacher';
-        const isSuperTeacher = (role) => role === 'superTeacher';
         // 로그인한 사용자 이름을 저장하고 책의 저자 영역을 동기화합니다.
         window.authorName = '';
         window.syncBookAuthor = function() {
@@ -512,7 +485,7 @@
             bookOwnerUid = data.owner || data.authorId || auth.currentUser.uid;
             bookIsPublic = !!data.isPublic;
             imagesGenerated = !!data.coverImage;
-            canEditBook = auth.currentUser && (auth.currentUser.uid === bookOwnerUid || hasTeacherRole(window.currentUserRole));
+            canEditBook = auth.currentUser && (auth.currentUser.uid === bookOwnerUid || window.currentUserRole === 'teacher');
             buildBookViewer();
 
             for (let i = 1; i < (data.characterSpreadCount || 1); i++) {
@@ -619,19 +592,15 @@
             const roleBadgeEl = document.getElementById('role-badge');
             const myClassBtn = document.getElementById('my-class-btn');
             const tokenGiveBtn = document.getElementById('token-give-btn');
-            const teacherRequestBtn = document.getElementById('book-teacher-request-btn');
-            if (hasTeacherRole(data.role)) {
+            if (data.role === 'teacher') {
                 roleBadgeEl.classList.remove('hidden');
-                roleBadgeEl.textContent = data.role === 'superTeacher' ? '슈퍼 관리자' : '교사';
+                roleBadgeEl.textContent = '교사';
                 myClassBtn.classList.remove('hidden');
                 tokenGiveBtn.classList.remove('hidden');
             } else {
                 roleBadgeEl.classList.add('hidden');
                 myClassBtn.classList.add('hidden');
                 tokenGiveBtn.classList.add('hidden');
-            }
-            if (teacherRequestBtn) {
-                teacherRequestBtn.classList.toggle('hidden', hasTeacherRole(data.role));
             }
             window.syncBookAuthor();
         }
@@ -1685,21 +1654,19 @@
                     uid: userCredential.user.uid,
                     name,
                     email,
-                    role: 'student',
+                    role: 'teacher',
                     userCode: null,
                     coins: 0,
                     balance: 0,
                     portfolio: {},
                     aeduTokens: 0,
-                    createdAt: serverTimestamp(),
-                    teacherSignupIntent: true
+                    createdAt: serverTimestamp()
                 }, { merge: true });
 
                 await addDoc(collection(db, 'signupLog'), {
                     name,
                     email,
-                    role: 'student',
-                    requestedRole: 'teacher',
+                    role: 'teacher',
                     signedUpAt: serverTimestamp()
                 });
 
@@ -1707,7 +1674,7 @@
                 document.getElementById('book-teacher-register-email').value = '';
                 document.getElementById('book-teacher-register-password').value = '';
 
-                alert(`환영합니다, ${name} 선생님!\n현재는 학생 권한으로 가입되었으며, 교사 권한 신청을 통해 승인을 요청해주세요.`);
+                alert(`환영합니다, ${name} 선생님!`);
                 teacherRegisterView.classList.add('hidden');
                 loginView.classList.remove('hidden');
                 switchLoginTab('teacher');
@@ -1773,14 +1740,6 @@
         const libraryBookListEl = document.getElementById('library-book-list');
         const bookLikeBtn = document.getElementById('book-like-btn');
         const addCommentBtn = document.getElementById('add-comment-btn');
-        const bookTeacherRequestModal = document.getElementById('book-teacher-request-modal');
-        const closeBookTeacherRequestModal = document.getElementById('close-book-teacher-request-modal');
-        const cancelBookTeacherRequestBtn = document.getElementById('cancel-book-teacher-request');
-        const bookTeacherRequestForm = document.getElementById('book-teacher-request-form');
-        const bookTeacherRequestSchoolInput = document.getElementById('book-teacher-request-school');
-        const bookTeacherRequestNameInput = document.getElementById('book-teacher-request-name');
-        const bookTeacherRequestStatus = document.getElementById('book-teacher-request-status');
-        const bookTeacherRequestBtn = document.getElementById('book-teacher-request-btn');
 
         myBooksTab.addEventListener('click', () => {
             myBooksTab.classList.add('border-orange-500', 'text-orange-500');
@@ -2043,83 +2002,6 @@
             const provider = new GoogleAuthProvider();
             try { await signInWithPopup(auth, provider); } catch (_) { alert('로그인 실패'); }
         });
-
-        async function openBookTeacherRequestModal() {
-            if (!bookTeacherRequestModal || !bookTeacherRequestForm) return;
-            if (!auth.currentUser) {
-                alert('교사 권한 신청을 하려면 로그인해야 합니다.');
-                return;
-            }
-            bookTeacherRequestSchoolInput.value = '';
-            bookTeacherRequestNameInput.value = window.authorName || '';
-            if (bookTeacherRequestStatus) {
-                bookTeacherRequestStatus.textContent = '';
-                bookTeacherRequestStatus.classList.add('hidden');
-            }
-            try {
-                const existingDoc = await getDoc(doc(db, 'teacherRoleRequests', auth.currentUser.uid));
-                if (existingDoc.exists()) {
-                    const data = existingDoc.data();
-                    bookTeacherRequestSchoolInput.value = data.school || '';
-                    bookTeacherRequestNameInput.value = data.realName || window.authorName || '';
-                    if (bookTeacherRequestStatus) {
-                        const status = data.status || 'pending';
-                        const label = status === 'approved' ? '승인됨' : (status === 'rejected' || status === 'denied') ? '거절됨' : '검토 중';
-                        const submittedAt = data.requestedAt && typeof data.requestedAt.toDate === 'function'
-                            ? data.requestedAt.toDate().toLocaleString('ko-KR')
-                            : '';
-                        bookTeacherRequestStatus.textContent = submittedAt
-                            ? `현재 상태: ${label} (신청일: ${submittedAt})`
-                            : `현재 상태: ${label}`;
-                        bookTeacherRequestStatus.classList.remove('hidden');
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to load teacher request info:', error);
-            }
-            bookTeacherRequestModal.classList.remove('hidden');
-        }
-
-        if (bookTeacherRequestBtn) {
-            bookTeacherRequestBtn.addEventListener('click', openBookTeacherRequestModal);
-        }
-        if (closeBookTeacherRequestModal) {
-            closeBookTeacherRequestModal.addEventListener('click', () => bookTeacherRequestModal.classList.add('hidden'));
-        }
-        if (cancelBookTeacherRequestBtn) {
-            cancelBookTeacherRequestBtn.addEventListener('click', () => bookTeacherRequestModal.classList.add('hidden'));
-        }
-        if (bookTeacherRequestForm) {
-            bookTeacherRequestForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                if (!auth.currentUser) {
-                    alert('교사 권한 신청을 하려면 로그인해야 합니다.');
-                    return;
-                }
-                const school = bookTeacherRequestSchoolInput.value.trim();
-                const realName = bookTeacherRequestNameInput.value.trim();
-                if (!school || !realName) {
-                    alert('모든 질문에 답변을 입력해주세요.');
-                    return;
-                }
-                try {
-                    await setDoc(doc(db, 'teacherRoleRequests', auth.currentUser.uid), {
-                        userId: auth.currentUser.uid,
-                        userName: window.authorName || realName,
-                        userEmail: auth.currentUser.email || '',
-                        school,
-                        realName,
-                        status: 'pending',
-                        requestedAt: serverTimestamp()
-                    }, { merge: true });
-                    bookTeacherRequestModal.classList.add('hidden');
-                    alert('교사 권한 신청이 접수되었습니다. 승인 후 안내드리겠습니다.');
-                } catch (error) {
-                    console.error('Teacher request submit error:', error);
-                    alert(`교사 권한 신청 중 오류가 발생했습니다: ${error.message}`);
-                }
-            });
-        }
 
         onAuthStateChanged(auth, async (user) => {
             const contentView = document.getElementById('book-content');
