@@ -46,6 +46,39 @@
             background-color: #f1f5f9; /* slate-100 */
             color: #475569; /* slate-600 */
         }
+        .monthly-plan-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        .monthly-plan-table th,
+        .monthly-plan-table td {
+            border: 1px solid #d1d5db;
+            padding: 0.75rem;
+            vertical-align: top;
+        }
+        .monthly-plan-table th[colspan="2"] {
+            text-align: center;
+            font-weight: 700;
+        }
+        .monthly-plan-table thead th {
+            background-color: #f1f5f9;
+            font-weight: 700;
+            text-align: center;
+        }
+        .monthly-plan-table thead th:not([colspan="2"]) {
+            width: 50%;
+        }
+        .monthly-plan-table tbody .header-cell {
+            background-color: #e2e8f0;
+            font-weight: 700;
+            text-align: center;
+            vertical-align: middle;
+            width: 50%;
+        }
+        .monthly-plan-table tbody .data-cell {
+            width: 50%;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -1072,17 +1105,146 @@
         }
 
         function saveIepPdf() {
-            const titleEl = document.getElementById('iep-title').cloneNode(true);
-            const contentEl = document.getElementById('iep-content').cloneNode(true);
-            contentEl.querySelectorAll('button').forEach(btn => btn.remove());
-            const container = document.createElement('div');
-            container.appendChild(titleEl);
-            container.appendChild(contentEl);
-            html2pdf().set({
-                filename: `${titleEl.textContent.trim()}.pdf`,
+            const titleNode = document.getElementById('iep-title');
+            const contentNode = document.getElementById('iep-content');
+            if (!titleNode || !contentNode) return;
+
+            const titleText = titleNode.textContent.trim();
+            const user = auth.currentUser;
+            let teacherName = (user?.displayName || '').trim();
+            if (!teacherName && user?.email) {
+                teacherName = user.email.split('@')[0];
+            }
+            if (!teacherName) {
+                teacherName = '미기재';
+            }
+
+            const contentClone = contentNode.cloneNode(true);
+            contentClone.querySelectorAll('button').forEach(btn => btn.remove());
+
+            let root = contentClone;
+            if (contentClone.children.length === 1 && contentClone.firstElementChild?.classList?.contains('space-y-6')) {
+                root = contentClone.firstElementChild;
+            }
+            const sectionElements = Array.from(root.children || []);
+
+            const pdfContainer = document.createElement('div');
+            pdfContainer.className = 'pdf-export-container';
+            pdfContainer.style.position = 'absolute';
+            pdfContainer.style.left = '-9999px';
+            pdfContainer.style.top = '0';
+            pdfContainer.style.width = '210mm';
+
+            const style = document.createElement('style');
+            style.textContent = `
+                .pdf-export-container { font-family: 'Noto Sans KR', sans-serif; color: #1f2937; }
+                .pdf-export-container .pdf-page { width: 210mm; min-height: 297mm; padding: 25mm; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; background-color: #ffffff; }
+                .pdf-export-container .pdf-page + .pdf-page { page-break-before: always; }
+                .pdf-export-container .pdf-title-page { justify-content: center; align-items: center; text-align: center; }
+                .pdf-export-container .pdf-title-page h1 { font-size: 28pt; font-weight: 700; margin: 0; }
+                .pdf-export-container .pdf-title-footer { margin-top: auto; font-size: 12pt; text-align: right; width: 100%; }
+                .pdf-export-container .pdf-page-content { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+                .pdf-export-container .pdf-page-content table { width: 100%; page-break-inside: avoid; border-collapse: collapse; }
+                .pdf-export-container .pdf-month-title { font-size: 16pt; font-weight: 600; margin: 0; }
+                .pdf-export-container .pdf-section-wrapper { display: flex; flex-direction: column; gap: 12px; }
+            `;
+            pdfContainer.appendChild(style);
+
+            const cloneForPdf = (element) => {
+                if (!element) return null;
+                const clone = element.cloneNode(true);
+                clone.querySelectorAll('button').forEach(btn => btn.remove());
+                clone.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
+                return clone;
+            };
+
+            const titlePage = document.createElement('section');
+            titlePage.className = 'pdf-page pdf-title-page';
+            const titleHeading = document.createElement('h1');
+            titleHeading.textContent = titleText;
+            titlePage.appendChild(titleHeading);
+            const titleFooter = document.createElement('div');
+            titleFooter.className = 'pdf-title-footer';
+            titleFooter.textContent = `특수교사: ${teacherName}`;
+            titlePage.appendChild(titleFooter);
+            pdfContainer.appendChild(titlePage);
+
+            const appendContentPage = (elements, headingText = '') => {
+                const filtered = elements.filter(Boolean);
+                if (!filtered.length && !headingText) return;
+                const page = document.createElement('section');
+                page.className = 'pdf-page';
+                const wrapper = document.createElement('div');
+                wrapper.className = 'pdf-page-content pdf-section-wrapper';
+                if (headingText) {
+                    const heading = document.createElement('h2');
+                    heading.className = 'pdf-month-title';
+                    heading.textContent = headingText;
+                    wrapper.appendChild(heading);
+                }
+                filtered.forEach(el => wrapper.appendChild(el));
+                if (!wrapper.children.length) return;
+                page.appendChild(wrapper);
+                pdfContainer.appendChild(page);
+            };
+
+            const achievementsSection = cloneForPdf(sectionElements[0]);
+            const semesterSection = cloneForPdf(sectionElements[1]);
+            const monthlySection = sectionElements[2] || null;
+
+            if (achievementsSection) {
+                appendContentPage([achievementsSection]);
+            }
+            if (semesterSection) {
+                appendContentPage([semesterSection]);
+            }
+
+            const months = getSemesterMonths(currentIepSemester);
+            const monthlyHeaderTemplate = monthlySection?.querySelector('table') || null;
+            const monthlyPlansContainer = monthlySection?.querySelector('#monthly-plans') || null;
+            const rawMonthBlocks = monthlyPlansContainer ? Array.from(monthlyPlansContainer.children) : [];
+
+            if (months.length) {
+                months.forEach((monthInfo, idx) => {
+                    const monthBlock = rawMonthBlocks[idx] ? cloneForPdf(rawMonthBlocks[idx]) : null;
+                    let contentElement = monthBlock;
+                    if (!contentElement) {
+                        const placeholder = document.createElement('p');
+                        placeholder.textContent = '월별 계획이 생성되지 않았습니다.';
+                        placeholder.className = 'text-sm text-gray-500';
+                        contentElement = placeholder;
+                    }
+                    const elements = [];
+                    if (idx === 0 && monthlyHeaderTemplate) {
+                        elements.push(cloneForPdf(monthlyHeaderTemplate));
+                    }
+                    elements.push(contentElement);
+                    const headingText = idx === 0
+                        ? `3. 월별 교육 목표 + ${monthInfo.pdfLabel} 월 계획`
+                        : `${monthInfo.pdfLabel} 월 계획`;
+                    appendContentPage(elements, headingText);
+                });
+            }
+
+            document.body.appendChild(pdfContainer);
+
+            const worker = html2pdf().set({
+                filename: `${titleText || '개별화교육계획'}.pdf`,
                 html2canvas: { scale: 2 },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            }).from(container).save();
+            }).from(pdfContainer).save();
+
+            const cleanup = () => {
+                if (pdfContainer.parentNode) {
+                    pdfContainer.parentNode.removeChild(pdfContainer);
+                }
+            };
+
+            if (worker && typeof worker.then === 'function') {
+                worker.then(cleanup).catch(cleanup);
+            } else {
+                cleanup();
+            }
         }
 
         const modifyInput = document.getElementById('iep-modify-input');
@@ -1242,11 +1404,14 @@
                 { label: '라', first: '6월', second: '11월' },
                 { label: '마', first: '7월', second: '12월' }
             ];
+            const isFirstSemester = semester === 1;
+            const otherSemesterText = isFirstSemester ? '2학기면' : '1학기면';
             return templates.map(template => {
-                const actual = semester === 1 ? template.first : template.second;
-                const alternate = semester === 1 ? template.second : template.first;
-                const title = `${template.label}.${actual}${semester === 1 ? `(2학기면 ${alternate})` : `(1학기면 ${alternate})`}`;
-                return { ...template, actual, alternate, title };
+                const actual = isFirstSemester ? template.first : template.second;
+                const alternate = isFirstSemester ? template.second : template.first;
+                const title = `${template.label}. ${actual}`;
+                const pdfLabel = `${actual}(${otherSemesterText} ${alternate})`;
+                return { ...template, actual, alternate, title, pdfLabel };
             });
         }
 
@@ -1276,14 +1441,46 @@
         }
 
         function buildMonthlyTables(month, subjectName, entry) {
-            const goalTable = `| 구분 | 교육목표 | 교육내용 |\n| --- | --- | --- |\n| ${month} ${subjectName} | ${formatTableCell(entry.goal)} | ${formatTableCell(entry.content)} |`;
-            const methodTable = `| 구분 | 교육방법 | 교육평가 |\n| --- | --- | --- |\n| ${month} ${subjectName} | ${formatTableCell(entry.method)} |  |`;
-            return `<div class="space-y-2">${markdownTableToHtml(goalTable)}${markdownTableToHtml(methodTable)}</div>`;
+            const goal = formatTableCell(entry.goal);
+            const content = formatTableCell(entry.content);
+            const method = formatTableCell(entry.method);
+            const evaluation = formatTableCell(entry.evaluation || '');
+            return `
+                <table class="monthly-plan-table text-sm">
+                    <thead>
+                        <tr>
+                            <th colspan="2" class="text-center">${month} ${subjectName}</th>
+                        </tr>
+                        <tr>
+                            <th class="text-center">교육 목표</th>
+                            <th class="text-center">교육 내용</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="data-cell">${goal}</td>
+                            <td class="data-cell">${content}</td>
+                        </tr>
+                        <tr>
+                            <td class="header-cell">교육 방법</td>
+                            <td class="header-cell">교육 평가</td>
+                        </tr>
+                        <tr>
+                            <td class="data-cell">${method}</td>
+                            <td class="data-cell">${evaluation}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            `.trim();
         }
 
         function formatTableCell(text) {
-            if (!text) return '';
-            return text.replace(/\|/g, '\\|').replace(/\n/g, '<br>');
+            if (!text) return '&nbsp;';
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\n/g, '<br>');
         }
 
         function extractSemesterGoalsFromDom() {
@@ -1310,9 +1507,15 @@
                     continue;
                 }
                 target.innerHTML = '<p class="text-gray-500">생성 중...</p>';
-                const prompt = `다음 성취기준을 바탕으로 ${name} 교과의 학기 교육목표를 1~5개의 문장으로 작성해줘. 각 문장은 '다.' 혹은 '한다.'로 끝나도록 하고 줄바꿈으로 구분해줘.\n\n성취기준:\n${list.map((item, idx) => `${idx + 1}. ${item.text}`).join('\n')}`;
+                const prompt = `다음 성취기준을 바탕으로 ${name} 교과의 학기 교육목표를 1~5개의 문장으로 작성해줘. 각 문장은 '다.' 혹은 '한다.'로 끝나도록 하고 줄바꿈으로 구분해줘. 각 문장 앞에는 숫자나 기호를 붙이지 마.\n\n성취기준:\n${list.map((item, idx) => `${idx + 1}. ${item.text}`).join('\n')}`;
                 const result = await callGemini(prompt);
-                const lines = result.split(/\n+/).map(l => l.trim()).filter(Boolean).filter(line => !line.startsWith('다음은')).slice(0, 5);
+                const lines = result
+                    .split(/\n+/)
+                    .map(l => l.trim())
+                    .filter(Boolean)
+                    .filter(line => !line.startsWith('다음은'))
+                    .map(line => line.replace(/^[-•\d]+[.)]?\s*/, ''))
+                    .slice(0, 5);
                 lastSemesterGoals[key] = lines;
                 if (!lines.length) {
                     target.innerHTML = '<p class="text-gray-500">학기 교육목표를 생성하지 못했습니다. 다시 시도해 주세요.</p>';
