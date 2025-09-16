@@ -806,6 +806,11 @@
         let isLoadingIepStudents = false;
         let lastKoreanList = [];
         let lastMathList = [];
+        let currentIepSemester = 1;
+        const lastSemesterGoals = {
+            korean: [],
+            math: []
+        };
 
         async function loadIepStudents() {
             const user = auth.currentUser;
@@ -1006,12 +1011,20 @@
 
         function renderIepContent(id, studentName, data) {
             showModifySection();
+            currentIepSemester = determineSemesterFromData(data);
+            lastSemesterGoals.korean = [];
+            lastSemesterGoals.math = [];
             const titleMd = `| **${data.title}** |\n| --- |`;
             let titleHtml = markdownTableToHtml(titleMd)
                 .replace('class="min-w-full border border-gray-300 text-sm"', 'class="mx-auto w-auto border border-gray-300 text-xl"')
                 .replace('<th class="border px-2 py-1 bg-gray-100">', '<th class="border px-4 py-2 bg-gray-100 text-center text-2xl">');
             let html = `<div class="flex flex-col items-center mb-4"><div id="iep-title">${titleHtml}</div><div class="space-x-2 mt-2"><button id="edit-iep-title" class="text-sm text-sky-600">편집</button><button id="save-iep-btn" class="bg-sky-600 hover:bg-sky-700 text-white text-sm px-3 py-1 rounded">저장</button><button id="save-pdf-btn" class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-3 py-1 rounded">PDF 저장</button></div></div><div id="iep-content">${data.content}</div>`;
             iepOutputContainer.innerHTML = html;
+            extractSemesterGoalsFromDom();
+            const monthlyBtn = document.getElementById('generate-monthly-plan-btn');
+            if (monthlyBtn && (lastSemesterGoals.korean.length || lastSemesterGoals.math.length)) {
+                monthlyBtn.classList.remove('hidden');
+            }
             document.getElementById('iep-achievement-btn')?.addEventListener('click', () => openAchievementView(studentName));
             document.getElementById('generate-semester-goals-btn')?.addEventListener('click', async () => {
                 await generateSemesterGoals(lastKoreanList, lastMathList);
@@ -1150,10 +1163,6 @@
                     ${sectionTitleTable('3. 월별 교육 목표')}
                     <div id="monthly-plans" class="mt-2"></div>
                 </div>
-                <div>
-                    ${sectionTitleTable('향후 기술')}
-                    <p class="text-gray-500">준비 중입니다.</p>
-                </div>
             </div>`;
         }
 
@@ -1206,13 +1215,96 @@
             }
         }
 
+        function determineSemesterFromData(data) {
+            let month = null;
+            const createdAt = data?.createdAt;
+            if (createdAt?.toDate) {
+                month = createdAt.toDate().getMonth() + 1;
+            } else if (createdAt?.seconds) {
+                month = new Date(createdAt.seconds * 1000).getMonth() + 1;
+            }
+            if (!month) {
+                const match = data?.title?.match(/([12])학기/);
+                if (match) {
+                    return parseInt(match[1], 10);
+                }
+                month = new Date().getMonth() + 1;
+            }
+            if (month >= 2 && month <= 7) return 1;
+            return 2;
+        }
+
+        function getSemesterMonths(semester) {
+            const templates = [
+                { label: '가', first: '3월', second: '8월' },
+                { label: '나', first: '4월', second: '9월' },
+                { label: '다', first: '5월', second: '10월' },
+                { label: '라', first: '6월', second: '11월' },
+                { label: '마', first: '7월', second: '12월' }
+            ];
+            return templates.map(template => {
+                const actual = semester === 1 ? template.first : template.second;
+                const alternate = semester === 1 ? template.second : template.first;
+                const title = `${template.label}.${actual}${semester === 1 ? `(2학기면 ${alternate})` : `(1학기면 ${alternate})`}`;
+                return { ...template, actual, alternate, title };
+            });
+        }
+
+        async function generateSubjectMonthlyPlans(subject, months) {
+            const semesterGoals = lastSemesterGoals[subject.key] || [];
+            if (!semesterGoals.length) return [];
+            const monthLabels = months.map(m => m.actual);
+            const achievementText = subject.list.length
+                ? subject.list.map((item, idx) => `${idx + 1}. ${item.text}`).join('\n')
+                : '관련 성취기준 정보 없음';
+            const prompt = `너는 특수교육 교사를 돕는 전문가야. 아래 정보를 참고하여 ${subject.name} 교과의 월별 계획을 JSON 배열로 작성해줘.\n\n- 학기: ${currentIepSemester}학기\n- 월 목록: ${monthLabels.join(', ')}\n- 학기 교육목표:\n${semesterGoals.map((goal, idx) => `${idx + 1}. ${goal}`).join('\n')}\n- 참고 성취기준:\n${achievementText}\n\n요구사항:\n1. 학기 교육목표의 핵심을 순서대로 ${monthLabels.length}개의 월별 교육목표로 나누어 제시한다. 필요한 경우 한 문장을 둘로 나누거나 두 문장을 하나로 묶어도 되지만 모든 학기 목표 내용이 월별 목표에 반영되어야 한다.\n2. 각 월별 목표마다 교육내용과 교육방법을 1~2문장으로 작성하고, 모든 문장은 '다.' 또는 '한다.'로 끝나도록 한다.\n3. 교육방법은 활동 중심으로 구체화한다.\n4. 응답은 반드시 JSON 배열만으로 제공하고 다른 설명은 포함하지 않는다.\n5. 배열의 각 요소는 {"month":"${monthLabels[0]}","goal":"...","content":"...","method":"..."} 형식을 따르며, month 값은 월 목록과 정확히 일치하고 순서를 유지해야 한다.`;
+            const result = await callGemini(prompt, true);
+            let plans = [];
+            if (Array.isArray(result)) {
+                plans = result;
+            } else if (Array.isArray(result?.plans)) {
+                plans = result.plans;
+            }
+            return monthLabels.map((month, idx) => {
+                const plan = plans.find(p => p.month === month) || plans[idx] || {};
+                return {
+                    goal: (plan.goal || '').trim(),
+                    content: (plan.content || '').trim(),
+                    method: (plan.method || '').trim()
+                };
+            });
+        }
+
+        function buildMonthlyTables(month, subjectName, entry) {
+            const goalTable = `| 구분 | 교육목표 | 교육내용 |\n| --- | --- | --- |\n| ${month} ${subjectName} | ${formatTableCell(entry.goal)} | ${formatTableCell(entry.content)} |`;
+            const methodTable = `| 구분 | 교육방법 | 교육평가 |\n| --- | --- | --- |\n| ${month} ${subjectName} | ${formatTableCell(entry.method)} |  |`;
+            return `<div class="space-y-2">${markdownTableToHtml(goalTable)}${markdownTableToHtml(methodTable)}</div>`;
+        }
+
+        function formatTableCell(text) {
+            if (!text) return '';
+            return text.replace(/\|/g, '\\|').replace(/\n/g, '<br>');
+        }
+
+        function extractSemesterGoalsFromDom() {
+            const subjects = [
+                { key: 'korean', selector: '#korean-goals table tbody tr td' },
+                { key: 'math', selector: '#math-goals table tbody tr td' }
+            ];
+            subjects.forEach(({ key, selector }) => {
+                const cells = Array.from(document.querySelectorAll(selector));
+                lastSemesterGoals[key] = cells.map(cell => cell.textContent.trim()).filter(Boolean);
+            });
+        }
+
         async function generateSemesterGoals(koreanList, mathList) {
             const subjects = [
-                { name: '국어', list: koreanList, targetId: 'korean-goals' },
-                { name: '수학', list: mathList, targetId: 'math-goals' }
+                { name: '국어', list: koreanList, targetId: 'korean-goals', key: 'korean' },
+                { name: '수학', list: mathList, targetId: 'math-goals', key: 'math' }
             ];
-            for (const { name, list, targetId } of subjects) {
+            for (const { name, list, targetId, key } of subjects) {
                 const target = document.getElementById(targetId);
+                lastSemesterGoals[key] = [];
                 if (!list.length) {
                     target.innerHTML = '<p class="text-gray-500">학습이 필요한 성취기준이 없습니다.</p>';
                     continue;
@@ -1221,43 +1313,64 @@
                 const prompt = `다음 성취기준을 바탕으로 ${name} 교과의 학기 교육목표를 1~5개의 문장으로 작성해줘. 각 문장은 '다.' 혹은 '한다.'로 끝나도록 하고 줄바꿈으로 구분해줘.\n\n성취기준:\n${list.map((item, idx) => `${idx + 1}. ${item.text}`).join('\n')}`;
                 const result = await callGemini(prompt);
                 const lines = result.split(/\n+/).map(l => l.trim()).filter(Boolean).filter(line => !line.startsWith('다음은')).slice(0, 5);
+                lastSemesterGoals[key] = lines;
+                if (!lines.length) {
+                    target.innerHTML = '<p class="text-gray-500">학기 교육목표를 생성하지 못했습니다. 다시 시도해 주세요.</p>';
+                    continue;
+                }
                 let md = `| ${name} 학기 교육목표 |\n| --- |\n`;
                 lines.forEach(line => { md += `| ${line} |\n`; });
                 target.innerHTML = markdownTableToHtml(md);
             }
+            const monthlyContainer = document.getElementById('monthly-plans');
+            if (monthlyContainer) {
+                monthlyContainer.innerHTML = '';
+            }
         }
 
         async function generateMonthlyPlans(koreanList, mathList) {
-            const months = ['7월', '8월'];
-            const subjects = [
-                { name: '국어', list: koreanList },
-                { name: '수학', list: mathList }
-            ];
             const container = document.getElementById('monthly-plans');
             if (!container) return;
             container.innerHTML = '<p class="text-gray-500">생성 중...</p>';
-            let html = '';
-            for (const month of months) {
-                for (const { name, list } of subjects) {
-                    if (!list.length) {
-                        html += `<p class="text-gray-500">${name} 학습이 필요한 성취기준이 없습니다.</p>`;
-                        continue;
-                    }
-                    const goals = await generateMonthlyLines(month, name, list, '교육목표', 3);
-                    const contents = await generateMonthlyLines(month, name, list, '교육내용', 4);
-                    const methods = await generateMonthlyLines(month, name, list, '교육방법', 4);
-                    let md = `| 구분 | 교육목표 | 교육내용 | 교육방법 |\n| --- | --- | --- | --- |\n| ${month} ${name} | ${goals.join('<br>')} | ${contents.join('<br>')} | ${methods.join('<br>')} |\n`;
-                    html += markdownTableToHtml(md);
-                }
+            const months = getSemesterMonths(currentIepSemester);
+            if (!months.length) {
+                container.innerHTML = '<p class="text-gray-500">월 정보를 불러오지 못했습니다.</p>';
+                return;
             }
+            const subjects = [
+                { name: '국어', key: 'korean', list: koreanList },
+                { name: '수학', key: 'math', list: mathList }
+            ];
+            const plansBySubject = {};
+            for (const subject of subjects) {
+                if (!(lastSemesterGoals[subject.key] || []).length) {
+                    plansBySubject[subject.key] = null;
+                    continue;
+                }
+                plansBySubject[subject.key] = await generateSubjectMonthlyPlans(subject, months);
+            }
+            let html = '';
+            months.forEach((month, idx) => {
+                html += `<div class="mb-6">`;
+                html += `<h4 class="font-semibold">${month.title}</h4>`;
+                html += '<div class="ml-4 space-y-4">';
+                subjects.forEach(subject => {
+                    html += '<div>';
+                    html += `<h5 class="font-semibold">- ${subject.name}</h5>`;
+                    const hasSemesterGoals = (lastSemesterGoals[subject.key] || []).length > 0;
+                    const entry = plansBySubject[subject.key]?.[idx];
+                    if (!hasSemesterGoals) {
+                        html += '<p class="text-gray-500 text-sm ml-4">학기 교육목표를 먼저 생성해 주세요.</p>';
+                    } else if (!entry || (!entry.goal && !entry.content && !entry.method)) {
+                        html += '<p class="text-gray-500 text-sm ml-4">월별 계획을 생성하지 못했습니다. 다시 시도해 주세요.</p>';
+                    } else {
+                        html += buildMonthlyTables(month.actual, subject.name, entry);
+                    }
+                    html += '</div>';
+                });
+                html += '</div></div>';
+            });
             container.innerHTML = html;
-        }
-
-        async function generateMonthlyLines(month, subject, list, type, maxLines) {
-            const range = type === '교육목표' ? '2~3' : '3~4';
-            const prompt = `다음 성취기준을 바탕으로 ${month} ${subject} 교과의 ${type}을 ${range}개의 문장으로 작성해줘. 각 문장은 '다.' 혹은 '한다.'로 끝나도록 하고 줄바꿈으로 구분해줘.\n\n성취기준:\n${list.map((item, idx) => `${idx + 1}. ${item.text}`).join('\n')}`;
-            const result = await callGemini(prompt);
-            return result.split(/\n+/).map(l => l.trim()).filter(Boolean).filter(line => !line.startsWith('다음은')).slice(0, maxLines);
         }
 
         // --- Behavior Intervention Logic ---
