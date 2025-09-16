@@ -9,10 +9,10 @@ service cloud.firestore {
     }
 
     function isTeacher() {
-      return request.auth != null &&
-             ['teacher', 'superTeacher'].has(
-               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
-             );
+      return request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superTeacher'
+      );
     }
 
     // ──────────────────────────────────────────────────────────────
