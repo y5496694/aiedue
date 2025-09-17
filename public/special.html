@@ -1539,16 +1539,18 @@
             const months = getSemesterMonths(defaultSemester);
             const monthlyPages = months.map((info, idx) => {
                 const pageNumber = 5 + idx;
+                const monthDisplay = buildMonthlyDisplayText(info);
+                const subjectHeadingSuffix = monthDisplay ? `${monthDisplay} ` : '';
                 return `
                 <section class="iep-page" data-page="${pageNumber}" data-month-index="${idx}" data-first-month="${info.first}" data-second-month="${info.second}">
                     <div class="iep-page-inner">
                         <div class="iep-month-block" data-month-index="${idx}">
                             <div class="iep-month-subject" data-subject="korean">
-                                ${sectionTitleTable('3. 월별 교육목표 - 국어')}
+                                ${sectionTitleTable(`3. 월별 교육목표 - ${subjectHeadingSuffix}국어`)}
                                 <div id="monthly-plan-${idx}-korean" class="iep-month-content mt-4 text-sm text-gray-500">월별 계획이 생성되지 않았습니다.</div>
                             </div>
                             <div class="iep-month-subject mt-6" data-subject="math">
-                                ${sectionTitleTable('3. 월별 교육목표 - 수학')}
+                                ${sectionTitleTable(`3. 월별 교육목표 - ${subjectHeadingSuffix}수학`)}
                                 <div id="monthly-plan-${idx}-math" class="iep-month-content mt-4 text-sm text-gray-500">월별 계획이 생성되지 않았습니다.</div>
                             </div>
                         </div>
@@ -1745,6 +1747,12 @@
                         }
                     }
                     if (subjectSection) {
+                        const headingStrong = subjectSection.querySelector('table thead th strong');
+                        if (headingStrong) {
+                            const subjectLabel = subject === 'math' ? '수학' : '국어';
+                            const monthPrefix = displayText ? `${displayText} ` : '';
+                            headingStrong.textContent = `3. 월별 교육목표 - ${monthPrefix}${subjectLabel}`;
+                        }
                         const content = subjectSection.querySelector('.iep-month-content');
                         if (content) {
                             const expectedId = `monthly-plan-${idx}-${subject}`;
