@@ -1252,34 +1252,58 @@
             });
         }
 
-        async function saveIepPdf() {
-            updateMonthlyPageDisplays();
-            const contentNode = document.getElementById('iep-content');
-            if (!contentNode) return;
+    async function saveIepPdf() {
+                const contentNode = document.getElementById('iep-content');
+                if (!contentNode) {
+                    console.error("IEP 콘텐츠 노드를 찾을 수 없습니다.");
+                    return;
+                }
+    
+                // --- UI 요소 준비 ---
+                const saveBtn = document.getElementById('save-pdf-btn');
+                const actionsContainer = document.getElementById('iep-cover-actions');
+                const originalBtnText = saveBtn?.textContent;
+                const titleText = document.getElementById('iep-title')?.textContent.trim() || '개별화교육계획';
+                const filename = `${sanitizeFileName(titleText)}.pdf`;
+                const pages = contentNode.querySelectorAll('.iep-page');
 
-            const saveBtn = document.getElementById('save-pdf-btn');
-            const originalBtnText = saveBtn?.textContent;
-            if (saveBtn) {
-                saveBtn.disabled = true;
-                saveBtn.dataset.originalText = originalBtnText || '';
-                saveBtn.textContent = '저장 중...';
-            }
+                // --- PDF 생성 전 처리 ---
+                if (saveBtn) {
+                    saveBtn.disabled = true;
+                    saveBtn.textContent = '저장 중...';
+                }
+                // 버튼 숨기기 및 그림자 제거 (PDF에 불필요한 요소 제거)
+                if (actionsContainer) actionsContainer.style.display = 'none';
+                pages.forEach(page => page.style.boxShadow = 'none');
 
-            const titleNode = document.getElementById('iep-title');
-            const teacherNode = document.getElementById('iep-teacher-name');
-            const titleText = titleNode ? titleNode.textContent.trim() : '';
-            const teacherName = teacherNode ? teacherNode.textContent.trim() : '미기재';
-            const baseFileName = sanitizeFileName(titleText) || '개별화교육계획';
 
-            const pageNodes = Array.from(contentNode.querySelectorAll('.iep-page'));
-            if (!pageNodes.length) {
-                if (saveBtn) {
-                    saveBtn.disabled = false;
-                    saveBtn.textContent = originalBtnText || 'PDF 저장';
-                    delete saveBtn.dataset.originalText;
-                }
-                return;
-            }
+                // --- html2pdf 옵션 설정 ---
+                const opt = {
+                    margin: 0,
+                    filename: filename,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, scrollY: -window.scrollY },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                    };
+
+                // --- PDF 생성 및 저장 ---
+                try {
+                    await html2pdf().from(contentNode).set(opt).save();
+                    showToast('PDF 저장이 완료되었습니다.');
+                } catch (error) {
+                    console.error('PDF 저장 중 오류:', error);
+                    showToast('PDF 저장 중 오류가 발생했습니다.');
+                } finally {
+                    // --- PDF 생성 후 처리 (숨겼던 요소 복원) ---
+                    if (actionsContainer) actionsContainer.style.display = 'flex';
+                    pages.forEach(page => page.style.boxShadow = ''); // 원래 스타일로 복원
+    
+                    if (saveBtn) {
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = originalBtnText;
+                    }
+                }
+            }
 
             const styleText = `
                 .pdf-export-container { font-family: 'Noto Sans KR', sans-serif; color: #1f2937; }
