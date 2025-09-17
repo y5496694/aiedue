@@ -1281,70 +1281,123 @@
                 return;
             }
 
+            const html2canvasFn = window.html2canvas;
+            const jsPdfConstructor = window.jspdf?.jsPDF || window.jsPDF;
+            if (typeof html2canvasFn !== 'function' || typeof jsPdfConstructor !== 'function') {
+                console.error('PDF 생성을 위한 라이브러리를 찾을 수 없습니다.');
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = originalBtnText || 'PDF 저장';
+                    delete saveBtn.dataset.originalText;
+                }
+                alert('PDF 저장 도중 문제가 발생했습니다. 새로고침 후 다시 시도해 주세요.');
+                return;
+            }
+
             const styleText = `
                 .pdf-export-container { font-family: 'Noto Sans KR', sans-serif; color: #1f2937; }
-                .pdf-export-container .pdf-page { width: 210mm; min-height: 297mm; padding: 25mm; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; background-color: #ffffff; page-break-after: always; }
+                .pdf-export-container .pdf-page { width: 210mm; min-height: 297mm; padding: 25mm; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; background-color: #ffffff; }
                 .pdf-export-container .pdf-title-page { justify-content: center; align-items: center; text-align: center; }
                 .pdf-export-container .pdf-page table { width: 100%; border-collapse: collapse; }
                 .pdf-export-container .pdf-cover-footer { margin-top: auto; font-size: 12pt; text-align: right; width: 100%; }
-                .pdf-export-container .pdf-page:last-child { page-break-after: auto; }
             `;
 
-            const pdfContainer = document.createElement('div');
-            pdfContainer.className = 'pdf-export-container';
-            pdfContainer.style.position = 'absolute';
-            pdfContainer.style.left = '-9999px';
-            pdfContainer.style.top = '0';
-            pdfContainer.style.width = '210mm';
-            pdfContainer.style.backgroundColor = '#ffffff';
-            pdfContainer.style.pointerEvents = 'none';
-            pdfContainer.style.zIndex = '-1';
-
-            const style = document.createElement('style');
-            style.textContent = styleText;
-            pdfContainer.appendChild(style);
-
-            pageNodes.forEach(page => {
-                const pdfPage = document.createElement('section');
-                pdfPage.className = 'pdf-page';
-                const clonedPage = page.cloneNode(true);
-                clonedPage.querySelectorAll('button').forEach(btn => btn.remove());
-                if (page.classList.contains('iep-page-cover')) {
-                    pdfPage.classList.add('pdf-title-page');
-                    const footer = clonedPage.querySelector('.iep-cover-footer');
-                    if (footer) {
-                        footer.textContent = `특수교사: ${teacherName}`;
-                        footer.classList.add('pdf-cover-footer');
-                    }
-                }
-                pdfPage.innerHTML = clonedPage.innerHTML;
-                pdfContainer.appendChild(pdfPage);
-            });
-
-            document.body.appendChild(pdfContainer);
-
+            const html2canvasOptions = { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 };
             const filename = `${baseFileName}.pdf`;
+            let stage;
+            let pdfSaved = false;
 
             try {
-                await html2pdf().set({
-                    filename,
-                    html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
-                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                    pagebreak: { mode: ['css', 'legacy'] }
-                }).from(pdfContainer).save();
+                stage = document.createElement('div');
+                stage.className = 'pdf-export-container';
+                Object.assign(stage.style, {
+                    position: 'fixed',
+                    inset: '0',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto',
+                    backgroundColor: 'transparent',
+                    zIndex: '2147483647',
+                    pointerEvents: 'none',
+                    opacity: '0'
+                });
+
+                const style = document.createElement('style');
+                style.textContent = styleText;
+                stage.appendChild(style);
+
+                const pageShell = document.createElement('section');
+                pageShell.className = 'pdf-page';
+                stage.appendChild(pageShell);
+
+                document.body.appendChild(stage);
+
+                const pdfDoc = new jsPdfConstructor({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+
+                for (let i = 0; i < pageNodes.length; i++) {
+                    const page = pageNodes[i];
+                    const clonedPage = page.cloneNode(true);
+                    clonedPage.querySelectorAll('button').forEach(btn => btn.remove());
+
+                    pageShell.className = 'pdf-page';
+                    if (page.classList.contains('iep-page-cover')) {
+                        pageShell.classList.add('pdf-title-page');
+                        const footer = clonedPage.querySelector('.iep-cover-footer');
+                        if (footer) {
+                            footer.textContent = `특수교사: ${teacherName}`;
+                            footer.classList.add('pdf-cover-footer');
+                        }
+                    }
+                    pageShell.innerHTML = clonedPage.innerHTML;
+
+                    stage.style.opacity = '1';
+                    await new Promise(resolve => requestAnimationFrame(resolve));
+
+                    const canvas = await html2canvasFn(pageShell, html2canvasOptions);
+
+                    stage.style.opacity = '0';
+
+                    const imageData = canvas.toDataURL('image/png');
+                    const pdfWidth = pdfDoc.internal.pageSize.getWidth();
+                    const pdfHeight = pdfDoc.internal.pageSize.getHeight();
+                    let renderWidth = pdfWidth;
+                    let renderHeight = (canvas.height * renderWidth) / canvas.width;
+
+                    if (renderHeight > pdfHeight) {
+                        renderHeight = pdfHeight;
+                        renderWidth = (canvas.width * renderHeight) / canvas.height;
+                    }
+
+                    const offsetX = (pdfWidth - renderWidth) / 2;
+                    const offsetY = (pdfHeight - renderHeight) / 2;
+
+                    if (i > 0) {
+                        pdfDoc.addPage();
+                    }
+                    pdfDoc.addImage(imageData, 'PNG', offsetX, offsetY, renderWidth, renderHeight);
+                }
+
+                pdfDoc.save(filename);
+                pdfSaved = true;
             } catch (error) {
                 console.error('PDF 저장 중 오류', error);
             } finally {
-                pdfContainer.remove();
+                if (stage) {
+                    stage.remove();
+                }
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = originalBtnText || 'PDF 저장';
+                    delete saveBtn.dataset.originalText;
+                }
             }
 
-            if (saveBtn) {
-                saveBtn.disabled = false;
-                saveBtn.textContent = originalBtnText || 'PDF 저장';
-                delete saveBtn.dataset.originalText;
+            if (pdfSaved) {
+                alert('PDF 저장이 완료되었습니다.');
+            } else {
+                alert('PDF 저장에 실패했습니다. 다시 시도해 주세요.');
             }
-
-            alert('PDF 저장이 완료되었습니다.');
         }
 
         const modifyInput = document.getElementById('iep-modify-input');
