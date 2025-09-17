@@ -131,18 +131,11 @@
         .iep-page-inner table {
             width: 100%;
         }
-        .iep-month-note {
-            font-size: 0.95rem;
-            color: #475569;
-        }
         .iep-month-block {
             flex: 1;
             display: flex;
             flex-direction: column;
             gap: 1rem;
-        }
-        .iep-month-subject h5 {
-            margin-bottom: 0.5rem;
         }
         .iep-month-content {
             min-height: 120px;
@@ -1544,20 +1537,15 @@
             const monthlyPages = months.map((info, idx) => {
                 const pageNumber = 5 + idx;
                 const displayText = buildMonthlyDisplayText(info);
-                const headingHtml = buildMonthlyHeadingHtml(info);
                 return `
                 <section class="iep-page" data-page="${pageNumber}" data-month-index="${idx}" data-first-month="${info.first}" data-second-month="${info.second}">
                     <div class="iep-page-inner">
                         ${sectionTitleTable('3. 월별 교육 목표')}
-                        <p class="iep-month-note">${displayText} 월 목표</p>
                         <div class="iep-month-block" data-month-index="${idx}">
-                            <h4 class="iep-month-title font-semibold" data-month-index="${idx}">${headingHtml || displayText}</h4>
                             <div class="iep-month-subject" data-subject="korean">
-                                <h5 class="font-semibold">국어</h5>
                                 <div id="monthly-plan-${idx}-korean" class="iep-month-content text-sm text-gray-500">월별 계획이 생성되지 않았습니다.</div>
                             </div>
                             <div class="iep-month-subject mt-4" data-subject="math">
-                                <h5 class="font-semibold">수학</h5>
                                 <div id="monthly-plan-${idx}-math" class="iep-month-content text-sm text-gray-500">월별 계획이 생성되지 않았습니다.</div>
                             </div>
                         </div>
@@ -1700,11 +1688,6 @@
             return info.actual || '';
         }
 
-        function buildMonthlyHeadingHtml(info) {
-            if (!info) return '';
-            return info.actual || '';
-        }
-
         function updateMonthlyPageDisplays(monthsArg) {
             const months = Array.isArray(monthsArg) ? monthsArg : getSemesterMonths(currentIepSemester);
             const modifySelect = document.getElementById('iep-modify-target');
@@ -1726,18 +1709,9 @@
                 if (!monthSection) return;
                 monthSection.setAttribute('data-page', String(pageNumber));
                 monthSection.setAttribute('data-month-index', String(idx));
-                const note = monthSection.querySelector('.iep-month-note');
-                if (note) {
-                    note.textContent = `${displayText} 월 목표`;
-                }
                 const block = monthSection.querySelector('.iep-month-block');
                 if (block) {
                     block.setAttribute('data-month-index', String(idx));
-                }
-                const heading = monthSection.querySelector('.iep-month-title');
-                if (heading) {
-                    heading.innerHTML = buildMonthlyHeadingHtml(info) || displayText;
-                    heading.setAttribute('data-month-index', String(idx));
                 }
                 const subjectOrder = ['korean', 'math'];
                 subjectOrder.forEach((subject, subjectIdx) => {
