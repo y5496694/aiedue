@@ -79,6 +79,77 @@
         .monthly-plan-table tbody .data-cell {
             width: 50%;
         }
+        .iep-pages-wrapper {
+            position: relative;
+        }
+        .iep-cover-actions {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            display: flex;
+            gap: 0.5rem;
+            z-index: 10;
+        }
+        .iep-cover-actions button {
+            box-shadow: 0 4px 10px rgba(148, 163, 184, 0.2);
+        }
+        .iep-page-collection {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .iep-page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            padding: 25mm;
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .iep-page-cover {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+        }
+        .iep-cover-footer {
+            margin-top: auto;
+            font-weight: 500;
+            align-self: flex-end;
+        }
+        .iep-page-inner {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .iep-page-inner table {
+            width: 100%;
+        }
+        .iep-month-note {
+            font-size: 0.95rem;
+            color: #475569;
+        }
+        .iep-month-block {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .iep-month-subject h5 {
+            margin-bottom: 0.5rem;
+        }
+        .iep-month-content {
+            min-height: 120px;
+        }
+        .iep-page + .iep-page {
+            margin-top: 1.5rem;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -182,8 +253,14 @@
                                 <div class="mb-2">
                                     <label for="iep-modify-target" class="text-sm font-medium mr-2">수정 항목</label>
                                     <select id="iep-modify-target" class="border rounded p-1 text-sm">
-                                        <option value="semester">학기 교육 목표</option>
-                                        <option value="monthly">월별교육목표</option>
+                                        <option value="page-1">1페이지 (표지)</option>
+                                        <option value="page-2">2페이지 (학습이 필요한 성취 기준)</option>
+                                        <option value="page-3">3페이지 (학기별 교육 목표)</option>
+                                        <option value="page-4" data-month-index="0">4페이지 (월별 교육 목표)</option>
+                                        <option value="page-5" data-month-index="1">5페이지 (월별 교육 목표)</option>
+                                        <option value="page-6" data-month-index="2">6페이지 (월별 교육 목표)</option>
+                                        <option value="page-7" data-month-index="3">7페이지 (월별 교육 목표)</option>
+                                        <option value="page-8" data-month-index="4">8페이지 (월별 교육 목표)</option>
                                         <option value="all">전체</option>
                                     </select>
                                 </div>
@@ -194,7 +271,7 @@
                             </div>
                         </aside>
                         <section class="w-full lg:w-2/3">
-                            <div id="iep-output" class="bg-white p-8 rounded-lg shadow-lg">
+                            <div id="iep-output" class="bg-white p-8 rounded-lg shadow-lg overflow-x-auto">
                                 <p class="text-gray-500">학생을 선택하면 IEP 정보가 표시됩니다.</p>
                             </div>
                         </section>
@@ -844,6 +921,17 @@
             korean: [],
             math: []
         };
+        const pageDescriptions = {
+            'page-1': '1페이지(표지)',
+            'page-2': '2페이지(학습이 필요한 성취 기준)',
+            'page-3': '3페이지(학기별 교육 목표)',
+            'page-4': '4페이지(월별 교육 목표)',
+            'page-5': '5페이지(월별 교육 목표)',
+            'page-6': '6페이지(월별 교육 목표)',
+            'page-7': '7페이지(월별 교육 목표)',
+            'page-8': '8페이지(월별 교육 목표)',
+            'all': '전체'
+        };
 
         async function loadIepStudents() {
             const user = auth.currentUser;
@@ -926,6 +1014,9 @@
                 html += '</ul>';
             }
             iepOutputContainer.innerHTML = html;
+            pageDescriptions['page-1'] = '1페이지(표지)';
+            pageDescriptions['page-2'] = '2페이지(학습이 필요한 성취 기준)';
+            pageDescriptions['page-3'] = '3페이지(학기별 교육 목표)';
             document.getElementById('add-iep-btn').addEventListener('click', () => addIep(studentName));
             iepOutputContainer.querySelectorAll('li[data-id]').forEach(el => {
                 el.addEventListener('click', (e) => {
@@ -1051,8 +1142,64 @@
             let titleHtml = markdownTableToHtml(titleMd)
                 .replace('class="min-w-full border border-gray-300 text-sm"', 'class="mx-auto w-auto border border-gray-300 text-xl"')
                 .replace('<th class="border px-2 py-1 bg-gray-100">', '<th class="border px-4 py-2 bg-gray-100 text-center text-2xl">');
-            let html = `<div class="flex flex-col items-center mb-4"><div id="iep-title">${titleHtml}</div><div class="space-x-2 mt-2"><button id="edit-iep-title" class="text-sm text-sky-600">편집</button><button id="save-iep-btn" class="bg-sky-600 hover:bg-sky-700 text-white text-sm px-3 py-1 rounded">저장</button><button id="save-pdf-btn" class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-3 py-1 rounded">PDF 저장</button></div></div><div id="iep-content">${data.content}</div>`;
+            const tempWrapper = document.createElement('div');
+            tempWrapper.innerHTML = data.content || '';
+            tempWrapper.querySelectorAll('.iep-page[data-page="1"]').forEach(node => node.remove());
+            const storedPagesHtml = tempWrapper.innerHTML;
+            const user = auth.currentUser;
+            let teacherName = (user?.displayName || '').trim();
+            if (!teacherName && user?.email) {
+                teacherName = user.email.split('@')[0];
+            }
+            if (!teacherName) {
+                teacherName = '미기재';
+            }
+            const html = `
+                <div class="iep-pages-wrapper">
+                    <div class="iep-cover-actions" id="iep-cover-actions">
+                        <button id="edit-iep-title" class="text-sm text-sky-600">편집</button>
+                        <button id="save-iep-btn" class="bg-sky-600 hover:bg-sky-700 text-white text-sm px-3 py-1 rounded">저장</button>
+                        <button id="save-pdf-btn" class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-3 py-1 rounded">PDF 저장</button>
+                    </div>
+                    <div id="iep-content" class="iep-page-collection">
+                        <section class="iep-page iep-page-cover" data-page="1">
+                            <div id="iep-title">${titleHtml}</div>
+                            <div class="iep-cover-footer">특수교사: <span id="iep-teacher-name">${teacherName}</span></div>
+                        </section>
+                        ${storedPagesHtml}
+                    </div>
+                </div>`;
             iepOutputContainer.innerHTML = html;
+            const teacherNameNode = document.getElementById('iep-teacher-name');
+            if (teacherNameNode) {
+                teacherNameNode.textContent = teacherName;
+            }
+            const modifySelect = document.getElementById('iep-modify-target');
+            const months = getSemesterMonths(currentIepSemester);
+            if (modifySelect) {
+                modifySelect.querySelectorAll('option[data-month-index]').forEach(option => {
+                    const idx = parseInt(option.dataset.monthIndex || '-1', 10);
+                    const info = Number.isInteger(idx) ? months[idx] : null;
+                    if (!info) return;
+                    option.textContent = `${4 + idx}페이지 (월별 교육 목표 - ${info.pdfLabel})`;
+                    pageDescriptions[`page-${4 + idx}`] = `${4 + idx}페이지(월별 교육 목표 - ${info.pdfLabel})`;
+                });
+            }
+            months.forEach((info, idx) => {
+                const monthSection = iepOutputContainer.querySelector(`.iep-page[data-month-index="${idx}"]`);
+                if (!monthSection) return;
+                const note = monthSection.querySelector('.iep-month-note');
+                if (note) {
+                    note.textContent = `${info.pdfLabel} 월 목표`;
+                }
+                const heading = monthSection.querySelector(`.iep-month-title[data-month-index="${idx}"]`);
+                if (heading) {
+                    heading.textContent = `${info.label}. ${info.pdfLabel}`;
+                }
+            });
+            pageDescriptions['page-1'] = '1페이지(표지)';
+            pageDescriptions['page-2'] = '2페이지(학습이 필요한 성취 기준)';
+            pageDescriptions['page-3'] = '3페이지(학기별 교육 목표)';
             extractSemesterGoalsFromDom();
             const monthlyBtn = document.getElementById('generate-monthly-plan-btn');
             if (monthlyBtn && (lastSemesterGoals.korean.length || lastSemesterGoals.math.length)) {
@@ -1095,7 +1242,13 @@
                 if (!user) return;
                 const docRef = doc(db, 'users', user.uid, 'ieps', id);
                 const title = document.getElementById('iep-title').textContent.trim();
-                const content = document.getElementById('iep-content').innerHTML;
+                const contentNode = document.getElementById('iep-content');
+                const contentClone = contentNode.cloneNode(true);
+                const coverPage = contentClone.querySelector('.iep-page-cover');
+                if (coverPage) {
+                    coverPage.parentNode.removeChild(coverPage);
+                }
+                const content = contentClone.innerHTML;
                 await updateDoc(docRef, { title, content });
                 showIepList(studentName);
                 openIepDocument(id, studentName);
@@ -1105,28 +1258,19 @@
         }
 
         function saveIepPdf() {
-            const titleNode = document.getElementById('iep-title');
             const contentNode = document.getElementById('iep-content');
-            if (!titleNode || !contentNode) return;
+            if (!contentNode) return;
 
-            const titleText = titleNode.textContent.trim();
-            const user = auth.currentUser;
-            let teacherName = (user?.displayName || '').trim();
-            if (!teacherName && user?.email) {
-                teacherName = user.email.split('@')[0];
-            }
-            if (!teacherName) {
-                teacherName = '미기재';
-            }
+            const titleNode = document.getElementById('iep-title');
+            const teacherNode = document.getElementById('iep-teacher-name');
+            const titleText = titleNode ? titleNode.textContent.trim() : '개별화교육계획';
+            const teacherName = teacherNode ? teacherNode.textContent.trim() : '미기재';
 
             const contentClone = contentNode.cloneNode(true);
             contentClone.querySelectorAll('button').forEach(btn => btn.remove());
 
-            let root = contentClone;
-            if (contentClone.children.length === 1 && contentClone.firstElementChild?.classList?.contains('space-y-6')) {
-                root = contentClone.firstElementChild;
-            }
-            const sectionElements = Array.from(root.children || []);
+            const pageNodes = Array.from(contentClone.querySelectorAll('.iep-page'));
+            if (!pageNodes.length) return;
 
             const pdfContainer = document.createElement('div');
             pdfContainer.className = 'pdf-export-container';
@@ -1141,90 +1285,28 @@
                 .pdf-export-container .pdf-page { width: 210mm; min-height: 297mm; padding: 25mm; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; background-color: #ffffff; }
                 .pdf-export-container .pdf-page + .pdf-page { page-break-before: always; }
                 .pdf-export-container .pdf-title-page { justify-content: center; align-items: center; text-align: center; }
-                .pdf-export-container .pdf-title-page h1 { font-size: 28pt; font-weight: 700; margin: 0; }
-                .pdf-export-container .pdf-title-footer { margin-top: auto; font-size: 12pt; text-align: right; width: 100%; }
-                .pdf-export-container .pdf-page-content { flex: 1; display: flex; flex-direction: column; gap: 16px; }
-                .pdf-export-container .pdf-page-content table { width: 100%; page-break-inside: avoid; border-collapse: collapse; }
-                .pdf-export-container .pdf-month-title { font-size: 16pt; font-weight: 600; margin: 0; }
-                .pdf-export-container .pdf-section-wrapper { display: flex; flex-direction: column; gap: 12px; }
+                .pdf-export-container .pdf-page table { width: 100%; border-collapse: collapse; }
+                .pdf-export-container .pdf-cover-footer { margin-top: auto; font-size: 12pt; text-align: right; width: 100%; }
             `;
             pdfContainer.appendChild(style);
 
-            const cloneForPdf = (element) => {
-                if (!element) return null;
-                const clone = element.cloneNode(true);
-                clone.querySelectorAll('button').forEach(btn => btn.remove());
-                clone.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
-                return clone;
-            };
-
-            const titlePage = document.createElement('section');
-            titlePage.className = 'pdf-page pdf-title-page';
-            const titleHeading = document.createElement('h1');
-            titleHeading.textContent = titleText;
-            titlePage.appendChild(titleHeading);
-            const titleFooter = document.createElement('div');
-            titleFooter.className = 'pdf-title-footer';
-            titleFooter.textContent = `특수교사: ${teacherName}`;
-            titlePage.appendChild(titleFooter);
-            pdfContainer.appendChild(titlePage);
-
-            const appendContentPage = (elements, headingText = '') => {
-                const filtered = elements.filter(Boolean);
-                if (!filtered.length && !headingText) return;
-                const page = document.createElement('section');
-                page.className = 'pdf-page';
-                const wrapper = document.createElement('div');
-                wrapper.className = 'pdf-page-content pdf-section-wrapper';
-                if (headingText) {
-                    const heading = document.createElement('h2');
-                    heading.className = 'pdf-month-title';
-                    heading.textContent = headingText;
-                    wrapper.appendChild(heading);
+            pageNodes.forEach(page => {
+                const pdfPage = document.createElement('section');
+                pdfPage.className = 'pdf-page';
+                const clonedPage = page.cloneNode(true);
+                clonedPage.querySelectorAll('button').forEach(btn => btn.remove());
+                clonedPage.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
+                if (page.classList.contains('iep-page-cover')) {
+                    pdfPage.classList.add('pdf-title-page');
+                    const footer = clonedPage.querySelector('.iep-cover-footer');
+                    if (footer) {
+                        footer.textContent = `특수교사: ${teacherName}`;
+                        footer.classList.add('pdf-cover-footer');
+                    }
                 }
-                filtered.forEach(el => wrapper.appendChild(el));
-                if (!wrapper.children.length) return;
-                page.appendChild(wrapper);
-                pdfContainer.appendChild(page);
-            };
-
-            const achievementsSection = cloneForPdf(sectionElements[0]);
-            const semesterSection = cloneForPdf(sectionElements[1]);
-            const monthlySection = sectionElements[2] || null;
-
-            if (achievementsSection) {
-                appendContentPage([achievementsSection]);
-            }
-            if (semesterSection) {
-                appendContentPage([semesterSection]);
-            }
-
-            const months = getSemesterMonths(currentIepSemester);
-            const monthlyHeaderTemplate = monthlySection?.querySelector('table') || null;
-            const monthlyPlansContainer = monthlySection?.querySelector('#monthly-plans') || null;
-            const rawMonthBlocks = monthlyPlansContainer ? Array.from(monthlyPlansContainer.children) : [];
-
-            if (months.length) {
-                months.forEach((monthInfo, idx) => {
-                    const monthBlock = rawMonthBlocks[idx] ? cloneForPdf(rawMonthBlocks[idx]) : null;
-                    let contentElement = monthBlock;
-                    if (!contentElement) {
-                        const placeholder = document.createElement('p');
-                        placeholder.textContent = '월별 계획이 생성되지 않았습니다.';
-                        placeholder.className = 'text-sm text-gray-500';
-                        contentElement = placeholder;
-                    }
-                    const elements = [];
-                    if (idx === 0 && monthlyHeaderTemplate) {
-                        elements.push(cloneForPdf(monthlyHeaderTemplate));
-                    }
-                    elements.push(contentElement);
-                    const headingText = idx === 0
-                        ? `3. 월별 교육 목표 + ${monthInfo.pdfLabel} 월 계획`
-                        : `${monthInfo.pdfLabel} 월 계획`;
-                    appendContentPage(elements, headingText);
-                });
-            }
+                pdfPage.innerHTML = clonedPage.innerHTML;
+                pdfContainer.appendChild(pdfPage);
+            });
 
             document.body.appendChild(pdfContainer);
 
@@ -1257,8 +1339,8 @@
             if (!instruction || !currentIepDocId) return;
             modifyInput.value = '';
             const currentContent = document.getElementById('iep-content').innerHTML;
-            const targetText = target === 'semester' ? '학기 교육 목표' : target === 'monthly' ? '월별교육목표' : '전체';
-            const prompt = `다음 개별화교육계획 중 '${targetText}' 부분을 사용자의 수정 요구에 맞게 수정해줘. 다른 부분은 변경하지 말고 HTML 형식을 유지하며 마크다운 표는 유지해줘.\n\n원본:\n${currentContent}\n\n수정 요구:${instruction}`;
+            const targetText = pageDescriptions[target] || '전체';
+            const prompt = `다음 개별화교육계획 HTML에서 '${targetText}'에 해당하는 부분만 사용자의 수정 요구에 맞게 수정해줘. 다른 페이지의 구조와 내용, 클래스, 마크다운 표는 그대로 유지해줘.\n\n원본:\n${currentContent}\n\n수정 요구:${instruction}`;
             let result = await callGemini(prompt);
             result = result.split(/\n+/).filter(line => !line.includes('다음은') && !line.includes('수정했습니다') && !line.includes('수정되었습니다')).join('\n');
             document.getElementById('iep-content').innerHTML = result;
@@ -1289,43 +1371,70 @@
             const mathList = collectYellowAchievements(data, 'math');
             lastKoreanList = koreanList;
             lastMathList = mathList;
-            return `<div class="space-y-6">
-                <div>
-                    ${sectionTitleTable('1. 학습이 필요한 성취기준')}
-                    <div class="flex justify-end mb-2">
-                        <button id="iep-achievement-btn" class="text-sky-600 hover:underline text-sm">성취 기준 이동</button>
+            const now = new Date();
+            const month = now.getMonth() + 1;
+            const defaultSemester = (month >= 8 || month <= 1) ? 2 : 1;
+            const months = getSemesterMonths(defaultSemester);
+            const monthlyPages = months.map((info, idx) => {
+                const pageNumber = 4 + idx;
+                const note = `${info.pdfLabel} 월 목표`;
+                return `
+                <section class="iep-page" data-page="${pageNumber}" data-month-index="${idx}" data-first-month="${info.first}" data-second-month="${info.second}">
+                    <div class="iep-page-inner">
+                        ${sectionTitleTable('3. 월별 교육 목표')}
+                        <p class="iep-month-note">${note}</p>
+                        <div class="iep-month-block" data-month-index="${idx}">
+                            <h4 class="iep-month-title font-semibold" data-month-index="${idx}">${info.label}. ${info.pdfLabel}</h4>
+                            <div class="iep-month-subject" data-subject="korean">
+                                <h5 class="font-semibold">국어</h5>
+                                <div id="monthly-plan-${idx}-korean" class="iep-month-content text-sm text-gray-500">월별 계획이 생성되지 않았습니다.</div>
+                            </div>
+                            <div class="iep-month-subject mt-4" data-subject="math">
+                                <h5 class="font-semibold">수학</h5>
+                                <div id="monthly-plan-${idx}-math" class="iep-month-content text-sm text-gray-500">월별 계획이 생성되지 않았습니다.</div>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <h4 class="font-semibold mb-2">가. 국어</h4>
-                        ${buildAchievementTable(koreanList)}
+                </section>`;
+            }).join('');
+            return `
+                <section class="iep-page" data-page="2">
+                    <div class="iep-page-inner">
+                        ${sectionTitleTable('1. 학습이 필요한 성취 기준')}
+                        <div class="flex justify-end">
+                            <button id="iep-achievement-btn" class="text-sky-600 hover:underline text-sm">성취 기준 이동</button>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold">가. 국어</h4>
+                            ${buildAchievementTable(koreanList)}
+                        </div>
+                        <div>
+                            <h4 class="font-semibold">나. 수학</h4>
+                            ${buildAchievementTable(mathList)}
+                        </div>
                     </div>
-                    <div>
-                        <h4 class="font-semibold mt-4 mb-2">나. 수학</h4>
-                        ${buildAchievementTable(mathList)}
+                </section>
+                <section class="iep-page" data-page="3">
+                    <div class="iep-page-inner">
+                        ${sectionTitleTable('2. 학기별 교육 목표')}
+                        <div class="flex justify-end">
+                            <button id="generate-semester-goals-btn" class="text-sky-600 hover:underline text-sm">생성</button>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold">가. 국어</h4>
+                            <div id="korean-goals"></div>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold">나. 수학</h4>
+                            <div id="math-goals"></div>
+                        </div>
+                        <div class="flex justify-end">
+                            <button id="generate-monthly-plan-btn" class="text-sky-600 hover:underline text-sm hidden">월별 교육목표/내용/방법 생성하기</button>
+                        </div>
                     </div>
-                </div>
-                <div>
-                    ${sectionTitleTable('2. 학기별 교육 목표')}
-                    <div class="flex justify-end mb-2">
-                        <button id="generate-semester-goals-btn" class="text-sky-600 hover:underline text-sm">생성</button>
-                    </div>
-                    <div>
-                        <h4 class="font-semibold mt-4 mb-2">가. 국어</h4>
-                        <div id="korean-goals"></div>
-                    </div>
-                    <div>
-                        <h4 class="font-semibold mt-4 mb-2">나. 수학</h4>
-                        <div id="math-goals"></div>
-                    </div>
-                    <div class="flex justify-end mt-4">
-                        <button id="generate-monthly-plan-btn" class="text-sky-600 hover:underline text-sm hidden">월별 교육목표/내용/방법 생성하기</button>
-                    </div>
-                </div>
-                <div>
-                    ${sectionTitleTable('3. 월별 교육 목표')}
-                    <div id="monthly-plans" class="mt-2"></div>
-                </div>
-            </div>`;
+                </section>
+                ${monthlyPages}
+            `;
         }
 
         function buildAchievementTable(list) {
@@ -1422,7 +1531,7 @@
             const achievementText = subject.list.length
                 ? subject.list.map((item, idx) => `${idx + 1}. ${item.text}`).join('\n')
                 : '관련 성취기준 정보 없음';
-            const prompt = `너는 특수교육 교사를 돕는 전문가야. 아래 정보를 참고하여 ${subject.name} 교과의 월별 계획을 JSON 배열로 작성해줘.\n\n- 학기: ${currentIepSemester}학기\n- 월 목록: ${monthLabels.join(', ')}\n- 학기 교육목표:\n${semesterGoals.map((goal, idx) => `${idx + 1}. ${goal}`).join('\n')}\n- 참고 성취기준:\n${achievementText}\n\n요구사항:\n1. 학기 교육목표의 핵심을 순서대로 ${monthLabels.length}개의 월별 교육목표로 나누어 제시한다. 필요한 경우 문장을 분할하거나 통합하되 모든 학기 목표 내용이 월별 목표에 반영되어야 한다.\n2. 각 월별 계획의 goal, content, method 값은 불릿 포인트 형식의 문자열로 작성한다. 불릿은 반드시 '○ '로 시작하고 문장마다 줄바꿈으로 구분한다.\n3. goal 항목은 2문장 이상, content와 method 항목은 각각 3문장 이상으로 작성한다.\n4. content 항목의 모든 문장은 '하기로.'로 끝나도록 작성한다.\n5. 모든 문장은 자연스러운 한국어로 작성한다.\n6. 응답은 반드시 JSON 배열만으로 제공하고 다른 설명은 포함하지 않는다.\n7. 배열의 각 요소는 {"month":"${monthLabels[0]}","goal":"...","content":"...","method":"..."} 형식을 따르며, month 값은 월 목록과 정확히 일치하고 순서를 유지해야 한다.`;
+            const prompt = `너는 특수교육 교사를 돕는 전문가야. 아래 정보를 참고하여 ${subject.name} 교과의 월별 계획을 JSON 배열로 작성해줘.\n\n- 학기: ${currentIepSemester}학기\n- 월 목록: ${monthLabels.join(', ')}\n- 학기 교육목표:\n${semesterGoals.map((goal, idx) => `${idx + 1}. ${goal}`).join('\n')}\n- 참고 성취기준:\n${achievementText}\n\n요구사항:\n1. 학기 교육목표의 핵심을 순서대로 ${monthLabels.length}개의 월별 교육목표로 나누어 제시한다. 필요한 경우 문장을 분할하거나 통합하되 모든 학기 목표 내용이 월별 목표에 반영되어야 한다.\n2. 각 월별 계획의 goal, content, method 값은 불릿 포인트 형식의 문자열로 작성한다. 불릿은 반드시 '○ '로 시작하고 문장마다 줄바꿈으로 구분한다.\n3. goal 항목은 2문장 이상, content와 method 항목은 각각 3문장 이상으로 작성한다.\n4. content 항목의 모든 문장은 마침표 없이 '~기' 형태(예: ...하기, ...쓰기)로 끝나도록 작성한다.\n5. 모든 문장은 자연스러운 한국어로 작성한다.\n6. 응답은 반드시 JSON 배열만으로 제공하고 다른 설명은 포함하지 않는다.\n7. 배열의 각 요소는 {"month":"${monthLabels[0]}","goal":"...","content":"...","method":"..."} 형식을 따르며, month 값은 월 목록과 정확히 일치하고 순서를 유지해야 한다.`;
             const result = await callGemini(prompt, true);
             let plans = [];
             if (Array.isArray(result)) {
@@ -1533,13 +1642,12 @@
                 trimmed = trimmed.replace(/^[-*•●○]\s*/, '').replace(/^\d+[.)]\s*/, '').trim();
                 trimmed = trimmed.replace(/\s+/g, ' ');
                 if (!trimmed) return null;
-                if (endingMode === 'hagiro') {
+                if (endingMode === 'gerund') {
                     trimmed = trimmed.replace(/[.!?]\s*$/, '');
-                    trimmed = trimmed.replace(/하기로\s*(?:한다|합니다|함|할 예정이다|할 계획이다|할 예정임|할 계획임)?$/, '하기로');
-                    if (!trimmed.endsWith('하기로')) {
-                        trimmed += '하기로';
-                    }
-                    trimmed = `${trimmed}.`;
+                    trimmed = trimmed.replace(/기로\s*(?:한다|합니다|함|할 예정이다|할 계획이다|할 예정임|할 계획임)?$/, '기');
+                    trimmed = trimmed.replace(/기\s*(?:한다|합니다|함|할 예정이다|할 계획이다|할 예정임|할 계획임)?$/, '기');
+                    trimmed = trimmed.replace(/한다$/, '하기').replace(/합니다$/, '하기');
+                    trimmed = trimmed.trim();
                 } else {
                     trimmed = trimmed.replace(/[.!?]\s*$/, '');
                     trimmed = `${trimmed}.`;
@@ -1552,13 +1660,12 @@
                 if (!fallback) return '';
                 fallback = fallback.replace(/[.!?]\s*$/, '');
                 fallback = fallback.replace(/\s+/g, ' ');
-                if (endingMode === 'hagiro') {
-                    fallback = fallback.replace(/하기로\s*(?:한다|합니다|함|할 예정이다|할 계획이다|할 예정임|할 계획임)?$/, '하기로');
-                    if (!fallback.endsWith('하기로')) {
-                        fallback += '하기로';
-                    }
+                if (endingMode === 'gerund') {
+                    fallback = fallback.replace(/기로\s*(?:한다|합니다|함|할 예정이다|할 계획이다|할 예정임|할 계획임)?$/, '기');
+                    fallback = fallback.replace(/기\s*(?:한다|합니다|함|할 예정이다|할 계획이다|할 예정임|할 계획임)?$/, '기');
+                    fallback = fallback.replace(/한다$/, '하기').replace(/합니다$/, '하기');
                 }
-                const sentence = `${fallback}.`;
+                const sentence = endingMode === 'gerund' ? fallback : `${fallback}.`;
                 const bulletLine = `○ ${sentence}`;
                 return Array.from({ length: Math.max(minCount, 1) }, () => bulletLine).join('\n');
             }
@@ -1577,7 +1684,7 @@
         }
 
         function formatMonthlyContentText(text) {
-            return ensureBulletString(text, { minCount: 3, endingMode: 'hagiro' });
+            return ensureBulletString(text, { minCount: 3, endingMode: 'gerund' });
         }
 
         function formatMonthlyMethodText(text) {
@@ -1626,25 +1733,35 @@
                 lines.forEach(line => { md += `| ${line} |\n`; });
                 target.innerHTML = markdownTableToHtml(md);
             }
-            const monthlyContainer = document.getElementById('monthly-plans');
-            if (monthlyContainer) {
-                monthlyContainer.innerHTML = '';
-            }
+            document.querySelectorAll('.iep-month-content').forEach(node => {
+                node.innerHTML = '<p class="text-gray-500 text-sm">월별 계획이 생성되지 않았습니다.</p>';
+            });
         }
 
         async function generateMonthlyPlans(koreanList, mathList) {
-            const container = document.getElementById('monthly-plans');
-            if (!container) return;
-            container.innerHTML = '<p class="text-gray-500">생성 중...</p>';
             const months = getSemesterMonths(currentIepSemester);
             if (!months.length) {
-                container.innerHTML = '<p class="text-gray-500">월 정보를 불러오지 못했습니다.</p>';
+                document.querySelectorAll('.iep-month-content').forEach(node => {
+                    node.innerHTML = '<p class="text-gray-500 text-sm">월 정보를 불러오지 못했습니다.</p>';
+                });
                 return;
             }
             const subjects = [
                 { name: '국어', key: 'korean', list: koreanList },
                 { name: '수학', key: 'math', list: mathList }
             ];
+            const containersByMonth = {};
+            months.forEach((_, idx) => {
+                containersByMonth[idx] = {};
+                subjects.forEach(subject => {
+                    const container = document.getElementById(`monthly-plan-${idx}-${subject.key}`);
+                    if (container) {
+                        containersByMonth[idx][subject.key] = container;
+                        container.innerHTML = '<p class="text-gray-500 text-sm">생성 중...</p>';
+                    }
+                });
+            });
+
             const plansBySubject = {};
             for (const subject of subjects) {
                 if (!(lastSemesterGoals[subject.key] || []).length) {
@@ -1653,28 +1770,22 @@
                 }
                 plansBySubject[subject.key] = await generateSubjectMonthlyPlans(subject, months);
             }
-            let html = '';
-            months.forEach((month, idx) => {
-                html += `<div class="mb-6">`;
-                html += `<h4 class="font-semibold">${month.title}</h4>`;
-                html += '<div class="ml-4 space-y-4">';
+
+            months.forEach((monthInfo, idx) => {
                 subjects.forEach(subject => {
-                    html += '<div>';
-                    html += `<h5 class="font-semibold">- ${subject.name}</h5>`;
-                    const hasSemesterGoals = (lastSemesterGoals[subject.key] || []).length > 0;
+                    const container = containersByMonth[idx]?.[subject.key];
+                    if (!container) return;
+                    const hasGoals = (lastSemesterGoals[subject.key] || []).length > 0;
                     const entry = plansBySubject[subject.key]?.[idx];
-                    if (!hasSemesterGoals) {
-                        html += '<p class="text-gray-500 text-sm ml-4">학기 교육목표를 먼저 생성해 주세요.</p>';
+                    if (!hasGoals) {
+                        container.innerHTML = '<p class="text-gray-500 text-sm">학기 교육목표를 먼저 생성해 주세요.</p>';
                     } else if (!entry || (!entry.goal && !entry.content && !entry.method)) {
-                        html += '<p class="text-gray-500 text-sm ml-4">월별 계획을 생성하지 못했습니다. 다시 시도해 주세요.</p>';
+                        container.innerHTML = '<p class="text-gray-500 text-sm">월별 계획을 생성하지 못했습니다. 다시 시도해 주세요.</p>';
                     } else {
-                        html += buildMonthlyTables(month.actual, subject.name, entry);
+                        container.innerHTML = buildMonthlyTables(monthInfo.actual, subject.name, entry);
                     }
-                    html += '</div>';
                 });
-                html += '</div></div>';
             });
-            container.innerHTML = html;
         }
 
         // --- Behavior Intervention Logic ---
