@@ -100,7 +100,7 @@
         }
         .iep-page {
             width: 210mm;
-            min-height: 284mm;
+            min-height: 297mm;
             margin: 0 auto;
             padding: 25mm;
             background-color: #ffffff;
@@ -254,13 +254,14 @@
                                     <label for="iep-modify-target" class="text-sm font-medium mr-2">수정 항목</label>
                                     <select id="iep-modify-target" class="border rounded p-1 text-sm">
                                         <option value="page-1">1페이지 (표지)</option>
-                                        <option value="page-2">2페이지 (학습이 필요한 성취 기준)</option>
-                                        <option value="page-3">3페이지 (학기별 교육 목표)</option>
-                                        <option value="page-4" data-month-index="0">4페이지 (월별 교육 목표)</option>
-                                        <option value="page-5" data-month-index="1">5페이지 (월별 교육 목표)</option>
-                                        <option value="page-6" data-month-index="2">6페이지 (월별 교육 목표)</option>
-                                        <option value="page-7" data-month-index="3">7페이지 (월별 교육 목표)</option>
-                                        <option value="page-8" data-month-index="4">8페이지 (월별 교육 목표)</option>
+                                        <option value="page-2">2페이지 (성취 기준 - 국어)</option>
+                                        <option value="page-3">3페이지 (성취 기준 - 수학)</option>
+                                        <option value="page-4">4페이지 (학기별 교육 목표)</option>
+                                        <option value="page-5" data-month-index="0">5페이지 (월별 교육 목표)</option>
+                                        <option value="page-6" data-month-index="1">6페이지 (월별 교육 목표)</option>
+                                        <option value="page-7" data-month-index="2">7페이지 (월별 교육 목표)</option>
+                                        <option value="page-8" data-month-index="3">8페이지 (월별 교육 목표)</option>
+                                        <option value="page-9" data-month-index="4">9페이지 (월별 교육 목표)</option>
                                         <option value="all">전체</option>
                                     </select>
                                 </div>
@@ -933,20 +934,22 @@
         };
         const pageDescriptions = {
             'page-1': '1페이지(표지)',
-            'page-2': '2페이지(학습이 필요한 성취 기준)',
-            'page-3': '3페이지(학기별 교육 목표)',
-            'page-4': '4페이지(월별 교육 목표)',
+            'page-2': '2페이지(성취 기준 - 국어)',
+            'page-3': '3페이지(성취 기준 - 수학)',
+            'page-4': '4페이지(학기별 교육 목표)',
             'page-5': '5페이지(월별 교육 목표)',
             'page-6': '6페이지(월별 교육 목표)',
             'page-7': '7페이지(월별 교육 목표)',
             'page-8': '8페이지(월별 교육 목표)',
+            'page-9': '9페이지(월별 교육 목표)',
             'all': '전체'
         };
 
         function setBasePageDescriptions() {
             pageDescriptions['page-1'] = '1페이지(표지)';
-            pageDescriptions['page-2'] = '2페이지(학습이 필요한 성취 기준)';
-            pageDescriptions['page-3'] = '3페이지(학기별 교육 목표)';
+            pageDescriptions['page-2'] = '2페이지(성취 기준 - 국어)';
+            pageDescriptions['page-3'] = '3페이지(성취 기준 - 수학)';
+            pageDescriptions['page-4'] = '4페이지(학기별 교육 목표)';
         }
 
         async function loadIepStudents() {
@@ -1031,8 +1034,9 @@
             }
             iepOutputContainer.innerHTML = html;
             pageDescriptions['page-1'] = '1페이지(표지)';
-            pageDescriptions['page-2'] = '2페이지(학습이 필요한 성취 기준)';
-            pageDescriptions['page-3'] = '3페이지(학기별 교육 목표)';
+            pageDescriptions['page-2'] = '2페이지(성취 기준 - 국어)';
+            pageDescriptions['page-3'] = '3페이지(성취 기준 - 수학)';
+            pageDescriptions['page-4'] = '4페이지(학기별 교육 목표)';
             document.getElementById('add-iep-btn').addEventListener('click', () => addIep(studentName));
             iepOutputContainer.querySelectorAll('li[data-id]').forEach(el => {
                 el.addEventListener('click', (e) => {
@@ -1161,6 +1165,7 @@
             const tempWrapper = document.createElement('div');
             tempWrapper.innerHTML = data.content || '';
             tempWrapper.querySelectorAll('.iep-page[data-page="1"]').forEach(node => node.remove());
+            upgradeLegacyIepStructure(tempWrapper);
             const storedPagesHtml = tempWrapper.innerHTML;
             const user = auth.currentUser;
             let teacherName = (user?.displayName || '').trim();
@@ -1186,6 +1191,7 @@
                     </div>
                 </div>`;
             iepOutputContainer.innerHTML = html;
+            normalizeIepPages(document.getElementById('iep-content'));
             const teacherNameNode = document.getElementById('iep-teacher-name');
             if (teacherNameNode) {
                 teacherNameNode.textContent = teacherName;
@@ -1330,6 +1336,7 @@
                     const sanitized = sanitizeAiHtmlResponse(result, currentContent);
                     if (sanitized) {
                         contentRoot.innerHTML = sanitized;
+                        normalizeIepPages(contentRoot);
                     }
                     updateMonthlyPageDisplays();
                     extractSemesterGoalsFromDom();
@@ -1377,6 +1384,22 @@
             return text || fallback;
         }
 
+        function normalizeIepPages(root) {
+            if (!root) return;
+            Array.from(root.children).forEach(page => {
+                if (!(page instanceof HTMLElement)) return;
+                page.classList.add('iep-page');
+                if (!page.classList.contains('iep-page-cover') && !page.querySelector('.iep-page-inner')) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'iep-page-inner';
+                    while (page.firstChild) {
+                        wrapper.appendChild(page.firstChild);
+                    }
+                    page.appendChild(wrapper);
+                }
+            });
+        }
+
         function findIepPageNode(target) {
             if (!target || target === 'all') return null;
             const contentRoot = document.getElementById('iep-content');
@@ -1409,9 +1432,11 @@
             if (newSection) {
                 preservePageAttributes(pageNode, newSection);
                 pageNode.replaceWith(newSection);
+                normalizeIepPages(document.getElementById('iep-content'));
                 return;
             }
             pageNode.innerHTML = trimmed;
+            normalizeIepPages(document.getElementById('iep-content'));
         }
 
         modifyBtn.addEventListener('click', applyModification);
@@ -1429,6 +1454,79 @@
                 .replace('<th class="border px-2 py-1 bg-gray-100">', '<th class="border px-4 py-2 bg-gray-100 text-center text-lg">');
         }
 
+        function upgradeLegacyIepStructure(wrapper) {
+            if (!wrapper) return;
+            const semesterPage = wrapper.querySelector('.iep-page[data-page="3"] #korean-goals')?.closest('.iep-page');
+            const achievementPage = wrapper.querySelector('.iep-page[data-page="2"]');
+            if (!semesterPage || !achievementPage) return;
+
+            const achievementInner = achievementPage.querySelector('.iep-page-inner');
+            if (!achievementInner) return;
+
+            const findSubjectBlock = (label) => {
+                return Array.from(achievementInner.children).find(child => {
+                    if (!(child instanceof HTMLElement)) return false;
+                    const heading = child.querySelector('h4');
+                    return heading && heading.textContent.includes(label);
+                });
+            };
+
+            let buttonContainer = achievementInner.querySelector('#iep-achievement-btn')?.parentElement;
+            if (!buttonContainer) {
+                buttonContainer = document.createElement('div');
+                buttonContainer.className = 'flex justify-end';
+                const btn = document.createElement('button');
+                btn.id = 'iep-achievement-btn';
+                btn.className = 'text-sky-600 hover:underline text-sm';
+                btn.textContent = '성취 기준 이동';
+                buttonContainer.appendChild(btn);
+            }
+
+            const koreanBlock = findSubjectBlock('국어');
+            const mathBlock = findSubjectBlock('수학');
+
+            achievementInner.innerHTML = '';
+            achievementInner.insertAdjacentHTML('beforeend', sectionTitleTable('1. 학습이 필요한 성취 기준 - 국어'));
+            achievementInner.appendChild(buttonContainer);
+
+            if (koreanBlock) {
+                const heading = koreanBlock.querySelector('h4');
+                if (heading) heading.textContent = '국어';
+                achievementInner.appendChild(koreanBlock);
+            } else {
+                const fallback = document.createElement('div');
+                fallback.innerHTML = '<h4 class="font-semibold">국어</h4><p class="text-gray-500">학습이 필요한 성취기준이 없습니다.</p>';
+                achievementInner.appendChild(fallback);
+            }
+
+            const mathPage = document.createElement('section');
+            mathPage.className = 'iep-page';
+            mathPage.setAttribute('data-page', '3');
+            const mathInner = document.createElement('div');
+            mathInner.className = 'iep-page-inner';
+            mathInner.insertAdjacentHTML('beforeend', sectionTitleTable('1. 학습이 필요한 성취 기준 - 수학'));
+            if (mathBlock) {
+                const heading = mathBlock.querySelector('h4');
+                if (heading) heading.textContent = '수학';
+                mathInner.appendChild(mathBlock);
+            } else {
+                const fallback = document.createElement('div');
+                fallback.innerHTML = '<h4 class="font-semibold">수학</h4><p class="text-gray-500">학습이 필요한 성취기준이 없습니다.</p>';
+                mathInner.appendChild(fallback);
+            }
+            mathPage.appendChild(mathInner);
+            achievementPage.insertAdjacentElement('afterend', mathPage);
+
+            semesterPage.setAttribute('data-page', '4');
+
+            const monthlyPages = Array.from(wrapper.querySelectorAll('.iep-page[data-page]'))
+                .filter(page => page !== semesterPage && Number(page.getAttribute('data-page')) >= 4)
+                .sort((a, b) => Number(a.getAttribute('data-page')) - Number(b.getAttribute('data-page')));
+            monthlyPages.forEach((page, idx) => {
+                page.setAttribute('data-page', String(5 + idx));
+            });
+        }
+
         async function buildIepContent(studentName) {
             const user = auth.currentUser;
             if (!user) return '';
@@ -1444,7 +1542,7 @@
             const defaultSemester = (month >= 8 || month <= 1) ? 2 : 1;
             const months = getSemesterMonths(defaultSemester);
             const monthlyPages = months.map((info, idx) => {
-                const pageNumber = 4 + idx;
+                const pageNumber = 5 + idx;
                 const displayText = buildMonthlyDisplayText(info);
                 const headingHtml = buildMonthlyHeadingHtml(info);
                 return `
@@ -1469,21 +1567,26 @@
             return `
                 <section class="iep-page" data-page="2">
                     <div class="iep-page-inner">
-                        ${sectionTitleTable('1. 학습이 필요한 성취 기준')}
+                        ${sectionTitleTable('1. 학습이 필요한 성취 기준 - 국어')}
                         <div class="flex justify-end">
                             <button id="iep-achievement-btn" class="text-sky-600 hover:underline text-sm">성취 기준 이동</button>
                         </div>
                         <div>
-                            <h4 class="font-semibold">가. 국어</h4>
+                            <h4 class="font-semibold">국어</h4>
                             ${buildAchievementTable(koreanList)}
-                        </div>
-                        <div>
-                            <h4 class="font-semibold">나. 수학</h4>
-                            ${buildAchievementTable(mathList)}
                         </div>
                     </div>
                 </section>
                 <section class="iep-page" data-page="3">
+                    <div class="iep-page-inner">
+                        ${sectionTitleTable('1. 학습이 필요한 성취 기준 - 수학')}
+                        <div>
+                            <h4 class="font-semibold">수학</h4>
+                            ${buildAchievementTable(mathList)}
+                        </div>
+                    </div>
+                </section>
+                <section class="iep-page" data-page="4">
                     <div class="iep-page-inner">
                         ${sectionTitleTable('2. 학기별 교육 목표')}
                         <div class="flex justify-end">
@@ -1609,10 +1712,11 @@
             setBasePageDescriptions();
             months.forEach((info, idx) => {
                 const displayText = buildMonthlyDisplayText(info);
-                const pageNumber = 4 + idx;
+                const pageNumber = 5 + idx;
                 if (modifySelect) {
                     const option = modifySelect.querySelector(`option[data-month-index="${idx}"]`);
                     if (option) {
+                        option.value = `page-${pageNumber}`;
                         option.textContent = `${pageNumber}페이지 (월별 교육 목표 - ${displayText})`;
                     }
                 }
