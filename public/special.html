@@ -784,13 +784,23 @@
             const lines = md.trim().split('\n');
             const headers = lines[0].split('|').slice(1, -1).map(s => s.trim());
             const rows = lines.slice(2).map(line => line.split('|').slice(1, -1).map(s => s.trim()));
+            const firstColWidth = 20;
+            const otherColWidth = headers.length > 1 ? (80 / (headers.length - 1)) : 80;
+            const firstWidthStyle = `style="width: ${firstColWidth}%"`;
+            const otherWidthStyle = headers.length > 1 ? `style="width: ${otherColWidth.toFixed(2)}%"` : '';
             let html = '<table class="min-w-full border border-gray-300 text-sm"><thead><tr>';
-            headers.forEach(h => { html += `<th class="border px-2 py-1 bg-gray-100">${h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</th>`; });
+            headers.forEach((h, idx) => {
+                const widthStyle = idx === 0 ? firstWidthStyle : otherWidthStyle;
+                const widthAttr = widthStyle ? `${widthStyle} ` : '';
+                html += `<th ${widthAttr}class="border px-2 py-1 bg-gray-100">${h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</th>`;
+            });
             html += '</tr></thead><tbody>';
             rows.forEach(row => {
                 html += '<tr>';
-                row.forEach(cell => {
-                    html += `<td class="border px-2 py-1 align-top">${cell.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</td>`;
+                row.forEach((cell, cellIdx) => {
+                    const widthStyle = cellIdx === 0 ? firstWidthStyle : otherWidthStyle;
+                    const widthAttr = widthStyle ? `${widthStyle} ` : '';
+                    html += `<td ${widthAttr}class="border px-2 py-1 align-top">${cell.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</td>`;
                 });
                 html += '</tr>';
             });
@@ -1273,26 +1283,28 @@
 
             const styleText = `
                 .pdf-export-container { font-family: 'Noto Sans KR', sans-serif; color: #1f2937; }
-                .pdf-export-container .pdf-page { width: 210mm; min-height: 297mm; padding: 25mm; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; background-color: #ffffff; }
+                .pdf-export-container .pdf-page { width: 210mm; min-height: 297mm; padding: 25mm; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; background-color: #ffffff; page-break-after: always; }
                 .pdf-export-container .pdf-title-page { justify-content: center; align-items: center; text-align: center; }
                 .pdf-export-container .pdf-page table { width: 100%; border-collapse: collapse; }
                 .pdf-export-container .pdf-cover-footer { margin-top: auto; font-size: 12pt; text-align: right; width: 100%; }
+                .pdf-export-container .pdf-page:last-child { page-break-after: auto; }
             `;
 
-            for (let index = 0; index < pageNodes.length; index++) {
-                const page = pageNodes[index];
-                const pdfContainer = document.createElement('div');
-                pdfContainer.className = 'pdf-export-container';
-                pdfContainer.style.position = 'fixed';
-                pdfContainer.style.left = '-9999px';
-                pdfContainer.style.top = '0';
-                pdfContainer.style.width = '210mm';
-                pdfContainer.style.backgroundColor = '#ffffff';
+            const pdfContainer = document.createElement('div');
+            pdfContainer.className = 'pdf-export-container';
+            pdfContainer.style.position = 'absolute';
+            pdfContainer.style.left = '-9999px';
+            pdfContainer.style.top = '0';
+            pdfContainer.style.width = '210mm';
+            pdfContainer.style.backgroundColor = '#ffffff';
+            pdfContainer.style.pointerEvents = 'none';
+            pdfContainer.style.opacity = '0';
 
-                const style = document.createElement('style');
-                style.textContent = styleText;
-                pdfContainer.appendChild(style);
+            const style = document.createElement('style');
+            style.textContent = styleText;
+            pdfContainer.appendChild(style);
 
+            pageNodes.forEach(page => {
                 const pdfPage = document.createElement('section');
                 pdfPage.className = 'pdf-page';
                 const clonedPage = page.cloneNode(true);
@@ -1307,25 +1319,23 @@
                 }
                 pdfPage.innerHTML = clonedPage.innerHTML;
                 pdfContainer.appendChild(pdfPage);
-                document.body.appendChild(pdfContainer);
+            });
 
-                const pageNumber = page.getAttribute('data-page') || String(index + 1);
-                const description = pageDescriptions[`page-${pageNumber}`] || `${pageNumber}페이지`;
-                const paddedIndex = String(index + 1).padStart(2, '0');
-                const fileSuffix = sanitizeFileName(description.replace(/[()]/g, ' ')) || `page-${pageNumber}`;
-                const filename = `${baseFileName}-${paddedIndex}-${fileSuffix}.pdf`;
+            document.body.appendChild(pdfContainer);
 
-                try {
-                    await html2pdf().set({
-                        filename,
-                        html2canvas: { scale: 2 },
-                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                    }).from(pdfContainer).save();
-                } catch (error) {
-                    console.error('PDF 저장 중 오류', error);
-                } finally {
-                    pdfContainer.remove();
-                }
+            const filename = `${baseFileName}.pdf`;
+
+            try {
+                await html2pdf().set({
+                    filename,
+                    html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                    pagebreak: { mode: ['css', 'legacy'] }
+                }).from(pdfContainer).save();
+            } catch (error) {
+                console.error('PDF 저장 중 오류', error);
+            } finally {
+                pdfContainer.remove();
             }
 
             if (saveBtn) {
@@ -1334,7 +1344,7 @@
                 delete saveBtn.dataset.originalText;
             }
 
-            alert('페이지별 PDF 저장이 완료되었습니다.');
+            alert('PDF 저장이 완료되었습니다.');
         }
 
         const modifyInput = document.getElementById('iep-modify-input');
@@ -1619,7 +1629,7 @@
             return templates.map(template => {
                 const actual = isFirstSemester ? template.first : template.second;
                 const alternate = isFirstSemester ? template.second : template.first;
-                const displayText = [actual, alternate].filter(Boolean).join(' ');
+                const displayText = actual || '';
                 return { ...template, actual, alternate, displayText };
             });
         }
@@ -1627,18 +1637,12 @@
         function buildMonthlyDisplayText(info) {
             if (!info) return '';
             if (info.displayText) return info.displayText;
-            const actual = info.actual || '';
-            const alternate = info.alternate || '';
-            return [actual, alternate].filter(Boolean).join(' ');
+            return info.actual || '';
         }
 
         function buildMonthlyHeadingHtml(info) {
             if (!info) return '';
-            const lines = [info.actual, info.alternate].filter(Boolean);
-            if (!lines.length) return '';
-            return lines
-                .map((line, idx) => `<span class="block${idx === 0 ? '' : ' text-sm text-gray-500'}">${line}</span>`)
-                .join('');
+            return info.actual || '';
         }
 
         function updateMonthlyPageDisplays(monthsArg) {
@@ -1865,7 +1869,34 @@
         }
 
         function formatMonthlyMethodText(text) {
-            return ensureBulletString(text, { minCount: 3, endingMode: 'period' });
+            const bulletText = ensureBulletString(text, { minCount: 3, endingMode: 'period' });
+            return enforceMethodSentenceEndings(bulletText);
+        }
+
+        function enforceMethodSentenceEndings(text) {
+            if (!text) return text;
+            const lines = text.split('\n');
+            return lines.map(line => {
+                const match = line.match(/^(\s*○\s*)(.*)$/);
+                if (!match) return line;
+                const prefix = match[1];
+                let sentence = match[2].trim();
+                if (!sentence) return line;
+                sentence = sentence.replace(/[.!?]\s*$/, '');
+                sentence = sentence.replace(/기로\s*(?:한다|합니다|함|할 예정이다|할 계획이다|할 예정임|할 계획임)?$/, '한다');
+                sentence = sentence.replace(/기\s*(?:한다|합니다|함|할 예정이다|할 계획이다|할 예정임|할 계획임)?$/, '한다');
+                sentence = sentence.replace(/하도록 지도$/, '하도록 지도한다');
+                sentence = sentence.replace(/지원$/, '지원한다');
+                sentence = sentence.replace(/지도$/, '지도한다');
+                if (!/다$/.test(sentence)) {
+                    sentence = sentence.replace(/하$/, '한다');
+                }
+                if (!/다$/.test(sentence)) {
+                    sentence += '한다';
+                }
+                sentence = sentence.replace(/다$/, '다.');
+                return `${prefix}${sentence}`;
+            }).join('\n');
         }
 
         function extractSemesterGoalsFromDom() {
