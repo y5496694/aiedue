@@ -255,6 +255,7 @@
                                         <option value="page-7" data-month-index="2">7페이지 (월별 교육 목표)</option>
                                         <option value="page-8" data-month-index="3">8페이지 (월별 교육 목표)</option>
                                         <option value="page-9" data-month-index="4">9페이지 (월별 교육 목표)</option>
+                                        <option value="page-10" data-role="semester-evaluation">10페이지 (학기 평가)</option>
                                         <option value="all">전체</option>
                                     </select>
                                 </div>
@@ -935,6 +936,7 @@
             'page-7': '7페이지(월별 교육 목표)',
             'page-8': '8페이지(월별 교육 목표)',
             'page-9': '9페이지(월별 교육 목표)',
+            'page-10': '10페이지(학기 평가)',
             'all': '전체'
         };
 
@@ -943,6 +945,7 @@
             pageDescriptions['page-2'] = '2페이지(성취 기준 - 국어)';
             pageDescriptions['page-3'] = '3페이지(성취 기준 - 수학)';
             pageDescriptions['page-4'] = '4페이지(학기별 교육 목표)';
+            pageDescriptions['page-10'] = '10페이지(학기 평가)';
         }
 
         async function loadIepStudents() {
@@ -1536,22 +1539,39 @@
             const months = getSemesterMonths(defaultSemester);
             const monthlyPages = months.map((info, idx) => {
                 const pageNumber = 5 + idx;
-                const displayText = buildMonthlyDisplayText(info);
                 return `
                 <section class="iep-page" data-page="${pageNumber}" data-month-index="${idx}" data-first-month="${info.first}" data-second-month="${info.second}">
                     <div class="iep-page-inner">
-                        ${sectionTitleTable('3. 월별 교육 목표')}
                         <div class="iep-month-block" data-month-index="${idx}">
                             <div class="iep-month-subject" data-subject="korean">
-                                <div id="monthly-plan-${idx}-korean" class="iep-month-content text-sm text-gray-500">월별 계획이 생성되지 않았습니다.</div>
+                                ${sectionTitleTable('3. 월별 교육목표 - 국어')}
+                                <div id="monthly-plan-${idx}-korean" class="iep-month-content mt-4 text-sm text-gray-500">월별 계획이 생성되지 않았습니다.</div>
                             </div>
-                            <div class="iep-month-subject mt-4" data-subject="math">
-                                <div id="monthly-plan-${idx}-math" class="iep-month-content text-sm text-gray-500">월별 계획이 생성되지 않았습니다.</div>
+                            <div class="iep-month-subject mt-6" data-subject="math">
+                                ${sectionTitleTable('3. 월별 교육목표 - 수학')}
+                                <div id="monthly-plan-${idx}-math" class="iep-month-content mt-4 text-sm text-gray-500">월별 계획이 생성되지 않았습니다.</div>
                             </div>
                         </div>
                     </div>
                 </section>`;
             }).join('');
+            const evaluationPageNumber = 5 + months.length;
+            const semesterEvaluationPage = `
+                <section class="iep-page" data-page="${evaluationPageNumber}" data-semester-evaluation="true">
+                    <div class="iep-page-inner">
+                        ${sectionTitleTable('4. 학기 평가')}
+                        <div class="space-y-6">
+                            <div class="iep-semester-evaluation-subject" data-subject="korean">
+                                <h4 class="font-semibold">가. 국어</h4>
+                                ${buildSemesterEvaluationTable()}
+                            </div>
+                            <div class="iep-semester-evaluation-subject" data-subject="math">
+                                <h4 class="font-semibold">나. 수학</h4>
+                                ${buildSemesterEvaluationTable()}
+                            </div>
+                        </div>
+                    </div>
+                </section>`;
             return `
                 <section class="iep-page" data-page="2">
                     <div class="iep-page-inner">
@@ -1594,6 +1614,7 @@
                     </div>
                 </section>
                 ${monthlyPages}
+                ${semesterEvaluationPage}
             `;
         }
 
@@ -1734,6 +1755,15 @@
                     }
                 });
             });
+            const evaluationPageNumber = 5 + months.length;
+            pageDescriptions[`page-${evaluationPageNumber}`] = `${evaluationPageNumber}페이지(학기 평가)`;
+            if (modifySelect) {
+                const evaluationOption = modifySelect.querySelector('option[data-role="semester-evaluation"]');
+                if (evaluationOption) {
+                    evaluationOption.value = `page-${evaluationPageNumber}`;
+                    evaluationOption.textContent = `${evaluationPageNumber}페이지 (학기 평가)`;
+                }
+            }
         }
 
         function sanitizeFileName(text) {
@@ -1779,7 +1809,7 @@
                         </tr>
                         <tr>
                             <th class="text-center">교육 목표</th>
-                            <th class="text-center">교육 내용</th>
+                            <th class="text-center">교육 내용 · 방법 · 월 평가</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1789,11 +1819,32 @@
                         </tr>
                         <tr>
                             <td class="header-cell">교육 방법</td>
-                            <td class="header-cell">교육 평가</td>
+                            <td class="data-cell">${method}</td>
                         </tr>
                         <tr>
-                            <td class="data-cell">${method}</td>
+                            <td class="header-cell">월 평가</td>
                             <td class="data-cell">${evaluation}</td>
+                        </tr>
+                        <tr>
+                            <td class="header-cell">월 평가 입력</td>
+                            <td class="data-cell">&nbsp;</td>
+                        </tr>
+                    </tbody>
+                </table>
+            `.trim();
+        }
+
+        function buildSemesterEvaluationTable() {
+            return `
+                <table class="w-full border border-gray-300 text-sm semester-evaluation-table">
+                    <thead>
+                        <tr>
+                            <th class="border px-2 py-2 bg-gray-100 text-center">평가</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="border px-2 py-10 align-top">&nbsp;</td>
                         </tr>
                     </tbody>
                 </table>
