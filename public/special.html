@@ -250,11 +250,17 @@
                                         <option value="page-2">2페이지 (성취 기준 - 국어)</option>
                                         <option value="page-3">3페이지 (성취 기준 - 수학)</option>
                                         <option value="page-4">4페이지 (학기별 교육 목표)</option>
-                                        <option value="page-5" data-month-index="0">5페이지 (월별 교육 목표)</option>
-                                        <option value="page-6" data-month-index="1">6페이지 (월별 교육 목표)</option>
-                                        <option value="page-7" data-month-index="2">7페이지 (월별 교육 목표)</option>
-                                        <option value="page-8" data-month-index="3">8페이지 (월별 교육 목표)</option>
-                                        <option value="page-9" data-month-index="4">9페이지 (월별 교육 목표)</option>
+                                        <option value="page-5" data-month-index="0" data-subject="korean">5페이지 (월별 교육목표 - 국어)</option>
+                                        <option value="page-6" data-month-index="0" data-subject="math">6페이지 (월별 교육목표 - 수학)</option>
+                                        <option value="page-7" data-month-index="1" data-subject="korean">7페이지 (월별 교육목표 - 국어)</option>
+                                        <option value="page-8" data-month-index="1" data-subject="math">8페이지 (월별 교육목표 - 수학)</option>
+                                        <option value="page-9" data-month-index="2" data-subject="korean">9페이지 (월별 교육목표 - 국어)</option>
+                                        <option value="page-10" data-month-index="2" data-subject="math">10페이지 (월별 교육목표 - 수학)</option>
+                                        <option value="page-11" data-month-index="3" data-subject="korean">11페이지 (월별 교육목표 - 국어)</option>
+                                        <option value="page-12" data-month-index="3" data-subject="math">12페이지 (월별 교육목표 - 수학)</option>
+                                        <option value="page-13" data-month-index="4" data-subject="korean">13페이지 (월별 교육목표 - 국어)</option>
+                                        <option value="page-14" data-month-index="4" data-subject="math">14페이지 (월별 교육목표 - 수학)</option>
+                                        <option value="page-15" data-role="semester-evaluation">15페이지 (4. 학기 평가)</option>
                                         <option value="all">전체</option>
                                     </select>
                                 </div>
@@ -930,11 +936,17 @@
             'page-2': '2페이지(성취 기준 - 국어)',
             'page-3': '3페이지(성취 기준 - 수학)',
             'page-4': '4페이지(학기별 교육 목표)',
-            'page-5': '5페이지(월별 교육 목표)',
-            'page-6': '6페이지(월별 교육 목표)',
-            'page-7': '7페이지(월별 교육 목표)',
-            'page-8': '8페이지(월별 교육 목표)',
-            'page-9': '9페이지(월별 교육 목표)',
+            'page-5': '5페이지(월별 교육목표 - 국어)',
+            'page-6': '6페이지(월별 교육목표 - 수학)',
+            'page-7': '7페이지(월별 교육목표 - 국어)',
+            'page-8': '8페이지(월별 교육목표 - 수학)',
+            'page-9': '9페이지(월별 교육목표 - 국어)',
+            'page-10': '10페이지(월별 교육목표 - 수학)',
+            'page-11': '11페이지(월별 교육목표 - 국어)',
+            'page-12': '12페이지(월별 교육목표 - 수학)',
+            'page-13': '13페이지(월별 교육목표 - 국어)',
+            'page-14': '14페이지(월별 교육목표 - 수학)',
+            'page-15': '15페이지(4. 학기 평가)',
             'all': '전체'
         };
 
@@ -943,6 +955,14 @@
             pageDescriptions['page-2'] = '2페이지(성취 기준 - 국어)';
             pageDescriptions['page-3'] = '3페이지(성취 기준 - 수학)';
             pageDescriptions['page-4'] = '4페이지(학기별 교육 목표)';
+            const months = getSemesterMonths(currentIepSemester);
+            months.forEach((_, idx) => {
+                const basePage = 5 + idx * 2;
+                pageDescriptions[`page-${basePage}`] = `${basePage}페이지(월별 교육목표 - 국어)`;
+                pageDescriptions[`page-${basePage + 1}`] = `${basePage + 1}페이지(월별 교육목표 - 수학)`;
+            });
+            const evaluationPage = 5 + months.length * 2;
+            pageDescriptions[`page-${evaluationPage}`] = `${evaluationPage}페이지(4. 학기 평가)`;
         }
 
         async function loadIepStudents() {
@@ -1534,24 +1554,29 @@
             const month = now.getMonth() + 1;
             const defaultSemester = (month >= 8 || month <= 1) ? 2 : 1;
             const months = getSemesterMonths(defaultSemester);
+            const subjectTemplates = [
+                { key: 'korean', name: '국어' },
+                { key: 'math', name: '수학' }
+            ];
             const monthlyPages = months.map((info, idx) => {
-                const pageNumber = 5 + idx;
-                const displayText = buildMonthlyDisplayText(info);
-                return `
-                <section class="iep-page" data-page="${pageNumber}" data-month-index="${idx}" data-first-month="${info.first}" data-second-month="${info.second}">
+                return subjectTemplates.map((subject, subjectIdx) => {
+                    const pageNumber = 5 + idx * subjectTemplates.length + subjectIdx;
+                    const titleText = `3. 월별(1학기면 ${info.first} 2학기면 ${info.second}) 교육목표 - ${subject.name}`;
+                    return `
+                <section class="iep-page" data-page="${pageNumber}" data-month-index="${idx}" data-subject="${subject.key}" data-first-month="${info.first}" data-second-month="${info.second}">
                     <div class="iep-page-inner">
-                        ${sectionTitleTable('3. 월별 교육 목표')}
-                        <div class="iep-month-block" data-month-index="${idx}">
-                            <div class="iep-month-subject" data-subject="korean">
-                                <div id="monthly-plan-${idx}-korean" class="iep-month-content text-sm text-gray-500">월별 계획이 생성되지 않았습니다.</div>
-                            </div>
-                            <div class="iep-month-subject mt-4" data-subject="math">
-                                <div id="monthly-plan-${idx}-math" class="iep-month-content text-sm text-gray-500">월별 계획이 생성되지 않았습니다.</div>
-                            </div>
+                        ${sectionTitleTable(titleText)}
+                        <div class="iep-month-block" data-month-index="${idx}" data-subject="${subject.key}">
+                            <div id="monthly-plan-${idx}-${subject.key}" class="iep-month-content text-sm text-gray-500">월별 계획이 생성되지 않았습니다.</div>
                         </div>
                     </div>
                 </section>`;
+                }).join('');
             }).join('');
+            const evaluationPageNumber = 5 + months.length * subjectTemplates.length;
+            const evaluationTableMd = `| 교과 | 평가 내용 | 평가 결과 |\n| --- | --- | --- |\n| 국어 |  |  |\n| 수학 |  |  |`;
+            const evaluationTableHtml = markdownTableToHtml(evaluationTableMd)
+                .replace('class="min-w-full border border-gray-300 text-sm"', 'class="w-full border border-gray-300 text-sm"');
             return `
                 <section class="iep-page" data-page="2">
                     <div class="iep-page-inner">
@@ -1594,6 +1619,12 @@
                     </div>
                 </section>
                 ${monthlyPages}
+                <section class="iep-page" data-page="${evaluationPageNumber}" data-role="semester-evaluation">
+                    <div class="iep-page-inner">
+                        ${sectionTitleTable('4. 학기 평가')}
+                        <div>${evaluationTableHtml}</div>
+                    </div>
+                </section>
             `;
         }
 
@@ -1692,48 +1723,62 @@
             const months = Array.isArray(monthsArg) ? monthsArg : getSemesterMonths(currentIepSemester);
             const modifySelect = document.getElementById('iep-modify-target');
             const contentRoot = document.getElementById('iep-content');
+            const subjects = [
+                { key: 'korean', name: '국어' },
+                { key: 'math', name: '수학' }
+            ];
             setBasePageDescriptions();
             months.forEach((info, idx) => {
                 const displayText = buildMonthlyDisplayText(info);
-                const pageNumber = 5 + idx;
-                if (modifySelect) {
-                    const option = modifySelect.querySelector(`option[data-month-index="${idx}"]`);
-                    if (option) {
-                        option.value = `page-${pageNumber}`;
-                        option.textContent = `${pageNumber}페이지 (월별 교육 목표 - ${displayText})`;
-                    }
-                }
-                pageDescriptions[`page-${pageNumber}`] = `${pageNumber}페이지(월별 교육 목표 - ${displayText})`;
-                if (!contentRoot) return;
-                const monthSection = contentRoot.querySelector(`.iep-page[data-month-index="${idx}"]`);
-                if (!monthSection) return;
-                monthSection.setAttribute('data-page', String(pageNumber));
-                monthSection.setAttribute('data-month-index', String(idx));
-                const block = monthSection.querySelector('.iep-month-block');
-                if (block) {
-                    block.setAttribute('data-month-index', String(idx));
-                }
-                const subjectOrder = ['korean', 'math'];
-                subjectOrder.forEach((subject, subjectIdx) => {
-                    let subjectSection = monthSection.querySelector(`.iep-month-subject[data-subject="${subject}"]`);
-                    if (!subjectSection) {
-                        const fallback = monthSection.querySelectorAll('.iep-month-subject')[subjectIdx];
-                        if (fallback) {
-                            fallback.setAttribute('data-subject', subject);
-                            subjectSection = fallback;
+                subjects.forEach((subject, subjectIdx) => {
+                    const pageNumber = 5 + idx * subjects.length + subjectIdx;
+                    if (modifySelect) {
+                        const option = modifySelect.querySelector(`option[data-month-index="${idx}"][data-subject="${subject.key}"]`);
+                        if (option) {
+                            option.value = `page-${pageNumber}`;
+                            option.textContent = `${pageNumber}페이지 (월별 교육목표 - ${displayText} ${subject.name})`;
                         }
                     }
-                    if (subjectSection) {
-                        const content = subjectSection.querySelector('.iep-month-content');
-                        if (content) {
-                            const expectedId = `monthly-plan-${idx}-${subject}`;
-                            if (content.id !== expectedId) {
-                                content.id = expectedId;
+                    pageDescriptions[`page-${pageNumber}`] = `${pageNumber}페이지(월별 교육목표 - ${displayText} ${subject.name})`;
+                    if (contentRoot) {
+                        const monthSection = contentRoot.querySelector(`.iep-page[data-month-index="${idx}"][data-subject="${subject.key}"]`);
+                        if (monthSection) {
+                            monthSection.setAttribute('data-page', String(pageNumber));
+                            monthSection.setAttribute('data-month-index', String(idx));
+                            monthSection.setAttribute('data-subject', subject.key);
+                            monthSection.setAttribute('data-first-month', info.first || '');
+                            monthSection.setAttribute('data-second-month', info.second || '');
+                            const block = monthSection.querySelector('.iep-month-block');
+                            if (block) {
+                                block.setAttribute('data-month-index', String(idx));
+                                block.setAttribute('data-subject', subject.key);
+                            }
+                            const content = monthSection.querySelector('.iep-month-content');
+                            if (content) {
+                                const expectedId = `monthly-plan-${idx}-${subject.key}`;
+                                if (content.id !== expectedId) {
+                                    content.id = expectedId;
+                                }
                             }
                         }
                     }
                 });
             });
+            const evaluationPageNumber = 5 + months.length * subjects.length;
+            pageDescriptions[`page-${evaluationPageNumber}`] = `${evaluationPageNumber}페이지(4. 학기 평가)`;
+            if (modifySelect) {
+                const evaluationOption = modifySelect.querySelector('option[data-role="semester-evaluation"]');
+                if (evaluationOption) {
+                    evaluationOption.value = `page-${evaluationPageNumber}`;
+                    evaluationOption.textContent = `${evaluationPageNumber}페이지 (4. 학기 평가)`;
+                }
+            }
+            if (contentRoot) {
+                const evaluationSection = contentRoot.querySelector('.iep-page[data-role="semester-evaluation"]');
+                if (evaluationSection) {
+                    evaluationSection.setAttribute('data-page', String(evaluationPageNumber));
+                }
+            }
         }
 
         function sanitizeFileName(text) {
@@ -1747,7 +1792,7 @@
             const achievementText = subject.list.length
                 ? subject.list.map((item, idx) => `${idx + 1}. ${item.text}`).join('\n')
                 : '관련 성취기준 정보 없음';
-            const prompt = `너는 특수교육 교사를 돕는 전문가야. 아래 정보를 참고하여 ${subject.name} 교과의 월별 계획을 JSON 배열로 작성해줘.\n\n- 학기: ${currentIepSemester}학기\n- 월 목록: ${monthLabels.join(', ')}\n- 학기 교육목표:\n${semesterGoals.map((goal, idx) => `${idx + 1}. ${goal}`).join('\n')}\n- 참고 성취기준:\n${achievementText}\n\n요구사항:\n1. 학기 교육목표의 핵심을 순서대로 ${monthLabels.length}개의 월별 교육목표로 나누어 제시한다. 필요한 경우 문장을 분할하거나 통합하되 모든 학기 목표 내용이 월별 목표에 반영되어야 한다.\n2. 각 월별 계획의 goal, content, method 값은 불릿 포인트 형식의 문자열로 작성한다. 불릿은 반드시 '○ '로 시작하고 문장마다 줄바꿈으로 구분한다.\n3. goal 항목은 2문장 이상, content와 method 항목은 각각 3문장 이상으로 작성한다.\n4. content 항목의 모든 문장은 마침표 없이 '~기' 형태(예: ...하기, ...쓰기)로 끝나도록 작성한다.\n5. 모든 문장은 자연스러운 한국어로 작성한다.\n6. 응답은 반드시 JSON 배열만으로 제공하고 다른 설명은 포함하지 않는다.\n7. 배열의 각 요소는 {"month":"${monthLabels[0]}","goal":"...","content":"...","method":"..."} 형식을 따르며, month 값은 월 목록과 정확히 일치하고 순서를 유지해야 한다.`;
+            const prompt = `너는 특수교육 교사를 돕는 전문가야. 아래 정보를 참고하여 ${subject.name} 교과의 월별 계획을 JSON 배열로 작성해줘.\n\n- 학기: ${currentIepSemester}학기\n- 월 목록: ${monthLabels.join(', ')}\n- 학기 교육목표:\n${semesterGoals.map((goal, idx) => `${idx + 1}. ${goal}`).join('\n')}\n- 참고 성취기준:\n${achievementText}\n\n요구사항:\n1. 학기 교육목표의 핵심을 순서대로 ${monthLabels.length}개의 월별 교육목표로 나누어 제시한다. 필요한 경우 문장을 분할하거나 통합하되 모든 학기 목표 내용이 월별 목표에 반영되어야 한다.\n2. 각 월별 계획의 goal, content, method, evaluation 값은 불릿 포인트 형식의 문자열로 작성한다. 불릿은 반드시 '○ '로 시작하고 문장마다 줄바꿈으로 구분한다.\n3. goal 항목은 2문장 이상, content와 method 항목은 각각 3문장 이상, evaluation 항목은 3문장으로 작성한다.\n4. content 항목의 모든 문장은 마침표 없이 '~기' 형태(예: ...하기, ...쓰기)로 끝나도록 작성한다.\n5. evaluation 항목의 모든 문장은 '~가' 형태로 끝나도록 작성한다.\n6. 모든 문장은 자연스러운 한국어로 작성한다.\n7. 응답은 반드시 JSON 배열만으로 제공하고 다른 설명은 포함하지 않는다.\n8. 배열의 각 요소는 {"month":"${monthLabels[0]}","goal":"...","content":"...","method":"...","evaluation":"..."} 형식을 따르며, month 값은 월 목록과 정확히 일치하고 순서를 유지해야 한다.`;
             const result = await callGemini(prompt, true);
             let plans = [];
             if (Array.isArray(result)) {
@@ -1761,7 +1806,7 @@
                     goal: formatMonthlyGoalText(plan.goal || ''),
                     content: formatMonthlyContentText(plan.content || ''),
                     method: formatMonthlyMethodText(plan.method || ''),
-                    evaluation: ''
+                    evaluation: formatMonthlyEvaluationText(plan.evaluation || plan.assessment || plan.evaluationItems || '')
                 };
             });
         }
@@ -1794,6 +1839,10 @@
                         <tr>
                             <td class="data-cell">${method}</td>
                             <td class="data-cell">${evaluation}</td>
+                        </tr>
+                        <tr>
+                            <td class="header-cell">월 평가</td>
+                            <td class="data-cell">&nbsp;</td>
                         </tr>
                     </tbody>
                 </table>
@@ -1853,35 +1902,45 @@
                     sentences = expanded;
                 }
             }
+            const applyEnding = (rawSentence) => {
+                let processed = (rawSentence || '').trim();
+                processed = processed.replace(/[.!?]\s*$/, '');
+                processed = processed.replace(/\s+/g, ' ').trim();
+                if (!processed) return '';
+                if (endingMode === 'gerund') {
+                    processed = processed.replace(/기\s*(?:한다|합니다|함)?$/, '기');
+                    processed = processed.replace(/한다$/, '하기');
+                    processed = processed.replace(/합니다$/, '하기');
+                    if (!processed.endsWith('기')) {
+                        processed = `${processed}기`;
+                    }
+                    return processed;
+                }
+                if (endingMode === 'ga') {
+                    processed = processed.replace(/가\s*(?:한다|합니다|함|할 예정이다|할 계획이다|할 예정임|할 계획임)?$/, '가');
+                    processed = processed.replace(/가요?$/, '가');
+                    if (!processed.endsWith('가')) {
+                        processed = `${processed}가`;
+                    }
+                    return processed;
+                }
+                return `${processed}.`;
+            };
             const bullets = sentences.map(sentence => {
                 let trimmed = sentence.trim();
                 trimmed = trimmed.replace(/^[-*•●○]\s*/, '').replace(/^\d+[.)]\s*/, '').trim();
                 trimmed = trimmed.replace(/\s+/g, ' ');
                 if (!trimmed) return null;
-                if (endingMode === 'gerund') {
-                    trimmed = trimmed.replace(/[.!?]\s*$/, '');
-                    trimmed = trimmed.replace(/기\s*(?:한다|합니다|함)?$/, '기');
-                    trimmed = trimmed.replace(/기\s*(?:한다|합니다|함)?$/, '기');
-                    trimmed = trimmed.replace(/한다$/, '한다').replace(/합니다$/, '하기');
-                    trimmed = trimmed.trim();
-                } else {
-                    trimmed = trimmed.replace(/[.!?]\s*$/, '');
-                    trimmed = `${trimmed}.`;
-                }
-                return `○ ${trimmed}`;
+                const formatted = applyEnding(trimmed);
+                if (!formatted) return null;
+                return `○ ${formatted}`;
             }).filter(Boolean);
 
             if (!bullets.length) {
                 let fallback = (text || '').replace(/^\s*[-*•●○]\s*/gm, '').trim();
                 if (!fallback) return '';
-                fallback = fallback.replace(/[.!?]\s*$/, '');
-                fallback = fallback.replace(/\s+/g, ' ');
-                if (endingMode === 'gerund') {
-                    fallback = fallback.replace(/기\s*(?:한다|합니다|함)?$/, '기');
-                    fallback = fallback.replace(/기\s*(?:한다|합니다|함)?$/, '기');
-                    fallback = fallback.replace(/한다$/, '한다').replace(/합니다$/, '하기');
-                }
-                const sentence = endingMode === 'gerund' ? fallback : `${fallback}.`;
+                const sentence = applyEnding(fallback);
+                if (!sentence) return '';
                 const bulletLine = `○ ${sentence}`;
                 return Array.from({ length: Math.max(minCount, 1) }, () => bulletLine).join('\n');
             }
@@ -1906,6 +1965,10 @@
         function formatMonthlyMethodText(text) {
             const bulletText = ensureBulletString(text, { minCount: 3, endingMode: 'period' });
             return enforceMethodSentenceEndings(bulletText);
+        }
+
+        function formatMonthlyEvaluationText(text) {
+            return ensureBulletString(text, { minCount: 3, endingMode: 'ga' });
         }
 
         function enforceMethodSentenceEndings(text) {
@@ -2023,7 +2086,7 @@
                     const entry = plansBySubject[subject.key]?.[idx];
                     if (!hasGoals) {
                         container.innerHTML = '<p class="text-gray-500 text-sm">학기 교육목표를 먼저 생성해 주세요.</p>';
-                    } else if (!entry || (!entry.goal && !entry.content && !entry.method)) {
+                    } else if (!entry || (!entry.goal && !entry.content && !entry.method && !entry.evaluation)) {
                         container.innerHTML = '<p class="text-gray-500 text-sm">월별 계획을 생성하지 못했습니다. 다시 시도해 주세요.</p>';
                     } else {
                         container.innerHTML = buildMonthlyTables(monthInfo.actual, subject.name, entry);
