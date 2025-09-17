@@ -1825,9 +1825,9 @@
                 if (!trimmed) return null;
                 if (endingMode === 'gerund') {
                     trimmed = trimmed.replace(/[.!?]\s*$/, '');
-                    trimmed = trimmed.replace(/기로\s*(?:한다|합니다|함|할 예정이다|할 계획이다|할 예정임|할 계획임)?$/, '기');
-                    trimmed = trimmed.replace(/기\s*(?:한다|합니다|함|할 예정이다|할 계획이다|할 예정임|할 계획임)?$/, '기');
-                    trimmed = trimmed.replace(/한다$/, '하기').replace(/합니다$/, '하기');
+                    trimmed = trimmed.replace(/기\s*(?:한다|합니다|함)?$/, '기');
+                    trimmed = trimmed.replace(/기\s*(?:한다|합니다|함)?$/, '기');
+                    trimmed = trimmed.replace(/한다$/, '한다').replace(/합니다$/, '하기');
                     trimmed = trimmed.trim();
                 } else {
                     trimmed = trimmed.replace(/[.!?]\s*$/, '');
@@ -1842,9 +1842,9 @@
                 fallback = fallback.replace(/[.!?]\s*$/, '');
                 fallback = fallback.replace(/\s+/g, ' ');
                 if (endingMode === 'gerund') {
-                    fallback = fallback.replace(/기로\s*(?:한다|합니다|함|할 예정이다|할 계획이다|할 예정임|할 계획임)?$/, '기');
-                    fallback = fallback.replace(/기\s*(?:한다|합니다|함|할 예정이다|할 계획이다|할 예정임|할 계획임)?$/, '기');
-                    fallback = fallback.replace(/한다$/, '하기').replace(/합니다$/, '하기');
+                    fallback = fallback.replace(/기\s*(?:한다|합니다|함)?$/, '기');
+                    fallback = fallback.replace(/기\s*(?:한다|합니다|함)?$/, '기');
+                    fallback = fallback.replace(/한다$/, '한다').replace(/합니다$/, '하기');
                 }
                 const sentence = endingMode === 'gerund' ? fallback : `${fallback}.`;
                 const bulletLine = `○ ${sentence}`;
