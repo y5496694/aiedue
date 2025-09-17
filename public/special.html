@@ -933,6 +933,12 @@
             'all': '전체'
         };
 
+        function setBasePageDescriptions() {
+            pageDescriptions['page-1'] = '1페이지(표지)';
+            pageDescriptions['page-2'] = '2페이지(학습이 필요한 성취 기준)';
+            pageDescriptions['page-3'] = '3페이지(학기별 교육 목표)';
+        }
+
         async function loadIepStudents() {
             const user = auth.currentUser;
             if (!user || isLoadingIepStudents) return;
@@ -1174,32 +1180,9 @@
             if (teacherNameNode) {
                 teacherNameNode.textContent = teacherName;
             }
-            const modifySelect = document.getElementById('iep-modify-target');
             const months = getSemesterMonths(currentIepSemester);
-            if (modifySelect) {
-                modifySelect.querySelectorAll('option[data-month-index]').forEach(option => {
-                    const idx = parseInt(option.dataset.monthIndex || '-1', 10);
-                    const info = Number.isInteger(idx) ? months[idx] : null;
-                    if (!info) return;
-                    option.textContent = `${4 + idx}페이지 (월별 교육 목표 - ${info.pdfLabel})`;
-                    pageDescriptions[`page-${4 + idx}`] = `${4 + idx}페이지(월별 교육 목표 - ${info.pdfLabel})`;
-                });
-            }
-            months.forEach((info, idx) => {
-                const monthSection = iepOutputContainer.querySelector(`.iep-page[data-month-index="${idx}"]`);
-                if (!monthSection) return;
-                const note = monthSection.querySelector('.iep-month-note');
-                if (note) {
-                    note.textContent = `${info.pdfLabel} 월 목표`;
-                }
-                const heading = monthSection.querySelector(`.iep-month-title[data-month-index="${idx}"]`);
-                if (heading) {
-                    heading.textContent = `${info.label}. ${info.pdfLabel}`;
-                }
-            });
-            pageDescriptions['page-1'] = '1페이지(표지)';
-            pageDescriptions['page-2'] = '2페이지(학습이 필요한 성취 기준)';
-            pageDescriptions['page-3'] = '3페이지(학기별 교육 목표)';
+            setBasePageDescriptions();
+            updateMonthlyPageDisplays(months);
             extractSemesterGoalsFromDom();
             const monthlyBtn = document.getElementById('generate-monthly-plan-btn');
             if (monthlyBtn && (lastSemesterGoals.korean.length || lastSemesterGoals.math.length)) {
@@ -1254,48 +1237,66 @@
                 openIepDocument(id, studentName);
                 alert('저장되었습니다.');
             });
-            document.getElementById('save-pdf-btn').addEventListener('click', saveIepPdf);
+            document.getElementById('save-pdf-btn')?.addEventListener('click', () => {
+                saveIepPdf().catch(err => console.error('PDF 저장 실패', err));
+            });
         }
 
-        function saveIepPdf() {
+        async function saveIepPdf() {
+            updateMonthlyPageDisplays();
             const contentNode = document.getElementById('iep-content');
             if (!contentNode) return;
 
+            const saveBtn = document.getElementById('save-pdf-btn');
+            const originalBtnText = saveBtn?.textContent;
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.dataset.originalText = originalBtnText || '';
+                saveBtn.textContent = '저장 중...';
+            }
+
             const titleNode = document.getElementById('iep-title');
             const teacherNode = document.getElementById('iep-teacher-name');
-            const titleText = titleNode ? titleNode.textContent.trim() : '개별화교육계획';
+            const titleText = titleNode ? titleNode.textContent.trim() : '';
             const teacherName = teacherNode ? teacherNode.textContent.trim() : '미기재';
+            const baseFileName = sanitizeFileName(titleText) || '개별화교육계획';
 
-            const contentClone = contentNode.cloneNode(true);
-            contentClone.querySelectorAll('button').forEach(btn => btn.remove());
+            const pageNodes = Array.from(contentNode.querySelectorAll('.iep-page'));
+            if (!pageNodes.length) {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = originalBtnText || 'PDF 저장';
+                    delete saveBtn.dataset.originalText;
+                }
+                return;
+            }
 
-            const pageNodes = Array.from(contentClone.querySelectorAll('.iep-page'));
-            if (!pageNodes.length) return;
-
-            const pdfContainer = document.createElement('div');
-            pdfContainer.className = 'pdf-export-container';
-            pdfContainer.style.position = 'absolute';
-            pdfContainer.style.left = '-9999px';
-            pdfContainer.style.top = '0';
-            pdfContainer.style.width = '210mm';
-
-            const style = document.createElement('style');
-            style.textContent = `
+            const styleText = `
                 .pdf-export-container { font-family: 'Noto Sans KR', sans-serif; color: #1f2937; }
                 .pdf-export-container .pdf-page { width: 210mm; min-height: 297mm; padding: 25mm; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; background-color: #ffffff; }
-                .pdf-export-container .pdf-page + .pdf-page { page-break-before: always; }
                 .pdf-export-container .pdf-title-page { justify-content: center; align-items: center; text-align: center; }
                 .pdf-export-container .pdf-page table { width: 100%; border-collapse: collapse; }
                 .pdf-export-container .pdf-cover-footer { margin-top: auto; font-size: 12pt; text-align: right; width: 100%; }
             `;
-            pdfContainer.appendChild(style);
 
-            pageNodes.forEach(page => {
+            for (let index = 0; index < pageNodes.length; index++) {
+                const page = pageNodes[index];
+                const pdfContainer = document.createElement('div');
+                pdfContainer.className = 'pdf-export-container';
+                pdfContainer.style.position = 'fixed';
+                pdfContainer.style.left = '-9999px';
+                pdfContainer.style.top = '0';
+                pdfContainer.style.width = '210mm';
+                pdfContainer.style.backgroundColor = '#ffffff';
+
+                const style = document.createElement('style');
+                style.textContent = styleText;
+                pdfContainer.appendChild(style);
+
                 const pdfPage = document.createElement('section');
                 pdfPage.className = 'pdf-page';
                 const clonedPage = page.cloneNode(true);
                 clonedPage.querySelectorAll('button').forEach(btn => btn.remove());
-                clonedPage.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
                 if (page.classList.contains('iep-page-cover')) {
                     pdfPage.classList.add('pdf-title-page');
                     const footer = clonedPage.querySelector('.iep-cover-footer');
@@ -1306,27 +1307,34 @@
                 }
                 pdfPage.innerHTML = clonedPage.innerHTML;
                 pdfContainer.appendChild(pdfPage);
-            });
+                document.body.appendChild(pdfContainer);
 
-            document.body.appendChild(pdfContainer);
+                const pageNumber = page.getAttribute('data-page') || String(index + 1);
+                const description = pageDescriptions[`page-${pageNumber}`] || `${pageNumber}페이지`;
+                const paddedIndex = String(index + 1).padStart(2, '0');
+                const fileSuffix = sanitizeFileName(description.replace(/[()]/g, ' ')) || `page-${pageNumber}`;
+                const filename = `${baseFileName}-${paddedIndex}-${fileSuffix}.pdf`;
 
-            const worker = html2pdf().set({
-                filename: `${titleText || '개별화교육계획'}.pdf`,
-                html2canvas: { scale: 2 },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            }).from(pdfContainer).save();
-
-            const cleanup = () => {
-                if (pdfContainer.parentNode) {
-                    pdfContainer.parentNode.removeChild(pdfContainer);
+                try {
+                    await html2pdf().set({
+                        filename,
+                        html2canvas: { scale: 2 },
+                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                    }).from(pdfContainer).save();
+                } catch (error) {
+                    console.error('PDF 저장 중 오류', error);
+                } finally {
+                    pdfContainer.remove();
                 }
-            };
-
-            if (worker && typeof worker.then === 'function') {
-                worker.then(cleanup).catch(cleanup);
-            } else {
-                cleanup();
             }
+
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = originalBtnText || 'PDF 저장';
+                delete saveBtn.dataset.originalText;
+            }
+
+            alert('페이지별 PDF 저장이 완료되었습니다.');
         }
 
         const modifyInput = document.getElementById('iep-modify-input');
@@ -1336,14 +1344,107 @@
         async function applyModification() {
             const instruction = modifyInput.value.trim();
             const target = modifyTarget.value;
-            if (!instruction || !currentIepDocId) return;
+            const contentRoot = document.getElementById('iep-content');
+            if (!instruction || !currentIepDocId || !contentRoot) return;
+
             modifyInput.value = '';
-            const currentContent = document.getElementById('iep-content').innerHTML;
-            const targetText = pageDescriptions[target] || '전체';
-            const prompt = `다음 개별화교육계획 HTML에서 '${targetText}'에 해당하는 부분만 사용자의 수정 요구에 맞게 수정해줘. 다른 페이지의 구조와 내용, 클래스, 마크다운 표는 그대로 유지해줘.\n\n원본:\n${currentContent}\n\n수정 요구:${instruction}`;
-            let result = await callGemini(prompt);
-            result = result.split(/\n+/).filter(line => !line.includes('다음은') && !line.includes('수정했습니다') && !line.includes('수정되었습니다')).join('\n');
-            document.getElementById('iep-content').innerHTML = result;
+            const button = modifyBtn;
+            const originalBtnText = button?.textContent;
+            if (button) {
+                button.disabled = true;
+                button.textContent = '수정 중...';
+            }
+
+            try {
+                if (target === 'all') {
+                    const currentContent = contentRoot.innerHTML;
+                    const prompt = `다음 개별화교육계획 HTML 전체를 사용자의 수정 요구에 맞게 수정해줘. 전체 구조와 클래스, data-* 속성, 표 구조는 유지하고 다른 페이지가 삭제되거나 순서가 바뀌지 않도록 해줘.\n\n원본:\n${currentContent}\n\n수정 요구:${instruction}`;
+                    let result = await callGemini(prompt);
+                    const sanitized = sanitizeAiHtmlResponse(result, currentContent);
+                    if (sanitized) {
+                        contentRoot.innerHTML = sanitized;
+                    }
+                    updateMonthlyPageDisplays();
+                    extractSemesterGoalsFromDom();
+                    return;
+                }
+
+                const pageNode = findIepPageNode(target);
+                if (!pageNode) {
+                    alert('선택한 페이지를 찾을 수 없습니다.');
+                    return;
+                }
+                const targetText = pageDescriptions[target] || '선택한 영역';
+                const originalOuter = pageNode.outerHTML;
+                const prompt = `다음 HTML은 개별화교육계획의 '${targetText}' 영역이야. HTML 구조(태그, 클래스, data-* 속성, id)를 유지하면서 사용자 요구에 맞게 필요한 부분만 수정해줘. 다른 페이지 내용은 포함하지 마.\n\n원본:\n${originalOuter}\n\n수정 요구:${instruction}\n\n응답에는 수정된 HTML만 포함해줘.`;
+                let result = await callGemini(prompt);
+                const sanitized = sanitizeAiHtmlResponse(result, originalOuter);
+                if (!sanitized) {
+                    return;
+                }
+                replaceIepPageWithHtml(pageNode, sanitized);
+                updateMonthlyPageDisplays();
+                extractSemesterGoalsFromDom();
+            } catch (error) {
+                console.error('수정 적용 중 오류', error);
+                alert('수정 내용을 적용하지 못했습니다. 다시 시도해 주세요.');
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = originalBtnText || '수정';
+                }
+            }
+        }
+
+        function sanitizeAiHtmlResponse(response, fallback) {
+            if (typeof response !== 'string') return fallback;
+            let text = response.trim();
+            text = text.replace(/^```(?:html)?\s*/i, '');
+            text = text.replace(/```$/i, '');
+            text = text.trim();
+            if (!text) return fallback;
+            const lines = text.split(/\n+/)
+                .map(line => line.trim())
+                .filter(line => line && !line.includes('다음은') && !line.includes('수정했습니다') && !line.includes('수정되었습니다'));
+            text = lines.join('\n').trim();
+            return text || fallback;
+        }
+
+        function findIepPageNode(target) {
+            if (!target || target === 'all') return null;
+            const contentRoot = document.getElementById('iep-content');
+            if (!contentRoot) return null;
+            const match = target.match(/page-(\d+)/);
+            if (!match) return null;
+            return contentRoot.querySelector(`.iep-page[data-page="${match[1]}"]`);
+        }
+
+        function preservePageAttributes(source, target) {
+            const sourceClasses = (source.getAttribute('class') || '').split(/\s+/).filter(Boolean);
+            sourceClasses.forEach(cls => {
+                if (!target.classList.contains(cls)) {
+                    target.classList.add(cls);
+                }
+            });
+            ['data-page', 'data-month-index', 'data-first-month', 'data-second-month'].forEach(attr => {
+                if (source.hasAttribute(attr)) {
+                    target.setAttribute(attr, source.getAttribute(attr));
+                }
+            });
+        }
+
+        function replaceIepPageWithHtml(pageNode, html) {
+            if (!pageNode || !html) return;
+            const trimmed = html.trim();
+            const template = document.createElement('template');
+            template.innerHTML = trimmed;
+            const newSection = template.content.querySelector('section');
+            if (newSection) {
+                preservePageAttributes(pageNode, newSection);
+                pageNode.replaceWith(newSection);
+                return;
+            }
+            pageNode.innerHTML = trimmed;
         }
 
         modifyBtn.addEventListener('click', applyModification);
@@ -1377,14 +1478,15 @@
             const months = getSemesterMonths(defaultSemester);
             const monthlyPages = months.map((info, idx) => {
                 const pageNumber = 4 + idx;
-                const note = `${info.pdfLabel} 월 목표`;
+                const displayText = buildMonthlyDisplayText(info);
+                const headingHtml = buildMonthlyHeadingHtml(info);
                 return `
                 <section class="iep-page" data-page="${pageNumber}" data-month-index="${idx}" data-first-month="${info.first}" data-second-month="${info.second}">
                     <div class="iep-page-inner">
                         ${sectionTitleTable('3. 월별 교육 목표')}
-                        <p class="iep-month-note">${note}</p>
+                        <p class="iep-month-note">${displayText} 월 목표</p>
                         <div class="iep-month-block" data-month-index="${idx}">
-                            <h4 class="iep-month-title font-semibold" data-month-index="${idx}">${info.label}. ${info.pdfLabel}</h4>
+                            <h4 class="iep-month-title font-semibold" data-month-index="${idx}">${headingHtml || displayText}</h4>
                             <div class="iep-month-subject" data-subject="korean">
                                 <h5 class="font-semibold">국어</h5>
                                 <div id="monthly-plan-${idx}-korean" class="iep-month-content text-sm text-gray-500">월별 계획이 생성되지 않았습니다.</div>
@@ -1514,14 +1616,89 @@
                 { label: '마', first: '7월', second: '12월' }
             ];
             const isFirstSemester = semester === 1;
-            const otherSemesterText = isFirstSemester ? '2학기면' : '1학기면';
             return templates.map(template => {
                 const actual = isFirstSemester ? template.first : template.second;
                 const alternate = isFirstSemester ? template.second : template.first;
-                const title = `${template.label}. ${actual}`;
-                const pdfLabel = `${actual}(${otherSemesterText} ${alternate})`;
-                return { ...template, actual, alternate, title, pdfLabel };
+                const displayText = [actual, alternate].filter(Boolean).join(' ');
+                return { ...template, actual, alternate, displayText };
             });
+        }
+
+        function buildMonthlyDisplayText(info) {
+            if (!info) return '';
+            if (info.displayText) return info.displayText;
+            const actual = info.actual || '';
+            const alternate = info.alternate || '';
+            return [actual, alternate].filter(Boolean).join(' ');
+        }
+
+        function buildMonthlyHeadingHtml(info) {
+            if (!info) return '';
+            const lines = [info.actual, info.alternate].filter(Boolean);
+            if (!lines.length) return '';
+            return lines
+                .map((line, idx) => `<span class="block${idx === 0 ? '' : ' text-sm text-gray-500'}">${line}</span>`)
+                .join('');
+        }
+
+        function updateMonthlyPageDisplays(monthsArg) {
+            const months = Array.isArray(monthsArg) ? monthsArg : getSemesterMonths(currentIepSemester);
+            const modifySelect = document.getElementById('iep-modify-target');
+            const contentRoot = document.getElementById('iep-content');
+            setBasePageDescriptions();
+            months.forEach((info, idx) => {
+                const displayText = buildMonthlyDisplayText(info);
+                const pageNumber = 4 + idx;
+                if (modifySelect) {
+                    const option = modifySelect.querySelector(`option[data-month-index="${idx}"]`);
+                    if (option) {
+                        option.textContent = `${pageNumber}페이지 (월별 교육 목표 - ${displayText})`;
+                    }
+                }
+                pageDescriptions[`page-${pageNumber}`] = `${pageNumber}페이지(월별 교육 목표 - ${displayText})`;
+                if (!contentRoot) return;
+                const monthSection = contentRoot.querySelector(`.iep-page[data-month-index="${idx}"]`);
+                if (!monthSection) return;
+                monthSection.setAttribute('data-page', String(pageNumber));
+                monthSection.setAttribute('data-month-index', String(idx));
+                const note = monthSection.querySelector('.iep-month-note');
+                if (note) {
+                    note.textContent = `${displayText} 월 목표`;
+                }
+                const block = monthSection.querySelector('.iep-month-block');
+                if (block) {
+                    block.setAttribute('data-month-index', String(idx));
+                }
+                const heading = monthSection.querySelector('.iep-month-title');
+                if (heading) {
+                    heading.innerHTML = buildMonthlyHeadingHtml(info) || displayText;
+                    heading.setAttribute('data-month-index', String(idx));
+                }
+                const subjectOrder = ['korean', 'math'];
+                subjectOrder.forEach((subject, subjectIdx) => {
+                    let subjectSection = monthSection.querySelector(`.iep-month-subject[data-subject="${subject}"]`);
+                    if (!subjectSection) {
+                        const fallback = monthSection.querySelectorAll('.iep-month-subject')[subjectIdx];
+                        if (fallback) {
+                            fallback.setAttribute('data-subject', subject);
+                            subjectSection = fallback;
+                        }
+                    }
+                    if (subjectSection) {
+                        const content = subjectSection.querySelector('.iep-month-content');
+                        if (content) {
+                            const expectedId = `monthly-plan-${idx}-${subject}`;
+                            if (content.id !== expectedId) {
+                                content.id = expectedId;
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        function sanitizeFileName(text) {
+            return (text || '').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim();
         }
 
         async function generateSubjectMonthlyPlans(subject, months) {
@@ -1740,6 +1917,7 @@
 
         async function generateMonthlyPlans(koreanList, mathList) {
             const months = getSemesterMonths(currentIepSemester);
+            updateMonthlyPageDisplays(months);
             if (!months.length) {
                 document.querySelectorAll('.iep-month-content').forEach(node => {
                     node.innerHTML = '<p class="text-gray-500 text-sm">월 정보를 불러오지 못했습니다.</p>';
