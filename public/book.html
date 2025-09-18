@@ -88,6 +88,7 @@
         <div class="flex items-center gap-3 bg-white border rounded-full px-4 py-2">
             <span id="role-badge" class="font-bold mr-1 hidden">교사</span>
             <span id="display-user-name" class="font-bold"></span>
+            <span id="display-user-code" class="text-sm text-gray-500 hidden"></span>
             <button id="token-give-btn" class="bg-purple-500 text-white px-2 py-1 rounded text-sm hidden">토큰 지급</button>
             <button id="my-class-btn" class="bg-amber-500 text-white px-2 py-1 rounded text-sm hidden">내 학급</button>
             <span class="text-sm text-gray-700">내 지갑: <span id="display-user-tokens">0</span>토큰</span>
@@ -569,6 +570,17 @@
             userTokens = Number(data.aeduTokens) || 0;
             window.currentUserRole = data.role || 'student';
             document.getElementById('display-user-name').textContent = window.authorName;
+            const displayUserCodeEl = document.getElementById('display-user-code');
+            const userCode = data.userCode ? String(data.userCode) : '';
+            if (displayUserCodeEl) {
+                if (userCode) {
+                    displayUserCodeEl.textContent = `코드: ${userCode}`;
+                    displayUserCodeEl.classList.remove('hidden');
+                } else {
+                    displayUserCodeEl.textContent = '';
+                    displayUserCodeEl.classList.add('hidden');
+                }
+            }
             document.getElementById('display-user-tokens').textContent = `${userTokens}`;
             const roleBadgeEl = document.getElementById('role-badge');
             const myClassBtn = document.getElementById('my-class-btn');
