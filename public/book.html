@@ -1429,17 +1429,15 @@
                 reader.readAsDataURL(blob);
             });
 
-            // Convert background images to data URLs for html2canvas
-            const bgElements = document.querySelectorAll('.book-page, .character-image-box');
             const originalBgs = [];
+            const bgElements = document.querySelectorAll('.book-page, .character-image-box');
             for (const el of bgElements) {
                 const bg = el.style.backgroundImage;
                 const match = bg.match(/url\(["']?(.*?)["']?\)/);
                 if (match && !match[1].startsWith('data:')) {
                     let dataUrl = null;
-
                     const imageName = el.dataset?.imageName;
-                    if (!dataUrl && imageName && bookCode) {
+                    if (imageName && bookCode) {
                         try {
                             const fileRef = storageRef(storage, `Book/${bookCode}/${imageName}`);
                             const blob = await getBlob(fileRef);
@@ -1448,18 +1446,6 @@
                             console.error('Failed to load image from storage for PDF', err);
                         }
                     }
-
-                    if (!dataUrl) {
-                        try {
-                            const response = await fetch(match[1], { mode: 'cors' });
-                            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                            const blob = await response.blob();
-                            dataUrl = await blobToDataUrl(blob);
-                        } catch (err) {
-                            console.error('Failed to inline background image', err);
-                        }
-                    }
-
                     if (dataUrl) {
                         originalBgs.push({ el, bg });
                         el.style.backgroundImage = `url('${dataUrl}')`;
@@ -1469,12 +1455,30 @@
 
             for (let i = 0; i < spreads.length; i++) {
                 if (i > 0) pdf.addPage("a4", "l");
-                
-                // 현재 페이지만 보이게 설정
+
                 document.querySelectorAll(".book-spread").forEach(s => s.classList.remove("active"));
                 spreads[i].classList.add("active");
                 
-                // 렌더링 시간 확보
+                // --- 텍스트 줄바꿈 처리를 위한 수정 ---
+                const textarea = spreads[i].querySelector('textarea.manual-text-area');
+                let tempDiv = null;
+
+                if (textarea) {
+                    // 1. textarea를 숨기고 똑같이 생긴 div를 만듭니다.
+                    tempDiv = document.createElement('div');
+                    // 클래스와 스타일을 복사하여 모양을 최대한 똑같이 만듭니다.
+                    tempDiv.className = textarea.className;
+                    tempDiv.style.cssText = window.getComputedStyle(textarea).cssText;
+                    
+                    // 2. textarea의 줄바꿈(\n)을 <br> 태그로 변환합니다.
+                    tempDiv.innerHTML = textarea.value.replace(/\n/g, '<br>');
+                    
+                    // 3. textarea를 숨기고 그 자리에 임시 div를 삽입합니다.
+                    textarea.style.display = 'none';
+                    textarea.parentNode.insertBefore(tempDiv, textarea);
+                }
+                // --- 수정 끝 ---
+
                 await new Promise(res => setTimeout(res, 100));
 
                 const canvas = await html2canvas(spreads[i], {
@@ -1483,15 +1487,21 @@
                     backgroundColor: "#ffffff"
                 });
                 pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, 297, 210);
+
+                // --- 원상 복구를 위한 수정 ---
+                if (tempDiv) {
+                    // 4. PDF 생성이 끝나면 임시 div를 제거하고 원래 textarea를 다시 보여줍니다.
+                    tempDiv.remove();
+                    textarea.style.display = '';
+                }
+                // --- 수정 끝 ---
             }
 
-            pdf.save("나만의_동화책.pdf");
+            pdf.save(`${document.querySelector(".book-title-sync").textContent || '나만의_동화책'}.pdf`);
 
-            // 원래 페이지로 복구
             document.querySelectorAll(".book-spread").forEach(s => s.classList.remove("active"));
             if (spreads[originalPage]) spreads[originalPage].classList.add("active");
 
-            // Restore original background images
             originalBgs.forEach(({ el, bg }) => {
                 el.style.backgroundImage = bg;
             });
