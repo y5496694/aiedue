@@ -293,7 +293,7 @@
                 <p class="service-desc">교사들을 위한<br>AI 업무 도구</p>
             </div>
             
-            <div class="service-card disabled" onclick="showComingSoon()">
+            <div class="service-card" onclick="goToAiduSpecial()">
                 <div class="service-icon">✨</div>
                 <h2 class="service-title">에이두 스페셜</h2>
                 <p class="service-desc">특수교사를 위한<br>AI 업무 도구</p>
@@ -310,13 +310,19 @@
                 <h2 class="service-title">낱말 쓰기</h2>
                 <p class="service-desc">단어 학습과<br>따라 쓰기 연습</p>
             </div>
+
+            <div class="service-card" onclick="goToNatmalQuiz()">
+                <div class="service-icon">🧠</div>
+                <h2 class="service-title">AI 낱말 퀴즈</h2>
+                <p class="service-desc">AI와 함께하는<br>재미있는 낱말 퀴즈</p>
+            </div>
         </div>
     </div>
 
     <div class="popup" id="comingSoonPopup">
         <div class="popup-content">
             <h3>🚧 준비 중입니다</h3>
-            <p>에이두 스페셜은 현재 개발 중입니다.<br>곧 만나보실 수 있습니다!</p>
+            <p>해당 서비스는 현재 개발 중입니다.<br>곧 만나보실 수 있습니다!</p>
             <button class="close-btn" onclick="closePopup()">확인</button>
         </div>
     </div>
@@ -347,12 +353,20 @@
             window.open('https://aieduet.netlify.app/#dashboard', '_blank');
         }
 
+        function goToAiduSpecial() {
+            window.open('https://aiedue.netlify.app/special.html', '_blank');
+        }
+
         function goToClassPaper() {
             window.open('https://classpaper.netlify.app/', '_blank');
         }
 
         function goToNatmal() {
             window.open('https://y5496694.github.io/Googer_Natmal/', '_blank');
+        }
+
+        function goToNatmalQuiz() {
+            window.open('https://y5496694.github.io/natmal_Quiz/', '_blank');
         }
 
         function showComingSoon() {
