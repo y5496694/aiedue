@@ -228,7 +228,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, serverTimestamp, updateDoc, increment, collection, addDoc, getDocs, query, where, runTransaction, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, getBlob } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // 전역 변수
         let bookCurrentPage = 0;
@@ -1422,6 +1422,13 @@
             const spreads = document.querySelectorAll(".book-spread");
             const originalPage = bookCurrentPage;
 
+            const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error);
+                reader.readAsDataURL(blob);
+            });
+
             // Convert background images to data URLs for html2canvas
             const bgElements = document.querySelectorAll('.book-page, .character-image-box');
             const originalBgs = [];
@@ -1429,18 +1436,33 @@
                 const bg = el.style.backgroundImage;
                 const match = bg.match(/url\(["']?(.*?)["']?\)/);
                 if (match && !match[1].startsWith('data:')) {
-                    try {
-                        const response = await fetch(match[1], { mode: 'cors' });
-                        const blob = await response.blob();
-                        const dataUrl = await new Promise(res => {
-                            const reader = new FileReader();
-                            reader.onload = () => res(reader.result);
-                            reader.readAsDataURL(blob);
-                        });
+                    let dataUrl = null;
+
+                    const imageName = el.dataset?.imageName;
+                    if (!dataUrl && imageName && bookCode) {
+                        try {
+                            const fileRef = storageRef(storage, `Book/${bookCode}/${imageName}`);
+                            const blob = await getBlob(fileRef);
+                            dataUrl = await blobToDataUrl(blob);
+                        } catch (err) {
+                            console.error('Failed to load image from storage for PDF', err);
+                        }
+                    }
+
+                    if (!dataUrl) {
+                        try {
+                            const response = await fetch(match[1], { mode: 'cors' });
+                            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                            const blob = await response.blob();
+                            dataUrl = await blobToDataUrl(blob);
+                        } catch (err) {
+                            console.error('Failed to inline background image', err);
+                        }
+                    }
+
+                    if (dataUrl) {
                         originalBgs.push({ el, bg });
                         el.style.backgroundImage = `url('${dataUrl}')`;
-                    } catch (err) {
-                        console.error('Failed to inline background image', err);
                     }
                 }
             }
