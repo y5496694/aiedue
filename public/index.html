@@ -3222,20 +3222,92 @@
             }
         }
 
+        const COPY_PROMISE_HISTORY_LIMIT = 100;
+        const copyPromiseHistoryKey = (userId) => userId ? `copyPromiseHistory_${userId}` : 'copyPromiseHistory';
+
+        function loadCopyPromiseHistoryFromLocal(userId) {
+            const key = copyPromiseHistoryKey(userId);
+            try {
+                const raw = localStorage.getItem(key);
+                if (!raw) return [];
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                console.error('Failed to parse local copy promise history:', error);
+                return [];
+            }
+        }
+
+        function saveCopyPromiseHistoryToLocal(userId, entries) {
+            const key = copyPromiseHistoryKey(userId);
+            try {
+                localStorage.setItem(key, JSON.stringify(entries));
+            } catch (error) {
+                console.error('Failed to save local copy promise history:', error);
+            }
+        }
+
+        function addCopyPromiseHistoryToLocal(userId, entry) {
+            if (!entry) return;
+            const entries = loadCopyPromiseHistoryFromLocal(userId);
+            entries.unshift(entry);
+            saveCopyPromiseHistoryToLocal(userId, entries.slice(0, COPY_PROMISE_HISTORY_LIMIT));
+        }
+
+        function normalizeLocalCopyPromiseEntry(entry) {
+            if (!entry || typeof entry !== 'object') return null;
+            const completedAtRaw = entry.completedAt ? new Date(entry.completedAt) : null;
+            const completedAt = completedAtRaw instanceof Date && !Number.isNaN(completedAtRaw.getTime()) ? completedAtRaw : null;
+            const typedSentences = Array.isArray(entry.typedSentences)
+                ? entry.typedSentences.map(detail => ({
+                    original: typeof detail?.original === 'string' ? detail.original : String(detail?.original ?? ''),
+                    typed: typeof detail?.typed === 'string' ? detail.typed : String(detail?.typed ?? '')
+                }))
+                : [];
+            return {
+                id: entry.id || null,
+                title: entry.title || '따라쓰기 약속',
+                rewardExp: Number(entry.rewardExp ?? 0) || 0,
+                repeatType: entry.repeatType || null,
+                sentences: Array.isArray(entry.sentences)
+                    ? entry.sentences.map(sentence => typeof sentence === 'string' ? sentence : String(sentence ?? ''))
+                    : [],
+                typedSentences,
+                completedAt
+            };
+        }
+
         async function saveCopyPromiseHistory(userId, record) {
             if (!record || !record.assignment) return;
             const assignment = record.assignment;
             const typedSentences = Array.isArray(record.typedSentences) ? record.typedSentences : [];
+            const sanitizedSentences = Array.isArray(assignment.sentences)
+                ? assignment.sentences.map(sentence => typeof sentence === 'string' ? sentence : String(sentence ?? ''))
+                : [];
+            const sanitizedTyped = typedSentences.map(detail => ({
+                original: typeof detail?.original === 'string' ? detail.original : String(detail?.original ?? ''),
+                typed: typeof detail?.typed === 'string' ? detail.typed : String(detail?.typed ?? '')
+            }));
+            const now = new Date();
+            const completedAtIso = now.toISOString();
+            const localEntry = {
+                id: assignment.id ? `${assignment.id}_${now.getTime()}` : `local_${now.getTime()}`,
+                title: assignment.text || '따라쓰기 약속',
+                rewardExp: Number(assignment.rewardExp ?? 0) || 0,
+                repeatType: assignment.repeatType || null,
+                sentences: sanitizedSentences,
+                typedSentences: sanitizedTyped,
+                completedAt: completedAtIso
+            };
+            addCopyPromiseHistoryToLocal(userId, localEntry);
+
             const payload = {
                 ruleId: assignment.id || null,
                 title: assignment.text || '따라쓰기 약속',
                 rewardExp: Number(assignment.rewardExp ?? 0) || 0,
                 repeatType: assignment.repeatType || null,
-                sentences: Array.isArray(assignment.sentences) ? assignment.sentences : [],
-                typedSentences: typedSentences.map(detail => ({
-                    original: detail?.original ?? '',
-                    typed: detail?.typed ?? ''
-                })),
+                sentences: sanitizedSentences,
+                typedSentences: sanitizedTyped,
                 completedAt: serverTimestamp()
             };
             await addDoc(collection(db, `users/${userId}/copyPromiseHistory`), payload);
@@ -3258,6 +3330,27 @@
                 return;
             }
 
+            const showEntries = (entries) => {
+                copyPromiseHistoryList.innerHTML = '';
+                entries.forEach(entry => {
+                    const item = document.createElement('button');
+                    item.type = 'button';
+                    item.className = 'w-full px-4 py-3 text-left transition hover:bg-amber-50 flex flex-col gap-1 md:flex-row md:items-center md:justify-between';
+                    const titleSpan = document.createElement('span');
+                    titleSpan.className = 'font-medium text-gray-800';
+                    titleSpan.textContent = entry.title;
+                    const dateSpan = document.createElement('span');
+                    dateSpan.className = 'text-sm text-gray-500 md:text-right';
+                    dateSpan.textContent = entry.completedAt ? formatDateOnly(entry.completedAt) : '일자 미확인';
+                    item.appendChild(titleSpan);
+                    item.appendChild(dateSpan);
+                    item.addEventListener('click', () => openCopyPromiseHistoryModal(entry));
+                    copyPromiseHistoryList.appendChild(item);
+                });
+                copyPromiseHistoryList.classList.remove('hidden');
+                copyPromiseHistoryEmpty.classList.add('hidden');
+            };
+
             try {
                 const historyQuery = query(
                     collection(db, `users/${dataToShow.id}/copyPromiseHistory`),
@@ -3269,45 +3362,60 @@
                 if (snapshot.empty) {
                     copyPromiseHistoryEmpty.textContent = defaultEmptyMessage;
                     copyPromiseHistoryEmpty.classList.remove('hidden');
+                    saveCopyPromiseHistoryToLocal(dataToShow.id, []);
                     return;
                 }
 
+                const entries = [];
                 snapshot.forEach(docSnap => {
                     const data = docSnap.data() || {};
                     const completedAt = data.completedAt && typeof data.completedAt.toDate === 'function'
                         ? data.completedAt.toDate()
                         : null;
+                    const sentences = Array.isArray(data.sentences)
+                        ? data.sentences.map(sentence => typeof sentence === 'string' ? sentence : String(sentence ?? ''))
+                        : [];
+                    const typedSentences = Array.isArray(data.typedSentences)
+                        ? data.typedSentences.map(detail => ({
+                            original: typeof detail?.original === 'string' ? detail.original : String(detail?.original ?? ''),
+                            typed: typeof detail?.typed === 'string' ? detail.typed : String(detail?.typed ?? '')
+                        }))
+                        : [];
                     const entry = {
                         id: docSnap.id,
                         title: data.title || '따라쓰기 약속',
                         rewardExp: Number(data.rewardExp ?? 0) || 0,
                         repeatType: data.repeatType || null,
                         completedAt,
-                        sentences: Array.isArray(data.sentences) ? data.sentences : [],
-                        typedSentences: Array.isArray(data.typedSentences) ? data.typedSentences : []
+                        sentences,
+                        typedSentences
                     };
-
-                    const item = document.createElement('button');
-                    item.type = 'button';
-                    item.className = 'w-full px-4 py-3 text-left transition hover:bg-amber-50 flex flex-col gap-1 md:flex-row md:items-center md:justify-between';
-                    const titleSpan = document.createElement('span');
-                    titleSpan.className = 'font-medium text-gray-800';
-                    titleSpan.textContent = entry.title;
-                    const dateSpan = document.createElement('span');
-                    dateSpan.className = 'text-sm text-gray-500 md:text-right';
-                    dateSpan.textContent = completedAt ? formatDateOnly(completedAt) : '일자 미확인';
-                    item.appendChild(titleSpan);
-                    item.appendChild(dateSpan);
-                    item.addEventListener('click', () => openCopyPromiseHistoryModal(entry));
-                    copyPromiseHistoryList.appendChild(item);
+                    entries.push(entry);
                 });
+                showEntries(entries);
 
-                copyPromiseHistoryList.classList.remove('hidden');
+                const entriesForLocal = entries.map(entry => ({
+                    id: entry.id,
+                    title: entry.title,
+                    rewardExp: entry.rewardExp,
+                    repeatType: entry.repeatType,
+                    sentences: entry.sentences,
+                    typedSentences: entry.typedSentences,
+                    completedAt: entry.completedAt instanceof Date ? entry.completedAt.toISOString() : null
+                }));
+                saveCopyPromiseHistoryToLocal(dataToShow.id, entriesForLocal);
             } catch (error) {
                 console.error('Error loading copy promise history:', error);
                 copyPromiseHistoryLoading.classList.add('hidden');
-                copyPromiseHistoryEmpty.textContent = '약속 기록을 불러오는 중 문제가 발생했어요.';
-                copyPromiseHistoryEmpty.classList.remove('hidden');
+                const fallbackEntries = loadCopyPromiseHistoryFromLocal(dataToShow.id)
+                    .map(normalizeLocalCopyPromiseEntry)
+                    .filter(entry => entry !== null);
+                if (fallbackEntries.length > 0) {
+                    showEntries(fallbackEntries);
+                } else {
+                    copyPromiseHistoryEmpty.textContent = '약속 기록을 불러오는 중 문제가 발생했어요.';
+                    copyPromiseHistoryEmpty.classList.remove('hidden');
+                }
             }
         }
 
