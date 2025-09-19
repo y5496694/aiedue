@@ -64,6 +64,12 @@ service cloud.firestore {
           if request.auth != null && request.auth.uid == userId;
       }
 
+      // ✨ [따라쓰기 약속] 완료 기록
+      match /copyPromiseHistory/{historyId} {
+        allow read, write, create, delete:
+          if request.auth != null && (request.auth.uid == userId || isTeacher());
+      }
+
       // ✨ [📚 에이두 북메이커] 사용자 전용 책 초안
       match /bookDrafts/{draftId} {
         allow read, write, create, delete:
