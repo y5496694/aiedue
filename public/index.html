@@ -351,8 +351,9 @@
             <div id="life-rules-management-tab-content" class="tab-content">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-2xl font-bold">📜 생활 규칙 관리</h2>
-                    <div class="space-x-2">
-                        <button id="add-life-rule-btn" class="btn bg-green-500 hover:bg-green-600 text-white">+ 새 규칙 만들기</button>
+                    <div class="flex flex-wrap gap-2">
+                        <button id="add-life-rule-btn" class="btn bg-green-500 hover:bg-green-600 text-white">+ 간단 규칙 만들기</button>
+                        <button id="add-copy-promise-btn" class="btn bg-amber-500 hover:bg-amber-600 text-white">+ 따라쓰기 약속</button>
                     </div>
                 </div>
                 <div id="life-rule-list" class="bg-white p-4 rounded-lg shadow">
@@ -577,13 +578,53 @@
                     <input type="text" id="life-rule-text" required class="w-full p-2 border rounded-md form-input" placeholder="예: 스스로 일어나기">
                 </div>
                 <div>
-                    <label for="life-rule-reward" class="block text-sm font-medium">보상 (원)</label>
-                    <input type="number" id="life-rule-reward" required min="0" class="w-full p-2 border rounded-md form-input" placeholder="예: 300">
+                    <label for="life-rule-reward" class="block text-sm font-medium">경험치 보상 (EXP)</label>
+                    <input type="number" id="life-rule-reward" required min="0" class="w-full p-2 border rounded-md form-input" placeholder="예: 30">
                 </div>
                 <div class="text-right">
                     <button type="submit" class="btn btn-primary">저장</button>
                 </div>
             </form>
+        </div>
+    </div>
+    <div id="copy-promise-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-copy-promise-modal-btn">&times;</span>
+            <h3 class="text-xl font-bold mb-4">따라쓰기 약속 만들기</h3>
+            <form id="copy-promise-form" class="text-left space-y-3">
+                <input type="hidden" id="copy-promise-id">
+                <div>
+                    <label for="copy-promise-text" class="block text-sm font-medium">약속 이름</label>
+                    <input type="text" id="copy-promise-text" required class="w-full p-2 border rounded-md form-input" placeholder="예: 받아쓰기 공책 1쪽 쓰기">
+                </div>
+                <div>
+                    <label for="copy-promise-reward" class="block text-sm font-medium">경험치 보상 (EXP)</label>
+                    <input type="number" id="copy-promise-reward" required min="0" class="w-full p-2 border rounded-md form-input" placeholder="예: 30">
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-sm font-medium">따라쓰기 문장</label>
+                        <button type="button" id="add-copy-promise-item-btn" class="btn btn-secondary text-xs px-3 py-1">문항 추가</button>
+                    </div>
+                    <div id="copy-promise-items" class="space-y-2"></div>
+                    <p class="text-xs text-gray-500">학생이 문장을 정확히 따라 쓰면 완료할 수 있어요.</p>
+                </div>
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="copy-promise-practice-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-copy-promise-practice-modal-btn">&times;</span>
+            <h3 id="copy-promise-practice-title" class="text-xl font-bold mb-2">따라쓰기 약속</h3>
+            <p id="copy-promise-practice-subtitle" class="text-sm text-gray-600 mb-4"></p>
+            <div id="copy-promise-practice-list" class="space-y-4 max-h-[60vh] overflow-y-auto"></div>
+            <p id="copy-promise-practice-feedback" class="text-sm text-rose-500 hidden mt-4"></p>
+            <div class="flex justify-end mt-6">
+                <button id="copy-promise-promise-btn" class="btn btn-primary btn-disabled" disabled>약속</button>
+            </div>
         </div>
     </div>
     <div id="wordchain-creation-modal" class="modal-overlay hidden">
@@ -1181,6 +1222,14 @@
         let adjustStudentModal = document.getElementById('adjust-student-modal');
         const shopItemModal = document.getElementById('shop-item-modal');
         const lifeRuleModal = document.getElementById('life-rule-modal');
+        const copyPromiseModal = document.getElementById('copy-promise-modal');
+        const copyPromiseItemsContainer = document.getElementById('copy-promise-items');
+        const copyPromisePracticeModal = document.getElementById('copy-promise-practice-modal');
+        const copyPromisePracticeList = document.getElementById('copy-promise-practice-list');
+        const copyPromisePracticeTitle = document.getElementById('copy-promise-practice-title');
+        const copyPromisePracticeSubtitle = document.getElementById('copy-promise-practice-subtitle');
+        const copyPromisePracticeFeedback = document.getElementById('copy-promise-practice-feedback');
+        const copyPromisePromiseBtn = document.getElementById('copy-promise-promise-btn');
         const wordchainCreationModal = document.getElementById('wordchain-creation-modal');
         const wordchainHomeworkModal = document.getElementById('wordchain-homework-modal');
         const homeworkModal = document.getElementById('homework-modal');
@@ -1202,10 +1251,133 @@
         const readingLogEntryModal = document.getElementById('reading-log-entry-modal');
         const editInfoModal = document.getElementById('edit-info-modal');
         let studentToAdjustId = null;
+        let currentCopyPromiseAssignment = null;
 
 
         // --- Utility & Modal Functions ---
         const formatCurrency = (amount) => new Intl.NumberFormat('ko-KR').format(amount) + ' 원';
+        const LEVEL_UP_EXP = 100;
+        const HOMEWORK_EXP_REWARD = 5;
+        const HOMEWORK_COIN_REWARD = 5;
+        const formatCoinsPlain = (amount) => formatCurrency(amount).replace(/\s?원$/, '원');
+
+        function getExperienceState(user) {
+            const rawLevel = Number(user?.aeduLevel);
+            const level = Number.isFinite(rawLevel) && rawLevel > 0 ? Math.floor(rawLevel) : 1;
+            const rawExp = Number(user?.aeduExperience);
+            const expValue = Number.isFinite(rawExp) && rawExp >= 0 ? Math.floor(rawExp) : 0;
+            const exp = ((expValue % LEVEL_UP_EXP) + LEVEL_UP_EXP) % LEVEL_UP_EXP;
+            const progress = Math.min(100, (exp / LEVEL_UP_EXP) * 100);
+            return { level, exp, nextLevelExp: LEVEL_UP_EXP, progress };
+        }
+
+        async function awardExperience(userId, expGain = 0, options = {}) {
+            const expToAdd = Number(expGain);
+            const coinsToAdd = Number(options.coins || 0);
+            const safeExp = Number.isFinite(expToAdd) ? Math.max(0, Math.floor(expToAdd)) : 0;
+            const safeCoins = Number.isFinite(coinsToAdd) ? Math.floor(coinsToAdd) : 0;
+            const result = {
+                expAwarded: safeExp,
+                coinsAwarded: safeCoins,
+                levelUps: 0,
+                warningTokensReduced: 0,
+                newLevel: null,
+                newExp: null,
+                newWarningTokens: null,
+                newBalance: null
+            };
+            if (safeExp === 0 && safeCoins === 0) {
+                return result;
+            }
+
+            const userRef = doc(db, 'users', userId);
+            await runTransaction(db, async (transaction) => {
+                const userSnap = await transaction.get(userRef);
+                if (!userSnap.exists()) {
+                    throw new Error('학생 정보를 찾을 수 없습니다.');
+                }
+                const data = userSnap.data();
+                let level = Number(data.aeduLevel);
+                if (!Number.isFinite(level) || level < 1) level = 1;
+                level = Math.floor(level);
+
+                let exp = Number(data.aeduExperience);
+                if (!Number.isFinite(exp) || exp < 0) exp = 0;
+                exp = Math.floor(exp);
+
+                let balance = Number(data.balance ?? data.coins ?? 0);
+                if (!Number.isFinite(balance)) balance = 0;
+
+                const warningTokensRaw = Number(data.warningTokens);
+                let warningTokens = Number.isFinite(warningTokensRaw) && warningTokensRaw > 0 ? Math.floor(warningTokensRaw) : 0;
+
+                exp += safeExp;
+                while (exp >= LEVEL_UP_EXP) {
+                    exp -= LEVEL_UP_EXP;
+                    level += 1;
+                    result.levelUps += 1;
+                }
+
+                if (safeCoins !== 0) {
+                    balance += safeCoins;
+                }
+
+                if (result.levelUps > 0) {
+                    const reduction = Math.min(warningTokens, result.levelUps);
+                    warningTokens = Math.max(0, warningTokens - reduction);
+                    result.warningTokensReduced = reduction;
+                }
+
+                result.newLevel = level;
+                result.newExp = exp;
+                result.newWarningTokens = warningTokens;
+                result.newBalance = balance;
+
+                const updates = {
+                    aeduLevel: level,
+                    aeduExperience: exp,
+                    warningTokens
+                };
+                if (safeCoins !== 0) {
+                    updates.balance = balance;
+                }
+                transaction.set(userRef, updates, { merge: true });
+            });
+            return result;
+        }
+
+        async function refreshUserData(userId) {
+            const userSnap = await getDoc(doc(db, 'users', userId));
+            if (!userSnap.exists()) return null;
+            const updatedData = { id: userSnap.id, ...userSnap.data() };
+            if (currentUserData && currentUserData.id === userSnap.id) {
+                currentUserData = updatedData;
+            }
+            if (viewedUserData && viewedUserData.id === userSnap.id) {
+                viewedUserData = updatedData;
+            }
+            updateDashboardDisplay();
+            return updatedData;
+        }
+
+        function buildRewardMessage(expGain, coinGain, result = {}) {
+            const parts = [];
+            if (Number.isFinite(coinGain) && coinGain !== 0) {
+                parts.push(`${formatCoinsPlain(coinGain)}`);
+            }
+            if (Number.isFinite(expGain) && expGain !== 0) {
+                parts.push(`${expGain} EXP`);
+            }
+            let message = parts.length > 0 ? `${parts.join('과 ')}를 획득했어요!` : '멋지게 해냈어요!';
+            if (result.levelUps > 0) {
+                let levelText = `레벨이 ${result.newLevel}이 되었어요!`;
+                if (result.warningTokensReduced > 0) {
+                    levelText += ` 주의 토큰이 ${result.warningTokensReduced}개 줄었어요.`;
+                }
+                message += `<br>${levelText}`;
+            }
+            return message;
+        }
 
         const getWarningTokenCount = (user) => {
             const rawTokens = Number(user?.warningTokens ?? 0);
@@ -1980,6 +2152,9 @@
                     balance: 0,
                     portfolio: {},
                     aeduTokens: 0,
+                    aeduExperience: 0,
+                    aeduLevel: 1,
+                    warningTokens: 0,
                     createdAt: serverTimestamp()
                 }, { merge: true });
 
@@ -2042,6 +2217,9 @@
                       coins: 0,
                       balance: 0,
                       portfolio: {},
+                    aeduExperience: 0,
+                    aeduLevel: 1,
+                    warningTokens: 0,
                     createdAt: serverTimestamp()
                 });
 
@@ -2589,9 +2767,9 @@
 
             document.querySelectorAll('.force-complete-hw-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                 const hwId = e.target.dataset.hwid;
-                const reward = Number(e.target.dataset.reward);
-                  await updateDoc(doc(db, `users/${studentToAdjustId}/assignedHomework`, hwId), { status: 'completed' });
-                  await updateDoc(doc(db, "users", studentToAdjustId), { balance: increment(reward) });
+                await updateDoc(doc(db, `users/${studentToAdjustId}/assignedHomework`, hwId), { status: 'completed' });
+                await awardExperience(studentToAdjustId, HOMEWORK_EXP_REWARD, { coins: HOMEWORK_COIN_REWARD });
+                await refreshUserData(studentToAdjustId);
                 openAdjustModal(studentToAdjustId); // Refresh modal
             }));
 
@@ -2825,101 +3003,335 @@
         async function renderLifeRulesForStudent() {
             const dataToShow = viewedUserData;
             const container = document.getElementById('life-rules-container');
-            if (!container) return;
-            container.innerHTML = '<p class="text-sm text-gray-500">규칙을 불러오는 중...</p>';
+            if (!container || !dataToShow) return;
+            container.innerHTML = '';
 
-            const q = query(collection(db, `users/${dataToShow.id}/assignedLifeRules`));
-            const querySnapshot = await getDocs(q);
-            
-            if (querySnapshot.empty) {
-                container.innerHTML = '<p class="text-sm text-gray-500">오늘 지켜야 할 생활 규칙이 없습니다.</p>';
+            const experience = getExperienceState(dataToShow);
+            const header = document.createElement('div');
+            header.className = 'bg-amber-50 border border-amber-200 rounded-lg p-4 shadow-sm';
+            header.innerHTML = `
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-2">
+                    <div>
+                        <p class="text-sm font-semibold text-amber-700">에이두 레벨</p>
+                        <p class="text-2xl font-bold text-amber-600">Lv. ${experience.level}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-semibold text-amber-700">에이두 경험치</p>
+                        <p class="text-lg font-bold text-amber-600">${experience.exp} / ${experience.nextLevelExp} EXP</p>
+                    </div>
+                </div>
+                <div class="w-full h-3 bg-white border border-amber-200 rounded-full overflow-hidden">
+                    <div class="h-full bg-amber-400" style="width: ${experience.progress}%;"></div>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">100 EXP를 모으면 레벨 업! 레벨이 오르면 주의 토큰이 1개 줄어들어요.</p>
+            `;
+            container.appendChild(header);
+
+            const rulesWrapper = document.createElement('div');
+            rulesWrapper.className = 'space-y-2 mt-4';
+            container.appendChild(rulesWrapper);
+
+            try {
+                const q = query(collection(db, `users/${dataToShow.id}/assignedLifeRules`));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    const empty = document.createElement('p');
+                    empty.className = 'text-sm text-gray-500';
+                    empty.textContent = '오늘 지켜야 할 생활 규칙이 없습니다.';
+                    rulesWrapper.appendChild(empty);
+                    return;
+                }
+
+                const today = new Date();
+                let rulesToDisplay = 0;
+
+                querySnapshot.forEach(docSnap => {
+                    const rule = { id: docSnap.id, ...docSnap.data() };
+                    const lastCompleted = rule.lastCompletedAt?.toDate();
+                    const isCompletedToday = lastCompleted && isSameDay(lastCompleted, today);
+                    let shouldShow = true;
+                    if (rule.repeatType === 'one-time' && lastCompleted) {
+                        shouldShow = false;
+                    }
+
+                    if (!shouldShow) return;
+
+                    rulesToDisplay++;
+                    const type = rule.type || 'simple';
+                    const rewardExp = Number(rule.rewardExp ?? rule.reward ?? 0) || 0;
+                    const repeatLabel = rule.repeatType === 'daily' ? '매일' : '한 번';
+                    const typeLabel = type === 'copyPromise' ? '따라쓰기 약속' : '간단 규칙';
+                    const sentenceCount = Array.isArray(rule.sentences) ? rule.sentences.length : 0;
+
+                    const item = document.createElement('div');
+                    item.className = 'flex flex-col gap-2 rounded-md border border-gray-200 bg-gray-50 p-3 shadow-sm md:flex-row md:items-center md:justify-between';
+
+                    const info = document.createElement('div');
+                    info.className = 'flex-1';
+                    const detailParts = [`${typeLabel}`, `${repeatLabel}`];
+                    if (type === 'copyPromise') {
+                        detailParts.push(`문항 ${sentenceCount}개`);
+                    }
+                    detailParts.push(`경험치 ${rewardExp} EXP`);
+                    info.innerHTML = `
+                        <p class="font-semibold text-gray-800">${rule.text}</p>
+                        <p class="text-xs text-gray-500 mt-1">${detailParts.join(' · ')}</p>
+                    `;
+                    item.appendChild(info);
+
+                    const actions = document.createElement('div');
+                    actions.className = 'flex flex-wrap items-center gap-2';
+
+                    if (type === 'copyPromise') {
+                        const copyBtn = document.createElement('button');
+                        copyBtn.className = `${isCompletedToday ? 'bg-gray-300 text-white' : 'bg-amber-500 hover:bg-amber-600 text-white'} text-xs font-bold py-1 px-3 rounded-full`;
+                        copyBtn.textContent = isCompletedToday ? '완료됨' : '따라쓰기';
+                        copyBtn.disabled = isCompletedToday || isAdminViewing;
+                        if (!copyBtn.disabled) {
+                            copyBtn.addEventListener('click', () => {
+                                openCopyPromisePracticeModal({
+                                    id: rule.id,
+                                    text: rule.text,
+                                    rewardExp,
+                                    sentences: Array.isArray(rule.sentences) ? rule.sentences : [],
+                                    repeatType: rule.repeatType
+                                });
+                            });
+                        } else {
+                            copyBtn.classList.add('btn-disabled');
+                        }
+                        actions.appendChild(copyBtn);
+                    } else {
+                        const completeBtn = document.createElement('button');
+                        completeBtn.className = `complete-rule-btn ${isCompletedToday ? 'bg-gray-300 text-white' : 'bg-green-500 hover:bg-green-600 text-white'} text-xs font-bold py-1 px-3 rounded-full`;
+                        completeBtn.textContent = isCompletedToday ? '완료됨' : '지킬게요';
+                        completeBtn.disabled = isCompletedToday || isAdminViewing;
+                        if (!completeBtn.disabled) {
+                            completeBtn.addEventListener('click', async () => {
+                                if (completeBtn.disabled || isAdminViewing) return;
+                                completeBtn.disabled = true;
+                                completeBtn.textContent = '완료됨';
+                                completeBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
+                                completeBtn.classList.add('bg-gray-300');
+                                try {
+                                    await finalizeLifeRuleCompletion(rule.id, rewardExp);
+                                } catch (error) {
+                                    completeBtn.disabled = false;
+                                    completeBtn.textContent = '지킬게요';
+                                    completeBtn.classList.remove('bg-gray-300');
+                                    completeBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+                                    showModal('오류', `생활 규칙 처리 중 오류가 발생했습니다: ${error.message}`);
+                                }
+                            });
+                        } else if (isAdminViewing) {
+                            completeBtn.classList.add('btn-disabled');
+                        }
+                        actions.appendChild(completeBtn);
+
+                        if (!isCompletedToday && !isAdminViewing) {
+                            const failBtn = document.createElement('button');
+                            failBtn.className = 'fail-rule-btn bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-1 px-3 rounded-full';
+                            failBtn.textContent = '못 지켰어요';
+                            failBtn.addEventListener('click', async () => {
+                                try {
+                                    const ruleRef = doc(db, `users/${currentUserData.id}/assignedLifeRules`, rule.id);
+                                    await updateDoc(ruleRef, { lastCompletedAt: serverTimestamp() });
+                                    showModal('다음에는 더 잘해봐요!', '경험치를 받지 못했어요.');
+                                } catch (error) {
+                                    showModal('오류', `처리 중 문제가 발생했습니다: ${error.message}`);
+                                } finally {
+                                    renderLifeRulesForStudent();
+                                }
+                            });
+                            actions.appendChild(failBtn);
+                        }
+                    }
+
+                    if (isAdminViewing) {
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.className = 'delete-assigned-rule-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1';
+                        deleteBtn.textContent = '삭제';
+                        deleteBtn.addEventListener('click', () => deleteAssignedLifeRule(rule.id));
+                        actions.appendChild(deleteBtn);
+                    }
+
+                    item.appendChild(actions);
+                    rulesWrapper.appendChild(item);
+                });
+
+                if (rulesToDisplay === 0) {
+                    rulesWrapper.innerHTML = '<p class="text-sm text-gray-500">오늘 지켜야 할 생활 규칙이 없습니다.</p>';
+                }
+            } catch (error) {
+                const errorMsg = document.createElement('p');
+                errorMsg.className = 'text-sm text-red-500';
+                errorMsg.textContent = '생활 규칙을 불러오는 중 오류가 발생했습니다.';
+                rulesWrapper.appendChild(errorMsg);
+                console.error('Error loading life rules:', error);
+            }
+        }
+
+        async function finalizeLifeRuleCompletion(ruleId, rewardExp, successTitle = '참 잘했어요!') {
+            if (!currentUserData) {
+                throw new Error('학생 정보를 찾을 수 없습니다.');
+            }
+            const userId = currentUserData.id;
+            const ruleRef = doc(db, `users/${userId}/assignedLifeRules`, ruleId);
+            const rewardResult = await awardExperience(userId, rewardExp);
+            await updateDoc(ruleRef, { lastCompletedAt: serverTimestamp() });
+            await refreshUserData(userId);
+            renderLifeRulesForStudent();
+            showModal(successTitle, buildRewardMessage(rewardExp, 0, rewardResult));
+            return rewardResult;
+        }
+
+        function resetCopyPromisePracticeModal() {
+            copyPromisePracticeList.innerHTML = '';
+            copyPromisePracticeSubtitle.textContent = '';
+            copyPromisePracticeFeedback.classList.add('hidden');
+            copyPromisePracticeFeedback.textContent = '';
+            copyPromisePromiseBtn.disabled = true;
+            copyPromisePromiseBtn.classList.add('btn-disabled');
+        }
+
+        function updateCopyPromiseConfirmState() {
+            const items = copyPromisePracticeList.querySelectorAll('.copy-promise-item');
+            if (items.length === 0) {
+                copyPromisePromiseBtn.disabled = false;
+                copyPromisePromiseBtn.classList.remove('btn-disabled');
                 return;
             }
+            const allDone = Array.from(items).every(item => item.dataset.completed === 'true');
+            if (allDone) {
+                copyPromisePromiseBtn.disabled = false;
+                copyPromisePromiseBtn.classList.remove('btn-disabled');
+            } else {
+                copyPromisePromiseBtn.disabled = true;
+                copyPromisePromiseBtn.classList.add('btn-disabled');
+            }
+        }
 
-            container.innerHTML = '';
-            const today = new Date();
-            let rulesToDisplay = 0;
-            querySnapshot.forEach(docSnap => {
-                const rule = { id: docSnap.id, ...docSnap.data() };
-                const lastCompleted = rule.lastCompletedAt?.toDate();
-                
-                const isCompletedToday = lastCompleted && isSameDay(lastCompleted, today);
-                let shouldShow = true;
-                if (rule.repeatType === 'one-time' && lastCompleted) {
-                    shouldShow = false; // Don't show one-time rules that are completed
-                }
+        function openCopyPromisePracticeModal(assignment) {
+            if (!assignment) return;
+            currentCopyPromiseAssignment = assignment;
+            resetCopyPromisePracticeModal();
+            const sentences = Array.isArray(assignment.sentences) ? assignment.sentences : [];
+            const summaryParts = [];
+            if (sentences.length > 0) summaryParts.push(`총 문항 ${sentences.length}개`);
+            if (assignment.rewardExp) summaryParts.push(`완료하면 ${assignment.rewardExp} EXP를 받을 수 있어요.`);
+            copyPromisePracticeTitle.textContent = assignment.text || '따라쓰기 약속';
+            copyPromisePracticeSubtitle.textContent = summaryParts.join(' • ') || '문장을 정확히 따라 적어보세요.';
 
-                if(shouldShow) {
-                    rulesToDisplay++;
-                    const div = document.createElement('div');
-                    div.className = 'flex justify-between items-center bg-gray-50 p-3 rounded-md';
-                    div.innerHTML = `
-                        <div class="flex-grow">
-                            <span>${rule.text}</span>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <button data-ruleid="${rule.id}" data-reward="${rule.reward}" data-repeat="${rule.repeatType}" class="complete-rule-btn ${isCompletedToday ? 'bg-gray-300' : 'bg-green-500 hover:bg-green-600'} text-white text-xs font-bold py-1 px-3 rounded-full" ${isCompletedToday || isAdminViewing ? 'disabled' : ''}>
-                                ${isCompletedToday ? '완료됨' : '지켰어요'}
-                            </button>
-                            ${!isCompletedToday && !isAdminViewing ? `<button data-ruleid="${rule.id}" class="fail-rule-btn bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-1 px-3 rounded-full">못 지켰어요</button>` : ''}
-                            ${isAdminViewing ? `<button data-ruleid="${rule.id}" class="delete-assigned-rule-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>` : ''}
-                        </div>
-                    `;
-                    container.appendChild(div);
-                }
-            });
-            
-            if (rulesToDisplay === 0) {
-                 container.innerHTML = '<p class="text-sm text-gray-500">오늘 지켜야 할 생활 규칙이 없습니다.</p>';
+            if (sentences.length === 0) {
+                const info = document.createElement('p');
+                info.className = 'text-sm text-gray-500';
+                info.textContent = '등록된 따라쓰기 문장이 없어요. 바로 약속을 완료할 수 있습니다.';
+                copyPromisePracticeList.appendChild(info);
+                updateCopyPromiseConfirmState();
+            } else {
+                sentences.forEach((sentence, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'copy-promise-item border border-gray-200 rounded-md p-3 bg-white';
+                    item.dataset.completed = 'false';
+
+                    const header = document.createElement('div');
+                    header.className = 'flex items-center gap-2 mb-2';
+                    const status = document.createElement('span');
+                    status.className = 'copy-promise-status w-6 text-lg text-gray-300 text-center';
+                    status.textContent = '•';
+                    const number = document.createElement('span');
+                    number.className = 'font-semibold';
+                    number.textContent = `${index + 1}.`;
+                    const original = document.createElement('span');
+                    original.className = 'text-sm text-gray-700 flex-1';
+                    original.textContent = sentence;
+                    header.append(status, number, original);
+                    item.appendChild(header);
+
+                    const inputWrap = document.createElement('div');
+                    inputWrap.className = 'flex flex-col gap-2 md:flex-row md:items-center';
+
+                    const textarea = document.createElement('textarea');
+                    textarea.className = 'copy-promise-answer w-full p-2 border rounded-md form-input flex-1';
+                    textarea.rows = 2;
+                    textarea.placeholder = '문장을 정확히 따라 적어보세요';
+
+                    const confirmBtn = document.createElement('button');
+                    confirmBtn.type = 'button';
+                    confirmBtn.className = 'btn btn-secondary text-xs px-3 py-1 self-start md:self-auto';
+                    confirmBtn.textContent = '확인';
+
+                    const message = document.createElement('p');
+                    message.className = 'text-xs text-rose-500 hidden mt-1';
+
+                    textarea.addEventListener('input', () => {
+                        if (item.dataset.completed === 'true') {
+                            item.dataset.completed = 'false';
+                            status.textContent = '•';
+                            status.classList.remove('text-emerald-500', 'text-rose-500');
+                            status.classList.add('text-gray-300');
+                            message.classList.add('hidden');
+                            message.classList.remove('text-emerald-600');
+                            message.classList.add('text-rose-500');
+                            updateCopyPromiseConfirmState();
+                        }
+                        copyPromisePracticeFeedback.classList.add('hidden');
+                    });
+
+                    confirmBtn.addEventListener('click', () => {
+                        const typed = textarea.value.trim();
+                        if (typed === sentence.trim()) {
+                            status.textContent = '⭕';
+                            status.classList.remove('text-rose-500', 'text-gray-300');
+                            status.classList.add('text-emerald-500');
+                            message.textContent = '문장이 정확해요!';
+                            message.classList.remove('hidden', 'text-rose-500');
+                            message.classList.add('text-emerald-600');
+                            item.dataset.completed = 'true';
+                            copyPromisePracticeFeedback.classList.add('hidden');
+                        } else {
+                            status.textContent = '✖';
+                            status.classList.remove('text-emerald-500', 'text-gray-300');
+                            status.classList.add('text-rose-500');
+                            message.textContent = '문장이 일치하지 않아요. 다시 확인해보세요.';
+                            message.classList.remove('hidden', 'text-emerald-600');
+                            message.classList.add('text-rose-500');
+                            item.dataset.completed = 'false';
+                            copyPromisePracticeFeedback.textContent = `${index + 1}번 문장을 다시 확인해보세요.`;
+                            copyPromisePracticeFeedback.classList.remove('hidden');
+                        }
+                        updateCopyPromiseConfirmState();
+                    });
+
+                    inputWrap.appendChild(textarea);
+                    inputWrap.appendChild(confirmBtn);
+                    item.appendChild(inputWrap);
+                    item.appendChild(message);
+                    copyPromisePracticeList.appendChild(item);
+                });
+                updateCopyPromiseConfirmState();
             }
 
-            document.querySelectorAll('.complete-rule-btn').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    if (isAdminViewing) return;
-                    const button = e.currentTarget;
-                    if (button.disabled) return;
-                    button.disabled = true;
-                    button.textContent = '완료됨';
-                    button.classList.remove('bg-green-500', 'hover:bg-green-600');
-                    button.classList.add('bg-gray-300');
-                    const ruleId = button.dataset.ruleid;
-                    const reward = Number(button.dataset.reward);
-                    const userRef = doc(db, "users", currentUserData.id);
-                    const ruleRef = doc(db, `users/${currentUserData.id}/assignedLifeRules`, ruleId);
-
-                    try {
-                        await updateDoc(userRef, { balance: increment(reward) });
-                        await updateDoc(ruleRef, { lastCompletedAt: serverTimestamp() });
-
-                        const userDoc = await getDoc(userRef);
-                        currentUserData = { id: userDoc.id, ...userDoc.data() };
-                        viewedUserData = currentUserData;
-                        showModal('참 잘했어요!', `${formatCurrency(reward)}을 획득했습니다!`);
-                    } finally {
-                        updateDashboardDisplay();
-                        renderLifeRulesForStudent();
-                    }
-                });
-            });
-
-            document.querySelectorAll('.fail-rule-btn').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    if (isAdminViewing) return;
-                    const ruleId = e.target.dataset.ruleid;
-                    const ruleRef = doc(db, `users/${currentUserData.id}/assignedLifeRules`, ruleId);
-
-                    await updateDoc(ruleRef, { lastCompletedAt: serverTimestamp() });
-
-                    showModal('다음에는 더 잘해봐요!', '포인트를 받지 못했어요.');
-                    renderLifeRulesForStudent();
-                });
-            });
-
-            document.querySelectorAll('.delete-assigned-rule-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => deleteAssignedLifeRule(e.target.dataset.ruleid));
-            });
+            copyPromisePracticeModal.style.display = 'flex';
         }
-        
+
+        copyPromisePromiseBtn.addEventListener('click', async () => {
+            if (!currentCopyPromiseAssignment || copyPromisePromiseBtn.disabled || isAdminViewing) return;
+            copyPromisePromiseBtn.disabled = true;
+            copyPromisePromiseBtn.classList.add('btn-disabled');
+            try {
+                await finalizeLifeRuleCompletion(currentCopyPromiseAssignment.id, currentCopyPromiseAssignment.rewardExp, '약속 완료!');
+                copyPromisePracticeModal.style.display = 'none';
+                resetCopyPromisePracticeModal();
+                currentCopyPromiseAssignment = null;
+            } catch (error) {
+                copyPromisePromiseBtn.disabled = false;
+                copyPromisePromiseBtn.classList.remove('btn-disabled');
+                showModal('오류', `약속을 완료하는 중 문제가 발생했습니다: ${error.message}`);
+            }
+        });
+
         // --- TTS ---
         function speak(text) {
             if ('speechSynthesis' in window) {
@@ -3452,12 +3864,18 @@
                     const repeatType = document.querySelector('input[name="repeatType"]:checked').value;
                     const ruleDoc = await getDoc(doc(db, "lifeRules", currentAssignmentItemId));
                     const rule = ruleDoc.data();
+                    const ruleType = rule?.type || 'simple';
+                    const rewardExp = Number(rule?.rewardExp ?? rule?.reward ?? 0) || 0;
+                    const sentences = Array.isArray(rule?.sentences) ? rule.sentences : [];
                     for (const studentId of selectedStudentIds) {
                         const assignmentData = {
                             ruleId: currentAssignmentItemId,
                             text: rule.text,
-                            reward: rule.reward,
-                            repeatType: repeatType, 
+                            reward: rewardExp,
+                            rewardExp: rewardExp,
+                            type: ruleType,
+                            sentences,
+                            repeatType: repeatType,
                             assignedAt: serverTimestamp(),
                             lastCompletedAt: null
                         };
@@ -3684,30 +4102,22 @@
             btn.disabled = true;
             btn.classList.add('btn-disabled');
 
-            const userRef = doc(db, "users", currentUserData.id);
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
-            
+
             const studentAnswers = Array.from(document.querySelectorAll('#homework-modal-content .student-answer-input')).map(input => input.value);
 
             try {
-                const assignmentDoc = await getDoc(assignmentRef);
-                const reward = assignmentDoc.data().reward || 0;
-
                   await updateDoc(assignmentRef, {
                       status: 'completed',
                       studentAnswers: studentAnswers,
                       completedAt: serverTimestamp()
                   });
-                  await updateDoc(userRef, { balance: increment(reward) });
+                const rewardResult = await awardExperience(currentUserData.id, HOMEWORK_EXP_REWARD, { coins: HOMEWORK_COIN_REWARD });
+                await refreshUserData(currentUserData.id);
 
-                const userDoc = await getDoc(userRef);
-                currentUserData = { id: userDoc.id, ...userDoc.data() };
-                viewedUserData = currentUserData;
-                
-                  homeworkModal.style.display = 'none';
-                  showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을 획득했습니다!`);
-                  updateDashboardDisplay();
-                  renderHomework();
+                homeworkModal.style.display = 'none';
+                showModal('숙제 완료!', buildRewardMessage(HOMEWORK_EXP_REWARD, HOMEWORK_COIN_REWARD, rewardResult));
+                renderHomework();
 
             } catch (error) {
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
@@ -3739,6 +4149,7 @@
 
         // --- Teacher: Life Rule Management ---
         document.getElementById('add-life-rule-btn').addEventListener('click', () => openLifeRuleModal());
+        document.getElementById('add-copy-promise-btn').addEventListener('click', () => openCopyPromiseCreationModal());
 
         async function loadLifeRules() {
             const container = document.getElementById('life-rule-list');
@@ -3757,26 +4168,36 @@
 
                 container.innerHTML = `
                     <div class="divide-y divide-gray-200">
-                        ${rules.map(rule => `
+                        ${rules.map(rule => {
+                            const type = rule.type || 'simple';
+                            const rewardExp = Number(rule.rewardExp ?? rule.reward ?? 0) || 0;
+                            const detailParts = [`경험치 ${rewardExp} EXP`, type === 'copyPromise' ? `문항 ${(Array.isArray(rule.sentences) ? rule.sentences.length : 0)}개` : null].filter(Boolean);
+                            const typeLabel = type === 'copyPromise' ? '따라쓰기 약속' : '간단 규칙';
+                            return `
                             <div class="p-3 flex justify-between items-center">
                                 <div>
                                     <p class="font-bold">${rule.text}</p>
-                                    <p class="text-sm text-gray-500">보상: ${formatCurrency(rule.reward)}</p>
+                                    <p class="text-xs text-gray-500">유형: ${typeLabel}${detailParts.length ? ' · ' + detailParts.join(' · ') : ''}</p>
                                 </div>
                                 <div class="space-x-2">
                                     <button data-id="${rule.id}" data-title="${rule.text}" class="assign-rule-btn btn bg-green-500 hover:bg-green-600 text-white text-xs px-2 py-1">배부</button>
                                     <button data-id="${rule.id}" class="edit-rule-btn btn bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1">수정</button>
                                     <button data-id="${rule.id}" class="delete-rule-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>
                                 </div>
-                            </div>
-                        `).join('')}
+                            </div>`;
+                        }).join('')}
                     </div>
                 `;
 
                 container.querySelectorAll('.assign-rule-btn').forEach(btn => btn.addEventListener('click', (e) => openAssignmentModal('lifeRule', e.target.dataset.id, e.target.dataset.title)));
                 container.querySelectorAll('.edit-rule-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                     const ruleDoc = await getDoc(doc(db, "lifeRules", e.target.dataset.id));
-                    openLifeRuleModal({id: ruleDoc.id, ...ruleDoc.data()});
+                    const ruleData = {id: ruleDoc.id, ...ruleDoc.data()};
+                    if ((ruleData.type || 'simple') === 'copyPromise') {
+                        openCopyPromiseCreationModal(ruleData);
+                    } else {
+                        openLifeRuleModal(ruleData);
+                    }
                 }));
                 container.querySelectorAll('.delete-rule-btn').forEach(btn => btn.addEventListener('click', (e) => deleteLifeRule(e.target.dataset.id)));
 
@@ -3790,28 +4211,109 @@
             lifeRuleModal.style.display = 'flex';
             const form = document.getElementById('life-rule-form');
             form.reset();
+            document.getElementById('life-rule-modal-title').textContent = rule ? '간단 규칙 수정' : '간단 규칙 만들기';
             form.querySelector('#life-rule-id').value = rule?.id || '';
             form.querySelector('#life-rule-text').value = rule?.text || '';
-            form.querySelector('#life-rule-reward').value = rule?.reward || '';
+            form.querySelector('#life-rule-reward').value = rule ? (rule.rewardExp ?? rule.reward ?? 0) : '';
         }
 
         document.getElementById('life-rule-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const ruleId = document.getElementById('life-rule-id').value;
+            const rewardValue = Number(document.getElementById('life-rule-reward').value);
+            if (!Number.isFinite(rewardValue) || rewardValue < 0) {
+                showModal('오류', '경험치 보상은 0 이상으로 입력해주세요.');
+                return;
+            }
             const data = {
                 text: document.getElementById('life-rule-text').value,
-                reward: Number(document.getElementById('life-rule-reward').value),
-                teacherId: currentAuthUser.uid,
-                createdAt: serverTimestamp()
+                rewardExp: rewardValue,
+                reward: rewardValue,
+                type: 'simple',
+                teacherId: currentUserData?.id || currentAuthUser.uid,
             };
 
             try {
                 if (ruleId) {
+                    data.updatedAt = serverTimestamp();
                     await setDoc(doc(db, "lifeRules", ruleId), data, { merge: true });
                 } else {
+                    data.createdAt = serverTimestamp();
                     await addDoc(collection(db, "lifeRules"), data);
                 }
                 lifeRuleModal.style.display = 'none';
+                loadLifeRules();
+            } catch (error) {
+                showModal('저장 실패', `오류: ${error.message}`);
+            }
+        });
+
+        function openCopyPromiseCreationModal(rule = null) {
+            copyPromiseModal.style.display = 'flex';
+            const form = document.getElementById('copy-promise-form');
+            form.reset();
+            copyPromiseModal.querySelector('h3').textContent = rule ? '따라쓰기 약속 수정' : '따라쓰기 약속 만들기';
+            document.getElementById('copy-promise-id').value = rule?.id || '';
+            document.getElementById('copy-promise-text').value = rule?.text || '';
+            document.getElementById('copy-promise-reward').value = rule ? (rule.rewardExp ?? rule.reward ?? 0) : '';
+            copyPromiseItemsContainer.innerHTML = '';
+            const sentences = Array.isArray(rule?.sentences) && rule.sentences.length > 0 ? rule.sentences : [''];
+            sentences.forEach(sentence => addCopyPromiseItem(sentence));
+        }
+
+        function addCopyPromiseItem(value = '') {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex items-center gap-2';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'copy-promise-sentence-input flex-1 p-2 border rounded-md form-input';
+            input.placeholder = '따라쓰기 문장을 입력하세요';
+            input.value = value;
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1';
+            removeBtn.textContent = '삭제';
+            removeBtn.addEventListener('click', () => wrapper.remove());
+            wrapper.appendChild(input);
+            wrapper.appendChild(removeBtn);
+            copyPromiseItemsContainer.appendChild(wrapper);
+        }
+
+        document.getElementById('add-copy-promise-item-btn').addEventListener('click', () => addCopyPromiseItem());
+
+        document.getElementById('copy-promise-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const promiseId = document.getElementById('copy-promise-id').value;
+            const rewardValue = Number(document.getElementById('copy-promise-reward').value);
+            if (!Number.isFinite(rewardValue) || rewardValue < 0) {
+                showModal('오류', '경험치 보상은 0 이상으로 입력해주세요.');
+                return;
+            }
+            const sentences = Array.from(copyPromiseItemsContainer.querySelectorAll('.copy-promise-sentence-input'))
+                .map(input => input.value.trim())
+                .filter(sentence => sentence.length > 0);
+            if (sentences.length === 0) {
+                showModal('오류', '따라쓰기 문장을 하나 이상 입력해주세요.');
+                return;
+            }
+            const data = {
+                text: document.getElementById('copy-promise-text').value,
+                rewardExp: rewardValue,
+                reward: rewardValue,
+                type: 'copyPromise',
+                sentences,
+                teacherId: currentUserData?.id || currentAuthUser.uid,
+            };
+
+            try {
+                if (promiseId) {
+                    data.updatedAt = serverTimestamp();
+                    await setDoc(doc(db, 'lifeRules', promiseId), data, { merge: true });
+                } else {
+                    data.createdAt = serverTimestamp();
+                    await addDoc(collection(db, 'lifeRules'), data);
+                }
+                copyPromiseModal.style.display = 'none';
                 loadLifeRules();
             } catch (error) {
                 showModal('저장 실패', `오류: ${error.message}`);
@@ -4239,28 +4741,22 @@
             btn.disabled = true;
             btn.classList.add('btn-disabled');
 
-            const userRef = doc(db, "users", currentUserData.id);
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
-            
+
             const studentAnswers = Array.from(document.querySelectorAll('#dictation-content .student-answer-input')).map(input => input.value);
-            
+
             try {
-                const reward = currentDictationTemplate.reward || 0;
                   await updateDoc(assignmentRef, {
                       status: 'completed',
                       studentAnswers: studentAnswers,
                       completedAt: serverTimestamp()
                   });
-                  await updateDoc(userRef, { balance: increment(reward) });
+                const rewardResult = await awardExperience(currentUserData.id, HOMEWORK_EXP_REWARD, { coins: HOMEWORK_COIN_REWARD });
+                await refreshUserData(currentUserData.id);
 
-                const userDoc = await getDoc(userRef);
-                currentUserData = { id: userDoc.id, ...userDoc.data() };
-                viewedUserData = currentUserData;
-
-                  dictationModal.style.display = 'none';
-                  showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을 획득했습니다!`);
-                  updateDashboardDisplay();
-                  renderHomework();
+                dictationModal.style.display = 'none';
+                showModal('숙제 완료!', buildRewardMessage(HOMEWORK_EXP_REWARD, HOMEWORK_COIN_REWARD, rewardResult));
+                renderHomework();
             } catch (error) {
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
             }
@@ -4467,19 +4963,16 @@
                 }
             }
             try {
-                const reward = assignmentDoc.data().reward || 0;
-                const userRef = doc(db, 'users', currentUserData.id);
-                  await updateDoc(assignmentRef, { status: 'completed', studentAnswers: [...inputAnswers, answer], completedAt: serverTimestamp() });
-                  await updateDoc(userRef, { balance: increment(reward) });
-                const userDoc = await getDoc(userRef);
-                currentUserData = { id: userDoc.id, ...userDoc.data() };
-                viewedUserData = currentUserData;
-                  manualProblemModal.style.display = 'none';
-                  showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을 획득했습니다!`);
-                  updateDashboardDisplay();
-                  renderHomework();
+                await updateDoc(assignmentRef, { status: 'completed', studentAnswers: [...inputAnswers, answer], completedAt: serverTimestamp() });
+                const rewardResult = await awardExperience(currentUserData.id, HOMEWORK_EXP_REWARD, { coins: HOMEWORK_COIN_REWARD });
+                await refreshUserData(currentUserData.id);
+                manualProblemModal.style.display = 'none';
+                showModal('숙제 완료!', buildRewardMessage(HOMEWORK_EXP_REWARD, HOMEWORK_COIN_REWARD, rewardResult));
+                renderHomework();
             } catch (error) {
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
+                btn.disabled = false;
+                btn.classList.remove('btn-disabled');
             }
         });
 
@@ -4751,7 +5244,20 @@
                     const docSnap = await getDoc(doc(db, 'lifeRules', sel.value));
                     const rule = docSnap.data();
                     for (const sid of bulkSelectedStudents) {
-                        const data = { ruleId: sel.value, text: rule.text, reward: rule.reward, repeatType: 'one-time', assignedAt: bulkScheduleDate ? Timestamp.fromDate(bulkScheduleDate) : serverTimestamp(), lastCompletedAt: null };
+                        const ruleType = rule?.type || 'simple';
+                        const rewardExp = Number(rule?.rewardExp ?? rule?.reward ?? 0) || 0;
+                        const sentences = Array.isArray(rule?.sentences) ? rule.sentences : [];
+                        const data = {
+                            ruleId: sel.value,
+                            text: rule.text,
+                            reward: rewardExp,
+                            rewardExp: rewardExp,
+                            type: ruleType,
+                            sentences,
+                            repeatType: 'one-time',
+                            assignedAt: bulkScheduleDate ? Timestamp.fromDate(bulkScheduleDate) : serverTimestamp(),
+                            lastCompletedAt: null
+                        };
                         await setDoc(doc(db, `users/${sid}/assignedLifeRules`, sel.value), data);
                     }
                 }
@@ -4950,23 +5456,17 @@
             if (!currentAssignmentId || isAdminViewing) return;
             const answers = Array.from(document.querySelectorAll('#wordchain-homework-content .wordchain-answer-input')).map(i => i.value);
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
-            const userRef = doc(db, 'users', currentUserData.id);
             try {
-                  const assignmentDoc = await getDoc(assignmentRef);
-                  const reward = assignmentDoc.data().reward || 0;
-                  await updateDoc(assignmentRef, {
-                      status: 'completed',
-                      studentAnswers: answers,
-                      completedAt: serverTimestamp()
-                  });
-                  await updateDoc(userRef, { balance: increment(reward) });
-                const userDoc = await getDoc(userRef);
-                currentUserData = { id: userDoc.id, ...userDoc.data() };
-                viewedUserData = currentUserData;
-                  wordchainHomeworkModal.style.display = 'none';
-                  showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을 획득했습니다!`);
-                  updateDashboardDisplay();
-                  renderHomework();
+                await updateDoc(assignmentRef, {
+                    status: 'completed',
+                    studentAnswers: answers,
+                    completedAt: serverTimestamp()
+                });
+                const rewardResult = await awardExperience(currentUserData.id, HOMEWORK_EXP_REWARD, { coins: HOMEWORK_COIN_REWARD });
+                await refreshUserData(currentUserData.id);
+                wordchainHomeworkModal.style.display = 'none';
+                showModal('숙제 완료!', buildRewardMessage(HOMEWORK_EXP_REWARD, HOMEWORK_COIN_REWARD, rewardResult));
+                renderHomework();
             } catch (error) {
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
             }
@@ -5086,12 +5586,8 @@
             if (!currentAssignmentId || isAdminViewing) return;
             const answers = Array.from(document.querySelectorAll('#reading-journal-content textarea')).map(t => t.value.trim());
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
-            const userRef = doc(db, 'users', currentUserData.id);
             try {
-                  const assignmentDoc = await getDoc(assignmentRef);
-                  const reward = assignmentDoc.data().reward || 0;
-                  await updateDoc(assignmentRef, { status: 'completed', studentAnswers: answers, completedAt: serverTimestamp() });
-                  await updateDoc(userRef, { balance: increment(reward) });
+                await updateDoc(assignmentRef, { status: 'completed', studentAnswers: answers, completedAt: serverTimestamp() });
                 await addDoc(collection(db, 'readingLogs'), {
                     userId: currentUserData.id,
                     userName: currentUserData.name || '',
@@ -5100,14 +5596,12 @@
                     answers,
                     createdAt: serverTimestamp()
                 });
-                const userDoc = await getDoc(userRef);
-                currentUserData = { id: userDoc.id, ...userDoc.data() };
-                  viewedUserData = currentUserData;
-                  readingJournalModal.style.display = 'none';
-                  showModal('숙제 완료!', `참 잘했어요! ${formatCurrency(reward)}을 획득했습니다!`);
-                  updateDashboardDisplay();
-                  renderHomework();
-                  renderReadingLog();
+                const rewardResult = await awardExperience(currentUserData.id, HOMEWORK_EXP_REWARD, { coins: HOMEWORK_COIN_REWARD });
+                await refreshUserData(currentUserData.id);
+                readingJournalModal.style.display = 'none';
+                showModal('숙제 완료!', buildRewardMessage(HOMEWORK_EXP_REWARD, HOMEWORK_COIN_REWARD, rewardResult));
+                renderHomework();
+                renderReadingLog();
             } catch (error) {
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
             }
@@ -5380,6 +5874,12 @@
         document.getElementById('close-problem-creation-modal-btn').addEventListener('click', () => problemCreationModal.style.display = 'none');
         document.getElementById('close-assignment-modal-btn').addEventListener('click', () => assignmentModal.style.display = 'none');
         document.getElementById('close-life-rule-modal-btn').addEventListener('click', () => lifeRuleModal.style.display = 'none');
+        document.getElementById('close-copy-promise-modal-btn').addEventListener('click', () => copyPromiseModal.style.display = 'none');
+        document.getElementById('close-copy-promise-practice-modal-btn').addEventListener('click', () => {
+            copyPromisePracticeModal.style.display = 'none';
+            resetCopyPromisePracticeModal();
+            currentCopyPromiseAssignment = null;
+        });
         document.getElementById('close-dictation-creation-modal-btn').addEventListener('click', () => dictationCreationModal.style.display = 'none');
         document.getElementById('close-dictation-modal-btn').addEventListener('click', () => dictationModal.style.display = 'none');
         document.getElementById('close-manual-problem-creation-modal-btn').addEventListener('click', () => manualProblemCreationModal.style.display = 'none');
