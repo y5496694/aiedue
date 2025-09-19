@@ -207,6 +207,7 @@
                 <nav class="-mb-px flex space-x-8" id="dashboard-tabs">
                     <button data-tab="main" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">대시보드</button>
                     <button data-tab="shop" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">상점</button>
+                    <button data-tab="copy-promises" id="copy-promises-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">내 약속</button>
                     <button data-tab="homework" id="homework-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm">오늘의 숙제</button>
                     <button data-tab="life-rules-management" id="life-rules-management-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">생활 규칙 관리</button>
                     <button data-tab="learning-problems" id="learning-problems-dashboard-tab" class="dashboard-tab py-4 px-1 border-b-2 font-medium text-sm hidden">학습 문제 관리</button>
@@ -312,6 +313,17 @@
                 </div>
                 <div id="shop-item-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     <!-- Shop items will be rendered here -->
+                </div>
+            </div>
+            <div id="copy-promises-tab-content" class="tab-content">
+                <div class="flex flex-col gap-2 mb-4 md:flex-row md:items-center md:justify-between">
+                    <h2 class="text-2xl font-bold">📝 내 약속</h2>
+                    <p class="text-sm text-gray-500">따라쓰기 약속을 완료하면 기록이 여기에 남아요.</p>
+                </div>
+                <div id="copy-promise-history-container" class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div id="copy-promise-history-loading" class="hidden p-6 text-center text-sm text-gray-500">기록을 불러오는 중이에요...</div>
+                    <div id="copy-promise-history-empty" class="p-6 text-center text-sm text-gray-500">완료한 따라쓰기 약속이 아직 없어요.</div>
+                    <div id="copy-promise-history-list" class="hidden divide-y divide-gray-200"></div>
                 </div>
             </div>
             <div id="homework-tab-content" class="tab-content">
@@ -625,6 +637,15 @@
             <div class="flex justify-end mt-6">
                 <button id="copy-promise-promise-btn" class="btn btn-primary btn-disabled" disabled>약속</button>
             </div>
+        </div>
+    </div>
+    <div id="copy-promise-history-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg text-left">
+            <span class="close-button" id="close-copy-promise-history-modal-btn">&times;</span>
+            <h3 id="copy-promise-history-modal-title" class="text-xl font-bold mb-2">따라쓰기 약속</h3>
+            <p id="copy-promise-history-modal-date" class="text-sm text-gray-500 mb-4"></p>
+            <div id="copy-promise-history-modal-meta" class="text-sm text-gray-600 mb-4 hidden"></div>
+            <div id="copy-promise-history-modal-content" class="space-y-4 max-h-[60vh] overflow-y-auto"></div>
         </div>
     </div>
     <div id="wordchain-creation-modal" class="modal-overlay hidden">
@@ -1230,6 +1251,15 @@
         const copyPromisePracticeSubtitle = document.getElementById('copy-promise-practice-subtitle');
         const copyPromisePracticeFeedback = document.getElementById('copy-promise-practice-feedback');
         const copyPromisePromiseBtn = document.getElementById('copy-promise-promise-btn');
+        const copyPromiseHistoryList = document.getElementById('copy-promise-history-list');
+        const copyPromiseHistoryLoading = document.getElementById('copy-promise-history-loading');
+        const copyPromiseHistoryEmpty = document.getElementById('copy-promise-history-empty');
+        const copyPromiseHistoryModal = document.getElementById('copy-promise-history-modal');
+        const closeCopyPromiseHistoryModalBtn = document.getElementById('close-copy-promise-history-modal-btn');
+        const copyPromiseHistoryModalTitle = document.getElementById('copy-promise-history-modal-title');
+        const copyPromiseHistoryModalDate = document.getElementById('copy-promise-history-modal-date');
+        const copyPromiseHistoryModalMeta = document.getElementById('copy-promise-history-modal-meta');
+        const copyPromiseHistoryModalContent = document.getElementById('copy-promise-history-modal-content');
         const wordchainCreationModal = document.getElementById('wordchain-creation-modal');
         const wordchainHomeworkModal = document.getElementById('wordchain-homework-modal');
         const homeworkModal = document.getElementById('homework-modal');
@@ -1256,6 +1286,16 @@
 
         // --- Utility & Modal Functions ---
         const formatCurrency = (amount) => new Intl.NumberFormat('ko-KR').format(amount) + ' 원';
+        const formatDateOnly = (date) => {
+            if (!(date instanceof Date)) return '';
+            return date.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        };
+        const formatDateTime = (date) => {
+            if (!(date instanceof Date)) return '';
+            const datePart = formatDateOnly(date);
+            const timePart = date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+            return `${datePart} ${timePart}`.trim();
+        };
         const LEVEL_UP_EXP = 100;
         const HOMEWORK_EXP_REWARD = 5;
         const HOMEWORK_COIN_REWARD = 5;
@@ -1467,6 +1507,8 @@
                 switchTab('dashboard', tab.dataset.tab);
                 if (tab.dataset.tab === 'reading-log') {
                     renderReadingLog();
+                } else if (tab.dataset.tab === 'copy-promises') {
+                    renderCopyPromiseHistory();
                 } else if (tab.dataset.tab === 'library') {
                     loadLibraryBooks();
                 } else if (tab.dataset.tab === 'sketchbook') {
@@ -1702,7 +1744,14 @@
             }
 
             // Show/hide tabs based on the *actual logged-in user's role*
-            document.getElementById('homework-dashboard-tab').style.display = dataToShow.role === 'student' ? 'inline-block' : 'none';
+            const homeworkTab = document.getElementById('homework-dashboard-tab');
+            if (homeworkTab) {
+                homeworkTab.style.display = dataToShow.role === 'student' ? 'inline-block' : 'none';
+            }
+            const copyPromisesTab = document.getElementById('copy-promises-dashboard-tab');
+            if (copyPromisesTab) {
+                copyPromisesTab.style.display = dataToShow.role === 'student' ? 'inline-block' : 'none';
+            }
             document.getElementById('learning-problems-dashboard-tab').style.display = currentUserData.role === 'teacher' ? 'inline-block' : 'none';
             document.getElementById('life-rules-management-dashboard-tab').style.display = currentUserData.role === 'teacher' ? 'inline-block' : 'none';
             document.getElementById('teacher-admin-panel').style.display = currentUserData.role === 'teacher' ? 'block' : 'none';
@@ -1746,6 +1795,7 @@
             if (role === 'student') {
                 renderHomework();
                 renderLifeRulesForStudent();
+                renderCopyPromiseHistory();
             }
             if (currentUserData.role === 'teacher') {
                 loadLearningProblems();
@@ -3172,7 +3222,160 @@
             }
         }
 
-        async function finalizeLifeRuleCompletion(ruleId, rewardExp, successTitle = '참 잘했어요!') {
+        async function saveCopyPromiseHistory(userId, record) {
+            if (!record || !record.assignment) return;
+            const assignment = record.assignment;
+            const typedSentences = Array.isArray(record.typedSentences) ? record.typedSentences : [];
+            const payload = {
+                ruleId: assignment.id || null,
+                title: assignment.text || '따라쓰기 약속',
+                rewardExp: Number(assignment.rewardExp ?? 0) || 0,
+                repeatType: assignment.repeatType || null,
+                sentences: Array.isArray(assignment.sentences) ? assignment.sentences : [],
+                typedSentences: typedSentences.map(detail => ({
+                    original: detail?.original ?? '',
+                    typed: detail?.typed ?? ''
+                })),
+                completedAt: serverTimestamp()
+            };
+            await addDoc(collection(db, `users/${userId}/copyPromiseHistory`), payload);
+        }
+
+        async function renderCopyPromiseHistory() {
+            if (!copyPromiseHistoryList || !copyPromiseHistoryEmpty || !copyPromiseHistoryLoading) return;
+            const defaultEmptyMessage = '완료한 따라쓰기 약속이 아직 없어요.';
+            copyPromiseHistoryEmpty.textContent = defaultEmptyMessage;
+            copyPromiseHistoryList.innerHTML = '';
+            copyPromiseHistoryList.classList.add('hidden');
+            copyPromiseHistoryEmpty.classList.add('hidden');
+            copyPromiseHistoryLoading.classList.remove('hidden');
+
+            const dataToShow = viewedUserData;
+            if (!dataToShow || dataToShow.role !== 'student') {
+                copyPromiseHistoryLoading.classList.add('hidden');
+                copyPromiseHistoryEmpty.textContent = '학생 전용 메뉴입니다.';
+                copyPromiseHistoryEmpty.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const historyQuery = query(
+                    collection(db, `users/${dataToShow.id}/copyPromiseHistory`),
+                    orderBy('completedAt', 'desc')
+                );
+                const snapshot = await getDocs(historyQuery);
+                copyPromiseHistoryLoading.classList.add('hidden');
+
+                if (snapshot.empty) {
+                    copyPromiseHistoryEmpty.textContent = defaultEmptyMessage;
+                    copyPromiseHistoryEmpty.classList.remove('hidden');
+                    return;
+                }
+
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data() || {};
+                    const completedAt = data.completedAt && typeof data.completedAt.toDate === 'function'
+                        ? data.completedAt.toDate()
+                        : null;
+                    const entry = {
+                        id: docSnap.id,
+                        title: data.title || '따라쓰기 약속',
+                        rewardExp: Number(data.rewardExp ?? 0) || 0,
+                        repeatType: data.repeatType || null,
+                        completedAt,
+                        sentences: Array.isArray(data.sentences) ? data.sentences : [],
+                        typedSentences: Array.isArray(data.typedSentences) ? data.typedSentences : []
+                    };
+
+                    const item = document.createElement('button');
+                    item.type = 'button';
+                    item.className = 'w-full px-4 py-3 text-left transition hover:bg-amber-50 flex flex-col gap-1 md:flex-row md:items-center md:justify-between';
+                    const titleSpan = document.createElement('span');
+                    titleSpan.className = 'font-medium text-gray-800';
+                    titleSpan.textContent = entry.title;
+                    const dateSpan = document.createElement('span');
+                    dateSpan.className = 'text-sm text-gray-500 md:text-right';
+                    dateSpan.textContent = completedAt ? formatDateOnly(completedAt) : '일자 미확인';
+                    item.appendChild(titleSpan);
+                    item.appendChild(dateSpan);
+                    item.addEventListener('click', () => openCopyPromiseHistoryModal(entry));
+                    copyPromiseHistoryList.appendChild(item);
+                });
+
+                copyPromiseHistoryList.classList.remove('hidden');
+            } catch (error) {
+                console.error('Error loading copy promise history:', error);
+                copyPromiseHistoryLoading.classList.add('hidden');
+                copyPromiseHistoryEmpty.textContent = '약속 기록을 불러오는 중 문제가 발생했어요.';
+                copyPromiseHistoryEmpty.classList.remove('hidden');
+            }
+        }
+
+        function openCopyPromiseHistoryModal(entry) {
+            if (!copyPromiseHistoryModal || !copyPromiseHistoryModalTitle || !copyPromiseHistoryModalDate || !copyPromiseHistoryModalContent) return;
+            copyPromiseHistoryModalTitle.textContent = entry?.title || '따라쓰기 약속';
+            if (entry?.completedAt instanceof Date) {
+                copyPromiseHistoryModalDate.textContent = `${formatDateTime(entry.completedAt)} 완료`;
+            } else {
+                copyPromiseHistoryModalDate.textContent = '완료 일자 정보가 없어요.';
+            }
+            if (copyPromiseHistoryModalMeta) {
+                const metaParts = [];
+                if (entry?.rewardExp) {
+                    metaParts.push(`보상 ${entry.rewardExp} EXP`);
+                }
+                if (entry?.repeatType === 'daily') {
+                    metaParts.push('매일 반복');
+                } else if (entry?.repeatType === 'one-time') {
+                    metaParts.push('한 번 약속');
+                }
+                if (metaParts.length > 0) {
+                    copyPromiseHistoryModalMeta.textContent = metaParts.join(' · ');
+                    copyPromiseHistoryModalMeta.classList.remove('hidden');
+                } else {
+                    copyPromiseHistoryModalMeta.textContent = '';
+                    copyPromiseHistoryModalMeta.classList.add('hidden');
+                }
+            }
+
+            copyPromiseHistoryModalContent.innerHTML = '';
+            const sentences = Array.isArray(entry?.typedSentences) && entry.typedSentences.length > 0
+                ? entry.typedSentences
+                : (Array.isArray(entry?.sentences) ? entry.sentences.map(sentence => ({ original: sentence, typed: sentence })) : []);
+
+            if (!sentences || sentences.length === 0) {
+                const empty = document.createElement('p');
+                empty.className = 'text-sm text-gray-500';
+                empty.textContent = '기록된 문장이 없어요. 바로 약속을 완료했어요.';
+                copyPromiseHistoryModalContent.appendChild(empty);
+            } else {
+                sentences.forEach((detail, index) => {
+                    const block = document.createElement('div');
+                    block.className = 'border border-gray-200 rounded-lg p-4 bg-gray-50 shadow-sm';
+                    const title = document.createElement('p');
+                    title.className = 'text-sm font-semibold text-gray-700 mb-2';
+                    title.textContent = `${index + 1}. 약속 문장`;
+                    const originalLabel = document.createElement('p');
+                    originalLabel.className = 'text-xs font-medium text-gray-500 uppercase tracking-wide';
+                    originalLabel.textContent = '원문';
+                    const originalText = document.createElement('p');
+                    originalText.className = 'text-sm text-gray-700 whitespace-pre-line mb-3';
+                    originalText.textContent = detail?.original ?? '';
+                    const typedLabel = document.createElement('p');
+                    typedLabel.className = 'text-xs font-medium text-amber-600 uppercase tracking-wide';
+                    typedLabel.textContent = '내가 적은 문장';
+                    const typedText = document.createElement('p');
+                    typedText.className = 'text-sm text-gray-900 whitespace-pre-line bg-white border border-amber-200 rounded-md p-3 mt-1';
+                    typedText.textContent = detail?.typed ?? detail?.original ?? '';
+                    block.append(title, originalLabel, originalText, typedLabel, typedText);
+                    copyPromiseHistoryModalContent.appendChild(block);
+                });
+            }
+
+            copyPromiseHistoryModal.style.display = 'flex';
+        }
+
+        async function finalizeLifeRuleCompletion(ruleId, rewardExp, successTitle = '참 잘했어요!', options = {}) {
             if (!currentUserData) {
                 throw new Error('학생 정보를 찾을 수 없습니다.');
             }
@@ -3180,8 +3383,18 @@
             const ruleRef = doc(db, `users/${userId}/assignedLifeRules`, ruleId);
             const rewardResult = await awardExperience(userId, rewardExp);
             await updateDoc(ruleRef, { lastCompletedAt: serverTimestamp() });
+            if (options.copyPromiseRecord && options.copyPromiseRecord.assignment) {
+                try {
+                    await saveCopyPromiseHistory(userId, options.copyPromiseRecord);
+                } catch (error) {
+                    console.error('Failed to save copy promise history:', error);
+                }
+            }
             await refreshUserData(userId);
             renderLifeRulesForStudent();
+            if (options.copyPromiseRecord) {
+                await renderCopyPromiseHistory();
+            }
             showModal(successTitle, buildRewardMessage(rewardExp, 0, rewardResult));
             return rewardResult;
         }
@@ -3274,13 +3487,15 @@
                             message.classList.add('hidden');
                             message.classList.remove('text-emerald-600');
                             message.classList.add('text-rose-500');
+                            delete item.dataset.typed;
                             updateCopyPromiseConfirmState();
                         }
                         copyPromisePracticeFeedback.classList.add('hidden');
                     });
 
                     confirmBtn.addEventListener('click', () => {
-                        const typed = textarea.value.trim();
+                        const typedRaw = textarea.value;
+                        const typed = typedRaw.trim();
                         if (typed === sentence.trim()) {
                             status.textContent = '⭕';
                             status.classList.remove('text-rose-500', 'text-gray-300');
@@ -3289,6 +3504,7 @@
                             message.classList.remove('hidden', 'text-rose-500');
                             message.classList.add('text-emerald-600');
                             item.dataset.completed = 'true';
+                            item.dataset.typed = typedRaw;
                             copyPromisePracticeFeedback.classList.add('hidden');
                         } else {
                             status.textContent = '✖';
@@ -3321,7 +3537,38 @@
             copyPromisePromiseBtn.disabled = true;
             copyPromisePromiseBtn.classList.add('btn-disabled');
             try {
-                await finalizeLifeRuleCompletion(currentCopyPromiseAssignment.id, currentCopyPromiseAssignment.rewardExp, '약속 완료!');
+                const typedSentences = [];
+                if (Array.isArray(currentCopyPromiseAssignment.sentences)) {
+                    const items = Array.from(copyPromisePracticeList.querySelectorAll('.copy-promise-item'));
+                    currentCopyPromiseAssignment.sentences.forEach((sentence, index) => {
+                        const item = items[index];
+                        let typedValue = '';
+                        if (item) {
+                            typedValue = item.dataset.typed ?? '';
+                            if (!typedValue) {
+                                const textarea = item.querySelector('.copy-promise-answer');
+                                if (textarea) {
+                                    typedValue = textarea.value;
+                                }
+                            }
+                        }
+                        typedSentences.push({
+                            original: sentence,
+                            typed: typedValue
+                        });
+                    });
+                }
+                await finalizeLifeRuleCompletion(
+                    currentCopyPromiseAssignment.id,
+                    currentCopyPromiseAssignment.rewardExp,
+                    '약속 완료!',
+                    {
+                        copyPromiseRecord: {
+                            assignment: currentCopyPromiseAssignment,
+                            typedSentences
+                        }
+                    }
+                );
                 copyPromisePracticeModal.style.display = 'none';
                 resetCopyPromisePracticeModal();
                 currentCopyPromiseAssignment = null;
@@ -5875,6 +6122,14 @@
         document.getElementById('close-assignment-modal-btn').addEventListener('click', () => assignmentModal.style.display = 'none');
         document.getElementById('close-life-rule-modal-btn').addEventListener('click', () => lifeRuleModal.style.display = 'none');
         document.getElementById('close-copy-promise-modal-btn').addEventListener('click', () => copyPromiseModal.style.display = 'none');
+        document.getElementById('close-copy-promise-history-modal-btn').addEventListener('click', () => copyPromiseHistoryModal.style.display = 'none');
+        if (copyPromiseHistoryModal) {
+            copyPromiseHistoryModal.addEventListener('click', (event) => {
+                if (event.target === copyPromiseHistoryModal) {
+                    copyPromiseHistoryModal.style.display = 'none';
+                }
+            });
+        }
         document.getElementById('close-copy-promise-practice-modal-btn').addEventListener('click', () => {
             copyPromisePracticeModal.style.display = 'none';
             resetCopyPromisePracticeModal();
