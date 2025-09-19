@@ -67,8 +67,9 @@
             <button id="book-teacher-login-btn" class="w-full py-2 rounded-md btn btn-primary">교사 로그인</button>
             <button id="book-teacher-google-login-btn" class="w-full py-2 mt-2 rounded-md btn btn-secondary"><i class="fab fa-google mr-2"></i>Google로 로그인</button>
         </div>
-        <div class="mt-6 text-center">
+        <div class="mt-6 text-center space-y-2">
             <button id="book-show-student-register-btn" class="w-full text-center text-sm text-amber-600 hover:underline">처음이신가요? 학생 등록하기</button>
+            <button id="book-show-teacher-register-btn" class="w-full text-center text-sm text-amber-600 hover:underline">교사이신가요? 회원가입하기</button>
         </div>
     </div>
 
@@ -80,6 +81,24 @@
         </div>
         <button id="book-student-register-btn" class="w-full py-2 rounded-md btn btn-primary mb-4">등록하고 코드 받기</button>
         <button id="book-back-to-login-btn" class="w-full text-center text-sm text-gray-600 hover:underline">로그인 화면으로 돌아가기</button>
+    </div>
+
+    <div id="book-teacher-register-view" class="max-w-md mx-auto mb-8 bg-white p-6 rounded-lg shadow-lg hidden">
+        <h2 class="text-2xl font-bold mb-6 text-center">🧑‍🏫 교사 회원가입</h2>
+        <div class="mb-4">
+            <label for="book-teacher-register-name" class="block text-sm font-medium text-gray-700 mb-1">이름</label>
+            <input type="text" id="book-teacher-register-name" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="이름을 입력하세요">
+        </div>
+        <div class="mb-4">
+            <label for="book-teacher-register-email" class="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+            <input type="email" id="book-teacher-register-email" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="example@email.com">
+        </div>
+        <div class="mb-6">
+            <label for="book-teacher-register-password" class="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+            <input type="password" id="book-teacher-register-password" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="6자리 이상 비밀번호를 입력하세요">
+        </div>
+        <button id="book-teacher-register-btn" class="w-full py-2 rounded-md btn btn-primary mb-4">회원가입</button>
+        <button id="book-teacher-back-to-login-btn" class="w-full text-center text-sm text-gray-600 hover:underline">로그인 화면으로 돌아가기</button>
     </div>
 
     <div id="book-content" class="hidden">
@@ -102,8 +121,15 @@
                 <button id="my-books-tab" class="pb-2 text-sm font-medium border-b-2 border-orange-500 text-orange-500">내 책</button>
                 <button id="library-tab" class="pb-2 text-sm font-medium border-b-2 border-transparent text-gray-500">에이두 도서관</button>
             </div>
-            <div id="my-book-list" class="flex items-center gap-2 overflow-x-auto"></div>
-            <div id="library-book-list" class="hidden flex items-center gap-2 overflow-x-auto"></div>
+            <div id="library-controls" class="hidden flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                <input type="text" id="library-search-input" class="w-full md:w-72 p-2 border border-gray-300 rounded-md form-input" placeholder="책 제목 또는 글쓴이를 검색하세요">
+                <div id="library-teacher-controls" class="hidden flex items-center gap-2">
+                    <button id="library-class-only-btn" class="px-3 py-1 rounded-full border border-amber-500 text-amber-600 text-sm hover:bg-amber-50">내 학급 학생들만 보기</button>
+                    <button id="library-show-all-btn" class="hidden px-3 py-1 rounded-full border border-gray-400 text-gray-600 text-sm hover:bg-gray-100">전체 보기</button>
+                </div>
+            </div>
+            <div id="my-book-list" class="flex items-stretch gap-3 overflow-x-auto pb-2"></div>
+            <div id="library-book-list" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
         </div>
     </div>
     <div id="book-viewer-page" class="page-content max-w-7xl mx-auto hidden">
@@ -228,7 +254,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, serverTimestamp, updateDoc, increment, collection, addDoc, getDocs, query, where, runTransaction, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, serverTimestamp, updateDoc, increment, collection, addDoc, getDocs, query, where, runTransaction, arrayUnion, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, getBlob } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // 전역 변수
@@ -246,8 +272,11 @@
         let canEditBook = false;
         let bookIsPublic = false;
         let imagesGenerated = false;
+        let libraryBooksCache = [];
+        let libraryShowClassOnly = false;
         // 로그인한 사용자 이름을 저장하고 책의 저자 영역을 동기화합니다.
         window.authorName = '';
+        window.currentUserRole = 'student';
         window.syncBookAuthor = function() {
             document.querySelectorAll('.book-author-sync').forEach(el => el.textContent = window.authorName);
         };
@@ -273,6 +302,66 @@
             }, duration);
         }
 
+        async function ensureBookUserDocument(user) {
+            if (!user) return null;
+            const userRef = doc(db, 'users', user.uid);
+            const existingDoc = await getDoc(userRef);
+
+            const providerData = Array.isArray(user.providerData) && user.providerData.length > 0 ? user.providerData[0] : null;
+            const displayName = (user.displayName || '').trim();
+            const inferredName = providerData && providerData.displayName ? providerData.displayName.trim() : '';
+            const fallbackName = user.email ? user.email.split('@')[0] : '';
+            const finalName = displayName || inferredName || fallbackName || '새 사용자';
+
+            if (existingDoc.exists()) {
+                const data = existingDoc.data() || {};
+                const updates = {};
+                if (!data.uid) updates.uid = user.uid;
+                if (!data.name) updates.name = finalName;
+                const providerEmail = providerData && providerData.email ? providerData.email : '';
+                if (!data.email && (user.email || providerEmail)) {
+                    updates.email = user.email || providerEmail;
+                }
+                const normalizedRole = typeof data.role === 'string' ? data.role.toLowerCase() : '';
+                if (normalizedRole === 'teacher' && data.role !== 'teacher') {
+                    updates.role = 'teacher';
+                } else if (normalizedRole === 'student' && data.role !== 'student') {
+                    updates.role = 'student';
+                } else if (!['teacher', 'student'].includes(normalizedRole)) {
+                    updates.role = 'student';
+                }
+                if (data.aeduTokens === undefined) updates.aeduTokens = 0;
+                if (data.aeduExperience === undefined) updates.aeduExperience = 0;
+                if (data.aeduLevel === undefined) updates.aeduLevel = 1;
+                if (data.warningTokens === undefined) updates.warningTokens = 0;
+                if (Object.keys(updates).length > 0) {
+                    await setDoc(userRef, updates, { merge: true });
+                    return await getDoc(userRef);
+                }
+                return existingDoc;
+            }
+
+            const providerEmail = providerData && providerData.email ? providerData.email : '';
+            const newUserData = {
+                uid: user.uid,
+                name: finalName,
+                email: user.email || providerEmail || '',
+                role: 'student',
+                userCode: null,
+                coins: 0,
+                balance: 0,
+                portfolio: {},
+                aeduTokens: 0,
+                aeduExperience: 0,
+                aeduLevel: 1,
+                warningTokens: 0,
+                createdAt: serverTimestamp()
+            };
+
+            await setDoc(userRef, newUserData, { merge: true });
+            return await getDoc(userRef);
+        }
+
         // 간단한 HTML 이스케이프
         function escapeHTML(str) {
             return str.replace(/[&<>"']/g, m => ({
@@ -288,21 +377,61 @@
             if (!bookAuthorUid) return;
             const listEl = document.getElementById('my-book-list');
             listEl.innerHTML = '';
-            const snap = await getDocs(collection(db, `users/${bookAuthorUid}/myBooks`));
-            snap.forEach(docSnap => {
-                const data = docSnap.data();
-                const item = document.createElement('button');
-                const created = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleDateString('ko-KR') : '';
-                item.innerHTML = `<div class="font-semibold">${data.title || '제목없음'}</div>` +
-                                  `<div class="text-xs text-gray-600">생성일: ${created}</div>` +
-                                  `<div class="text-xs text-gray-600">코드: ${data.bookId}</div>`;
-                item.className = 'text-left px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 flex-shrink-0';
-                item.addEventListener('click', () => loadBook(data.bookId));
-                listEl.appendChild(item);
-            });
+            try {
+                const snap = await getDocs(collection(db, `users/${bookAuthorUid}/myBooks`));
+                if (snap.empty) {
+                    const emptyEl = document.createElement('div');
+                    emptyEl.className = 'min-w-[200px] max-w-[220px] flex-shrink-0 border border-dashed border-gray-300 rounded-lg p-3 text-sm text-gray-500 flex items-center justify-center text-center';
+                    emptyEl.textContent = '아직 만든 책이 없습니다.';
+                    listEl.appendChild(emptyEl);
+                }
+                snap.forEach(docSnap => {
+                    const data = docSnap.data();
+                    const item = document.createElement('div');
+                    item.className = 'relative min-w-[200px] max-w-[220px] flex-shrink-0 bg-white border border-gray-200 rounded-lg p-3 shadow-sm cursor-pointer hover:shadow-md transition';
+                    item.addEventListener('click', () => loadBook(data.bookId));
+
+                    const titleEl = document.createElement('div');
+                    titleEl.className = 'font-semibold text-base truncate';
+                    titleEl.textContent = data.title || '제목없음';
+                    item.appendChild(titleEl);
+
+                    const created = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleDateString('ko-KR') : '';
+                    if (created) {
+                        const createdEl = document.createElement('div');
+                        createdEl.className = 'text-xs text-gray-500 mt-1';
+                        createdEl.textContent = `생성일: ${created}`;
+                        item.appendChild(createdEl);
+                    }
+
+                    const codeEl = document.createElement('div');
+                    codeEl.className = 'text-xs text-gray-500';
+                    codeEl.textContent = `코드: ${data.bookId}`;
+                    item.appendChild(codeEl);
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'absolute top-2 right-2 text-red-500 hover:text-red-600';
+                    deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+                    deleteBtn.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        deleteMyBook(docSnap.id, data.bookId);
+                    });
+                    item.appendChild(deleteBtn);
+
+                    listEl.appendChild(item);
+                });
+            } catch (error) {
+                console.error('Failed to load user books:', error);
+                const errorEl = document.createElement('div');
+                errorEl.className = 'min-w-[200px] max-w-[220px] flex-shrink-0 border border-red-200 bg-red-50 text-red-600 rounded-lg p-3 text-sm';
+                errorEl.textContent = '내 책을 불러오지 못했습니다.';
+                listEl.appendChild(errorEl);
+            }
+
             const addBtn = document.createElement('button');
             addBtn.id = 'add-book-btn';
-            addBtn.className = 'text-left px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 flex-shrink-0';
+            addBtn.className = 'min-w-[200px] max-w-[220px] flex-shrink-0 border-2 border-dashed border-amber-400 text-amber-600 rounded-lg p-3 text-sm font-semibold hover:bg-amber-50 transition';
             addBtn.textContent = '+ 책 추가/1토큰';
             addBtn.addEventListener('click', () => {
                 if (!bookAuthorUid) return;
@@ -313,30 +442,145 @@
             listEl.appendChild(addBtn);
         }
 
+        async function deleteMyBook(myBookDocId, bookId) {
+            if (!bookAuthorUid) return;
+            if (!confirm('정말 삭제하시겠습니까?')) return;
+            try {
+                await deleteDoc(doc(db, `users/${bookAuthorUid}/myBooks`, myBookDocId));
+            } catch (error) {
+                console.error('Failed to remove book from my list:', error);
+                showNotification(`내 책 삭제 실패: ${error.message}`);
+                return;
+            }
+            try {
+                await deleteDoc(doc(db, 'Book', bookId));
+            } catch (error) {
+                console.warn('Failed to delete book document:', error);
+            }
+            showNotification('책이 삭제되었습니다.');
+            await loadUserBooks();
+            await loadLibraryBooks();
+        }
+
         async function loadLibraryBooks() {
             const listEl = document.getElementById('library-book-list');
-            listEl.innerHTML = '';
-            const q = query(collection(db, 'Book'), where('isPublic', '==', true));
-            const snap = await getDocs(q);
-            for (const docSnap of snap.docs) {
-                const data = docSnap.data();
-                const item = document.createElement('button');
-                let coverUrl = '';
-                if (data.coverImage) {
-                    try {
-                        coverUrl = await getDownloadURL(storageRef(storage, `Book/${docSnap.id}/${data.coverImage}`));
-                    } catch (e) {
-                        console.error(e);
+            if (!listEl) return;
+            listEl.innerHTML = '<div class="col-span-full text-sm text-gray-500">도서관을 불러오는 중...</div>';
+            libraryBooksCache = [];
+            try {
+                const q = query(collection(db, 'Book'), where('isPublic', '==', true));
+                const snap = await getDocs(q);
+                const books = [];
+                for (const docSnap of snap.docs) {
+                    const data = docSnap.data();
+                    let coverUrl = '';
+                    if (data.coverImage) {
+                        try {
+                            coverUrl = await getDownloadURL(storageRef(storage, `Book/${docSnap.id}/${data.coverImage}`));
+                        } catch (e) {
+                            console.error('Failed to load cover image:', e);
+                        }
                     }
+                    books.push({ id: docSnap.id, data, coverUrl });
                 }
-                item.innerHTML = `<div class="w-32 h-40 bg-gray-200 bg-cover bg-center mb-2"${coverUrl ? ` style="background-image:url('${coverUrl}')"` : ''}></div>` +
-                                  `<div class="font-semibold">${data.title || '제목없음'}</div>` +
-                                  `<div class="text-xs text-gray-600">좋아요 ${data.likesCount || 0} · 댓글 ${data.commentsCount || 0}</div>` +
-                                  `<div class="text-xs text-gray-600">글쓴이: ${data.author || ''}</div>` +
-                                  `<div class="text-xs text-gray-600">코드: ${docSnap.id}</div>`;
-                item.className = 'text-left p-2 bg-gray-100 rounded-lg hover:bg-gray-200 flex-shrink-0';
-                item.addEventListener('click', () => loadBook(docSnap.id));
-                listEl.appendChild(item);
+                libraryBooksCache = books;
+                renderLibraryBooks();
+                updateLibraryTeacherControls();
+            } catch (error) {
+                console.error('Failed to load library books:', error);
+                listEl.innerHTML = `<div class="col-span-full text-sm text-red-500">도서관을 불러오지 못했습니다: ${error.message}</div>`;
+            }
+        }
+
+        function renderLibraryBooks() {
+            const listEl = document.getElementById('library-book-list');
+            if (!listEl) return;
+            const searchTerm = (librarySearchInput?.value || '').trim().toLowerCase();
+            const classOnly = libraryShowClassOnly && window.currentUserRole === 'teacher';
+            const classStudentSet = new Set(currentClassStudents || []);
+
+            const filtered = libraryBooksCache.filter(({ data }) => {
+                const title = (data.title || '').toLowerCase();
+                const author = (data.author || '').toLowerCase();
+                const matchesSearch = !searchTerm || title.includes(searchTerm) || author.includes(searchTerm);
+                if (!matchesSearch) return false;
+                if (!classOnly) return true;
+                const ownerId = data.authorId || data.owner || '';
+                return ownerId && classStudentSet.has(ownerId);
+            });
+
+            listEl.innerHTML = '';
+
+            if (filtered.length === 0) {
+                const emptyEl = document.createElement('div');
+                emptyEl.className = 'col-span-full text-sm text-gray-500 bg-gray-50 border border-dashed border-gray-300 rounded-lg p-4 text-center';
+                emptyEl.textContent = '조건에 맞는 책이 없습니다.';
+                listEl.appendChild(emptyEl);
+                return;
+            }
+
+            filtered.forEach((book) => {
+                const { id, data, coverUrl } = book;
+                const card = document.createElement('div');
+                card.className = 'relative bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition cursor-pointer flex flex-col gap-2';
+                card.addEventListener('click', () => loadBook(id));
+
+                const coverEl = document.createElement('div');
+                coverEl.className = 'w-full h-40 bg-gray-200 rounded-lg bg-cover bg-center';
+                if (coverUrl) {
+                    coverEl.style.backgroundImage = `url('${coverUrl}')`;
+                }
+                card.appendChild(coverEl);
+
+                const titleEl = document.createElement('div');
+                titleEl.className = 'font-semibold text-lg truncate';
+                titleEl.textContent = data.title || '제목없음';
+                card.appendChild(titleEl);
+
+                const authorEl = document.createElement('div');
+                authorEl.className = 'text-sm text-gray-600 truncate';
+                authorEl.textContent = `글쓴이: ${data.author || '알 수 없음'}`;
+                card.appendChild(authorEl);
+
+                const metaEl = document.createElement('div');
+                metaEl.className = 'text-xs text-gray-500';
+                metaEl.textContent = `좋아요 ${data.likesCount || 0} · 댓글 ${data.commentsCount || 0}`;
+                card.appendChild(metaEl);
+
+                const codeEl = document.createElement('div');
+                codeEl.className = 'text-xs text-gray-400';
+                codeEl.textContent = `코드: ${id}`;
+                card.appendChild(codeEl);
+
+                if (window.currentUserRole === 'teacher') {
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'absolute top-2 right-2 text-xs px-2 py-1 rounded-full bg-white/90 border border-red-200 text-red-500 hover:bg-red-50';
+                    deleteBtn.textContent = '삭제';
+                    deleteBtn.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        removeLibraryBook(id);
+                    });
+                    card.appendChild(deleteBtn);
+                }
+
+                listEl.appendChild(card);
+            });
+        }
+
+        async function removeLibraryBook(bookId) {
+            if (window.currentUserRole !== 'teacher') return;
+            if (!confirm('정말 삭제하시겠습니까?')) return;
+            try {
+                await updateDoc(doc(db, 'Book', bookId), {
+                    isPublic: false,
+                    publishedAt: null
+                });
+                showNotification('도서관에서 책을 삭제했습니다.');
+                await loadLibraryBooks();
+            } catch (error) {
+                console.error('Failed to remove book from library:', error);
+                showNotification(`도서관 삭제 실패: ${error.message}`);
             }
         }
 
@@ -561,11 +805,14 @@
             await loadComments();
         }
 
-        async function updateUserInfo() {
+        async function updateUserInfo(prefetchedData = null) {
             if (!bookAuthorUid) return;
-            const userRef = doc(db, 'users', bookAuthorUid);
-            const userDoc = await getDoc(userRef);
-            const data = userDoc.data() || {};
+            let data = prefetchedData || null;
+            if (!data) {
+                const userRef = doc(db, 'users', bookAuthorUid);
+                const userDoc = await getDoc(userRef);
+                data = userDoc.data() || {};
+            }
             window.authorName = data.name || '';
             userTokens = Number(data.aeduTokens) || 0;
             window.currentUserRole = data.role || 'student';
@@ -590,12 +837,55 @@
                 roleBadgeEl.textContent = '교사';
                 myClassBtn.classList.remove('hidden');
                 tokenGiveBtn.classList.remove('hidden');
+                await loadTeacherClassStudents();
             } else {
                 roleBadgeEl.classList.add('hidden');
                 myClassBtn.classList.add('hidden');
                 tokenGiveBtn.classList.add('hidden');
+                currentClassStudents = [];
             }
             window.syncBookAuthor();
+            updateLibraryTeacherControls();
+            return data;
+        }
+
+        async function loadTeacherClassStudents() {
+            if (!bookAuthorUid) {
+                currentClassStudents = [];
+                renderLibraryBooks();
+                return;
+            }
+            try {
+                const classDoc = await getDoc(doc(db, 'classes', bookAuthorUid));
+                currentClassStudents = classDoc.exists() ? (classDoc.data().students || []) : [];
+                renderLibraryBooks();
+            } catch (error) {
+                console.error('Failed to load class students:', error);
+                currentClassStudents = [];
+                renderLibraryBooks();
+            }
+        }
+
+        function updateLibraryTeacherControls() {
+            const libraryTeacherControls = document.getElementById('library-teacher-controls');
+            const classOnlyBtn = document.getElementById('library-class-only-btn');
+            const showAllBtn = document.getElementById('library-show-all-btn');
+            if (!libraryTeacherControls || !classOnlyBtn || !showAllBtn) return;
+            if (window.currentUserRole === 'teacher') {
+                libraryTeacherControls.classList.remove('hidden');
+                if (libraryShowClassOnly) {
+                    classOnlyBtn.classList.add('hidden');
+                    showAllBtn.classList.remove('hidden');
+                } else {
+                    classOnlyBtn.classList.remove('hidden');
+                    showAllBtn.classList.add('hidden');
+                }
+            } else {
+                libraryTeacherControls.classList.add('hidden');
+                libraryShowClassOnly = false;
+                classOnlyBtn.classList.remove('hidden');
+                showAllBtn.classList.add('hidden');
+            }
         }
 
         /**
@@ -1610,19 +1900,33 @@
         teacherLoginTab.addEventListener('click', () => switchLoginTab('teacher'));
         switchLoginTab('student');
 
-        const registerView = document.getElementById('book-student-register-view');
-        const showRegisterBtn = document.getElementById('book-show-student-register-btn');
+        const studentRegisterView = document.getElementById('book-student-register-view');
+        const teacherRegisterView = document.getElementById('book-teacher-register-view');
+        const showStudentRegisterBtn = document.getElementById('book-show-student-register-btn');
+        const showTeacherRegisterBtn = document.getElementById('book-show-teacher-register-btn');
         const backToLoginBtn = document.getElementById('book-back-to-login-btn');
+        const teacherBackToLoginBtn = document.getElementById('book-teacher-back-to-login-btn');
 
-        showRegisterBtn.addEventListener('click', () => {
-            document.getElementById('book-login-view').classList.add('hidden');
-            registerView.classList.remove('hidden');
-        });
-
-        backToLoginBtn.addEventListener('click', () => {
-            registerView.classList.add('hidden');
+        function showLoginView() {
             document.getElementById('book-login-view').classList.remove('hidden');
+            studentRegisterView.classList.add('hidden');
+            teacherRegisterView.classList.add('hidden');
+        }
+
+        showStudentRegisterBtn.addEventListener('click', () => {
+            document.getElementById('book-login-view').classList.add('hidden');
+            teacherRegisterView.classList.add('hidden');
+            studentRegisterView.classList.remove('hidden');
         });
+
+        showTeacherRegisterBtn.addEventListener('click', () => {
+            document.getElementById('book-login-view').classList.add('hidden');
+            studentRegisterView.classList.add('hidden');
+            teacherRegisterView.classList.remove('hidden');
+        });
+
+        backToLoginBtn.addEventListener('click', showLoginView);
+        teacherBackToLoginBtn.addEventListener('click', showLoginView);
 
         document.getElementById('book-student-register-btn').addEventListener('click', async () => {
             const name = document.getElementById('book-student-name').value.trim();
@@ -1664,11 +1968,68 @@
                 });
 
                 alert(`환영합니다, ${name} 학생! 고유 코드는 ${newCode} 입니다.`);
-                registerView.classList.add('hidden');
+                studentRegisterView.classList.add('hidden');
                 document.getElementById('book-login-view').classList.remove('hidden');
+                switchLoginTab('student');
             } catch (e) {
                 console.error('Error adding document: ', e);
                 alert('학생 등록 중 문제가 발생했습니다.');
+            }
+        });
+
+        document.getElementById('book-teacher-register-btn').addEventListener('click', async () => {
+            const name = document.getElementById('book-teacher-register-name').value.trim();
+            const email = document.getElementById('book-teacher-register-email').value.trim();
+            const password = document.getElementById('book-teacher-register-password').value;
+
+            if (!name || !email || !password) {
+                alert('이름, 이메일, 비밀번호를 모두 입력해주세요.');
+                return;
+            }
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                await setDoc(doc(db, 'users', userCredential.user.uid), {
+                    uid: userCredential.user.uid,
+                    name,
+                    email,
+                    role: 'teacher',
+                    userCode: null,
+                    coins: 0,
+                    balance: 0,
+                    portfolio: {},
+                    aeduTokens: 0,
+                    aeduExperience: 0,
+                    aeduLevel: 1,
+                    warningTokens: 0,
+                    createdAt: serverTimestamp()
+                }, { merge: true });
+
+                await addDoc(collection(db, 'signupLog'), {
+                    name,
+                    email,
+                    role: 'teacher',
+                    signedUpAt: serverTimestamp()
+                });
+
+                alert(`환영합니다, ${name} 선생님! 이제 로그인해보세요.`);
+                document.getElementById('book-teacher-register-name').value = '';
+                document.getElementById('book-teacher-register-email').value = '';
+                document.getElementById('book-teacher-register-password').value = '';
+                teacherRegisterView.classList.add('hidden');
+                document.getElementById('book-login-view').classList.remove('hidden');
+                switchLoginTab('teacher');
+            } catch (error) {
+                console.error('Teacher registration error:', error);
+                let message = '교사 회원가입 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.';
+                if (error.code === 'auth/email-already-in-use') {
+                    message = '이미 사용 중인 이메일입니다. 다른 이메일을 사용해주세요.';
+                } else if (error.code === 'auth/invalid-email') {
+                    message = '유효한 이메일 주소를 입력해주세요.';
+                } else if (error.code === 'auth/weak-password') {
+                    message = '비밀번호는 6자 이상이어야 합니다.';
+                }
+                alert(message);
             }
         });
 
@@ -1686,6 +2047,10 @@
         const libraryTab = document.getElementById('library-tab');
         const myBookListEl = document.getElementById('my-book-list');
         const libraryBookListEl = document.getElementById('library-book-list');
+        const libraryControls = document.getElementById('library-controls');
+        const librarySearchInput = document.getElementById('library-search-input');
+        const libraryClassOnlyBtn = document.getElementById('library-class-only-btn');
+        const libraryShowAllBtn = document.getElementById('library-show-all-btn');
         const bookLikeBtn = document.getElementById('book-like-btn');
         const addCommentBtn = document.getElementById('add-comment-btn');
 
@@ -1694,6 +2059,7 @@
             libraryTab.classList.remove('border-orange-500', 'text-orange-500');
             myBookListEl.classList.remove('hidden');
             libraryBookListEl.classList.add('hidden');
+            if (libraryControls) libraryControls.classList.add('hidden');
             loadUserBooks();
         });
 
@@ -1702,8 +2068,26 @@
             myBooksTab.classList.remove('border-orange-500', 'text-orange-500');
             libraryBookListEl.classList.remove('hidden');
             myBookListEl.classList.add('hidden');
+            if (libraryControls) libraryControls.classList.remove('hidden');
             loadLibraryBooks();
         });
+
+        if (librarySearchInput) {
+            librarySearchInput.addEventListener('input', () => renderLibraryBooks());
+        }
+
+        if (libraryClassOnlyBtn && libraryShowAllBtn) {
+            libraryClassOnlyBtn.addEventListener('click', () => {
+                libraryShowClassOnly = true;
+                updateLibraryTeacherControls();
+                renderLibraryBooks();
+            });
+            libraryShowAllBtn.addEventListener('click', () => {
+                libraryShowClassOnly = false;
+                updateLibraryTeacherControls();
+                renderLibraryBooks();
+            });
+        }
 
         bookLikeBtn.addEventListener('click', likeBook);
         addCommentBtn.addEventListener('click', addComment);
@@ -1819,9 +2203,13 @@
                 if (!classDoc.exists()) {
                     myClassStudentList.innerHTML = '<li class="text-sm text-gray-500">학급이 없습니다.</li>';
                     currentClassStudents = [];
+                    renderLibraryBooks();
+                    updateLibraryTeacherControls();
                     return;
                 }
                 currentClassStudents = classDoc.data().students || [];
+                renderLibraryBooks();
+                updateLibraryTeacherControls();
                 let html = '';
                 for (const sid of currentClassStudents) {
                     try {
@@ -1958,18 +2346,32 @@
             const listSection = document.getElementById('book-list-section');
             if (user) {
                 loginView.classList.add('hidden');
-                registerView.classList.add('hidden');
+                studentRegisterView.classList.add('hidden');
+                teacherRegisterView.classList.add('hidden');
                 contentView.classList.remove('hidden');
                 viewerPage.classList.add('hidden');
                 listSection.classList.remove('hidden');
                 bookAuthorUid = user.uid;
-                await updateUserInfo();
+                libraryShowClassOnly = false;
+                const ensuredDoc = await ensureBookUserDocument(user);
+                const ensuredData = ensuredDoc && typeof ensuredDoc.data === 'function' ? ensuredDoc.data() : null;
+                await updateUserInfo(ensuredData);
                 await loadUserBooks();
                 await loadLibraryBooks();
             } else {
                 loginView.classList.remove('hidden');
-                registerView.classList.add('hidden');
+                studentRegisterView.classList.add('hidden');
+                teacherRegisterView.classList.add('hidden');
                 contentView.classList.add('hidden');
+                window.currentUserRole = 'student';
+                bookAuthorUid = null;
+                currentClassStudents = [];
+                libraryShowClassOnly = false;
+                if (libraryControls) libraryControls.classList.add('hidden');
+                if (librarySearchInput) librarySearchInput.value = '';
+                libraryBooksCache = [];
+                renderLibraryBooks();
+                updateLibraryTeacherControls();
             }
         });
 
