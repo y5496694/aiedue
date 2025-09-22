@@ -24,6 +24,10 @@
         .manual-text-area { width: 100%; height: 80%; background: transparent; border: 2px dashed #ccc; border-radius: 8px; padding: 1rem; text-align: left; overflow-y: auto; font-size: 1.125rem; white-space: pre-wrap; word-break: break-word; }
         .tts-word { cursor: pointer; transition: color 0.2s; }
         .tts-word:hover { color: #3b82f6; }
+        .character-image-box { position: relative; overflow: hidden; }
+        .image-regen-btn { position: absolute; top: 0.5rem; right: 0.5rem; background-color: rgba(17, 24, 39, 0.85); color: white; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 9999px; display: none; z-index: 5; }
+        .image-regen-btn:hover { background-color: rgba(37, 99, 235, 0.9); }
+        .image-regen-btn.visible { display: inline-flex; align-items: center; justify-content: center; gap: 0.25rem; }
         #notification { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background-color: #2c3e50; color: white; padding: 1rem 2rem; border-radius: 8px; z-index: 1000; transition: opacity 0.5s, transform 0.5s; opacity: 0; pointer-events: none; }
         #notification.show { opacity: 1; transform: translate(-50%, 10px); }
         .login-tab.active { border-bottom-color: #F59E0B; color: #F59E0B; }
@@ -272,6 +276,7 @@
         let canEditBook = false;
         let bookIsPublic = false;
         let imagesGenerated = false;
+        let imageGenerationMethod = 'stability';
         let libraryBooksCache = [];
         let libraryShowClassOnly = false;
         // 로그인한 사용자 이름을 저장하고 책의 저자 영역을 동기화합니다.
@@ -302,6 +307,179 @@
             setTimeout(() => {
                 notification.classList.remove('show');
             }, duration);
+        }
+
+        function attachRegenerateButton(target, handler) {
+            if (!target || target.querySelector('.image-regen-btn')) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'image-regen-btn';
+            btn.textContent = '재생성';
+            btn.addEventListener('click', async (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                await handleRegenerateButtonClick(btn, handler);
+            });
+            target.appendChild(btn);
+        }
+
+        async function handleRegenerateButtonClick(btn, handler) {
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '생성중...';
+            try {
+                await handler();
+                showNotification('그림을 재생성했습니다.');
+            } catch (error) {
+                if (error?.message) {
+                    showNotification(error.message);
+                } else {
+                    showNotification('그림 재생성에 실패했습니다.');
+                }
+                console.error('Regenerate image failed:', error);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        function setupRegenerateButtonsForSpread(spread) {
+            if (!spread) return;
+            const type = spread.dataset.pageType;
+            if (type === 'cover') {
+                const coverPage = spread.querySelector('.book-page:last-child');
+                attachRegenerateButton(coverPage, () => regenerateCoverImage(spread));
+            } else if (type === 'character') {
+                const boxes = spread.querySelectorAll('.character-image-box');
+                boxes.forEach((box) => {
+                    attachRegenerateButton(box, () => regenerateCharacterImage(spread, box));
+                });
+            } else if (type === 'story') {
+                const imagePage = spread.querySelector('.book-page:first-child');
+                attachRegenerateButton(imagePage, () => regenerateStoryImage(spread));
+            }
+        }
+
+        function setupAllRegenerateButtons() {
+            document.querySelectorAll('#book-viewer .book-spread').forEach(setupRegenerateButtonsForSpread);
+            updateRegenerateButtonsVisibility();
+        }
+
+        function updateRegenerateButtonsVisibility() {
+            const shouldShow = !isViewMode && !bookIsPublic;
+            document.querySelectorAll('.image-regen-btn').forEach((btn) => {
+                if (shouldShow) {
+                    btn.classList.add('visible');
+                } else {
+                    btn.classList.remove('visible');
+                }
+            });
+        }
+
+        function collectCharacterPrompts() {
+            const charSpreads = document.querySelectorAll('#book-viewer .book-spread[data-page-type="character"]');
+            const contextParts = [];
+            charSpreads.forEach((spread) => {
+                const prompts = [spread.dataset.promptLeft, spread.dataset.promptRight];
+                const descriptions = spread.querySelectorAll('textarea');
+                const names = spread.querySelectorAll('.editable-text');
+                prompts.forEach((prompt, index) => {
+                    if (!prompt) {
+                        const desc = descriptions[index]?.value?.trim() || '';
+                        const name = names[index]?.textContent?.trim() || '';
+                        const combined = [name, desc].filter(Boolean).join(', ');
+                        if (combined) {
+                            prompt = combined;
+                        }
+                    }
+                    if (prompt) {
+                        contextParts.push(prompt);
+                    }
+                });
+            });
+            return contextParts.join('\n');
+        }
+
+        function buildStoryContextForSpread(targetSpread) {
+            const parts = [];
+            const characterContext = collectCharacterPrompts();
+            if (characterContext) {
+                parts.push(`등장인물 정보: ${characterContext}`);
+            }
+            const storySpreads = Array.from(document.querySelectorAll('#book-viewer .book-spread[data-page-type="story"]'));
+            for (const spread of storySpreads) {
+                if (spread === targetSpread) break;
+                const text = spread.querySelector('textarea')?.value?.trim() || '';
+                const extra = spread.dataset.prompt || '';
+                if (text) parts.push(`이전 줄거리: ${text}`);
+                if (extra) parts.push(`이전 추가 설명: ${extra}`);
+            }
+            return parts.join('\n');
+        }
+
+        async function generateImageUsingCurrentMethod(prompt, context = '') {
+            const trimmedPrompt = (prompt || '').trim();
+            if (!trimmedPrompt) {
+                throw new Error('이미지를 재생성할 내용을 입력해주세요.');
+            }
+            if (imageGenerationMethod === 'gpt') {
+                return await generateImageForParagraphGPT(trimmedPrompt, context);
+            }
+            return await generateImageForParagraph(trimmedPrompt, context);
+        }
+
+        async function regenerateCoverImage(spread) {
+            const coverPage = spread.querySelector('.book-page:last-child');
+            if (!coverPage) return;
+            const promptSource = spread.dataset.prompt || document.querySelector('#spread-0 .book-title-sync')?.textContent || '';
+            const characterContext = collectCharacterPrompts();
+            const imageUrl = await generateImageUsingCurrentMethod(promptSource, characterContext);
+            coverPage.style.backgroundImage = `url('${imageUrl}')`;
+        }
+
+        async function regenerateCharacterImage(spread, box) {
+            const boxes = Array.from(spread.querySelectorAll('.character-image-box'));
+            const index = boxes.indexOf(box);
+            if (index === -1) return;
+            const prompts = [spread.dataset.promptLeft, spread.dataset.promptRight];
+            let prompt = prompts[index] || '';
+            if (!prompt) {
+                const descriptions = spread.querySelectorAll('textarea');
+                const names = spread.querySelectorAll('.editable-text');
+                const desc = descriptions[index]?.value?.trim() || '';
+                const name = names[index]?.textContent?.trim() || '';
+                prompt = [name, desc].filter(Boolean).join(', ');
+            }
+            const basePrompt = prompt.trim();
+            if (!basePrompt) {
+                throw new Error('등장인물 정보를 입력해주세요.');
+            }
+            const finalPrompt = `${basePrompt}, 동일한 파스텔 색감과 몽환적인 분위기를 지닌 단일 캐릭터 장면`;
+            const imageUrl = await generateImageUsingCurrentMethod(finalPrompt, '');
+            box.style.backgroundImage = `url('${imageUrl}')`;
+            box.textContent = '';
+            delete box.dataset.imageName;
+            setupRegenerateButtonsForSpread(spread);
+        }
+
+        async function regenerateStoryImage(spread) {
+            const textArea = spread.querySelector('.book-page:last-child textarea');
+            const storyText = textArea?.value?.trim() || '';
+            const extra = spread.dataset.prompt || '';
+            const prompt = [storyText, extra].filter(Boolean).join('\n').trim();
+            if (!prompt) {
+                throw new Error('이 페이지에 대한 이야기를 입력해주세요.');
+            }
+            const context = buildStoryContextForSpread(spread);
+            const imageUrl = await generateImageUsingCurrentMethod(prompt, context);
+            const imagePage = spread.querySelector('.book-page:first-child');
+            if (!imagePage) return;
+            const pageNumber = imagePage.querySelector('.page-number');
+            const pageNumberHTML = pageNumber ? pageNumber.outerHTML : '';
+            imagePage.style.backgroundImage = `url('${imageUrl}')`;
+            imagePage.innerHTML = pageNumberHTML;
+            delete imagePage.dataset.imageName;
+            setupRegenerateButtonsForSpread(spread);
         }
 
         async function ensureBookUserDocument(user) {
@@ -707,6 +885,7 @@
             listEl.innerHTML = '';
             if (!bookCode) return;
             try {
+                const currentUser = auth?.currentUser || null;
                 const snap = await getDocs(collection(db, `Book/${bookCode}/comments`));
                 const comments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 const commentsCount = comments.length;
@@ -734,8 +913,10 @@
                         } catch (_) {}
                     }
                     const dateStr = c.createdAt?.toDate ? c.createdAt.toDate().toLocaleDateString('ko-KR') : '';
+                    const canDeleteComment = currentUser && (currentUser.uid === bookOwnerUid || window.currentUserRole === 'teacher');
+                    const deleteBtnHtml = canDeleteComment ? `<button class="text-xs text-red-500 hover:underline comment-delete-btn" data-id="${c.id}">삭제</button>` : '';
                     html += `<div class="border p-2 rounded" data-id="${c.id}">` +
-                            `<div class="text-sm mb-1"><span class="font-semibold">${escapeHTML(c.authorName || '')}</span> <span class="text-xs text-gray-500">${dateStr}</span></div>` +
+                            `<div class="flex items-start justify-between text-sm mb-1"><div><span class="font-semibold">${escapeHTML(c.authorName || '')}</span> <span class="text-xs text-gray-500">${dateStr}</span></div>${deleteBtnHtml}</div>` +
                             `<div class="mb-1">${escapeHTML(c.text || '')}</div>` +
                             `<button class="text-xs text-blue-500 comment-like-btn" data-id="${c.id}" ${liked ? 'disabled' : ''}>추천 ${c.likesCount || 0}</button>` +
                             `</div>`;
@@ -743,6 +924,13 @@
                 listEl.innerHTML = html;
                 document.querySelectorAll('.comment-like-btn').forEach(btn => {
                     btn.addEventListener('click', () => likeComment(btn.dataset.id));
+                });
+                document.querySelectorAll('.comment-delete-btn').forEach(btn => {
+                    btn.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        deleteComment(btn.dataset.id);
+                    });
                 });
             } catch (err) {
                 console.error(err);
@@ -765,6 +953,27 @@
                 await updateDoc(doc(db, 'Book', bookCode), { commentsCount: increment(1) });
             } catch (err) {
                 console.error(err);
+            }
+            await loadComments();
+        }
+
+        async function deleteComment(id) {
+            if (!auth?.currentUser || !bookCode) return;
+            const isAuthor = auth.currentUser.uid === bookOwnerUid;
+            const isTeacher = window.currentUserRole === 'teacher';
+            if (!isAuthor && !isTeacher) {
+                showNotification('댓글을 삭제할 권한이 없습니다.');
+                return;
+            }
+            if (!confirm('이 댓글을 삭제하시겠어요?')) {
+                return;
+            }
+            try {
+                await deleteDoc(doc(db, `Book/${bookCode}/comments`, id));
+                await updateDoc(doc(db, 'Book', bookCode), { commentsCount: increment(-1) });
+            } catch (err) {
+                console.error(err);
+                showNotification('댓글 삭제에 실패했습니다.');
             }
             await loadComments();
         }
@@ -883,6 +1092,8 @@
                 const promptVal = data[`story${idx}Prompt`];
                 if (promptVal !== undefined) spread.dataset.prompt = promptVal;
             }
+
+            setupAllRegenerateButtons();
 
             document.getElementById('book-viewer-page').classList.remove('hidden');
             document.getElementById('book-list-section').classList.add('hidden');
@@ -1172,6 +1383,8 @@
 
             viewer.innerHTML = spread0 + spread1 + spread2 + navButtons;
 
+            setupAllRegenerateButtons();
+
             bookCurrentPage = 0;
             document.getElementById('spread-0').classList.add('active'); // 첫 페이지 활성화
             updateBookView();
@@ -1241,10 +1454,12 @@
                 const lastCharacterSpread = characterSpreads[characterSpreads.length - 1];
                 lastCharacterSpread.after(newSpread);
             }
+            setupRegenerateButtonsForSpread(newSpread);
+            updateRegenerateButtonsVisibility();
             totalBookSpreads++;
-            
+
             updatePageNumbersAndIDs();
-            
+
             const newPageIndex = Array.from(viewer.querySelectorAll('.book-spread')).indexOf(newSpread);
             bookCurrentPage = newPageIndex;
             updateBookView();
@@ -1271,9 +1486,12 @@
             const prevButton = document.getElementById('prev-page-btn');
             viewer.insertBefore(newSpread, prevButton);
 
+            setupRegenerateButtonsForSpread(newSpread);
+            updateRegenerateButtonsVisibility();
+
             totalBookSpreads++;
             updatePageNumbersAndIDs();
-            
+
             bookCurrentPage = totalBookSpreads - 1;
             updateBookView();
         }
@@ -1517,6 +1735,7 @@
                 document.querySelectorAll('#book-viewer textarea').forEach(t => t.removeAttribute('readonly'));
                 document.querySelectorAll('#book-viewer .editable-text').forEach(e => e.setAttribute('contenteditable', 'true'));
             }
+            updateRegenerateButtonsVisibility();
         }
 
         function enableEditMode() {
@@ -1561,6 +1780,7 @@
                             charImageBoxes[i].textContent = '';
                         }
                     }
+                    setupRegenerateButtonsForSpread(charSpread);
                 }
                 const characterContext = contextParts.join('\n');
 
@@ -1593,6 +1813,7 @@
                         if (extra) {
                             storyContextParts.push(`이전 추가 설명: ${extra}`);
                         }
+                        setupRegenerateButtonsForSpread(spread);
                     }
                 }
                 showNotification("책이 완성되었습니다! 이제 도서관에 등록할 수 있습니다.");
@@ -1601,6 +1822,7 @@
                 generateBtn.disabled = true;
                 generateBtn.classList.add('hidden');
                 imagesGenerated = true;
+                imageGenerationMethod = 'stability';
 
                 // PDF 저장 및 도서관 등록 버튼 보이기 및 활성화
                 if(savePdfBtn) {
@@ -1619,6 +1841,7 @@
                 generateBtn.textContent = originalGenerateText;
                 generateBtn.disabled = false;
             }
+            updateRegenerateButtonsVisibility();
         }
 
         async function completeManualBookGPT() {
@@ -1673,6 +1896,7 @@
                             charImageBoxes[i].textContent = '';
                         }
                     }
+                    setupRegenerateButtonsForSpread(charSpread);
                 }
                 const characterContext = contextParts.join('\n');
 
@@ -1705,6 +1929,7 @@
                         if (extra) {
                             storyContextParts.push(`이전 추가 설명: ${extra}`);
                         }
+                        setupRegenerateButtonsForSpread(spread);
                     }
                 }
                 showNotification("책이 완성되었습니다! 이제 도서관에 등록할 수 있습니다.");
@@ -1719,6 +1944,8 @@
                     registerBtn.disabled = false;
                 }
 
+                imageGenerationMethod = 'gpt';
+
             } catch (error) {
                 console.error("수동 책 완성 오류:", error);
                 showNotification(`그림 생성 중 오류가 발생했습니다: ${error.message}`);
@@ -1727,6 +1954,7 @@
                 gptBtn.disabled = false;
                 if (stabilityBtn) stabilityBtn.disabled = false;
             }
+            updateRegenerateButtonsVisibility();
         }
         
         // 페이지 넘기기
