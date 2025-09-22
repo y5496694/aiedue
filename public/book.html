@@ -1350,6 +1350,31 @@
          * 실제로는 서버에 요청을 보내야 하지만, 여기서는 플레이스홀더 이미지 URL을 반환합니다.
          */
         const IMAGE_STYLE_INSTRUCTION = "모든 장면은 부드럽고 몽환적인 파스텔톤의 아기자기한 그림체로 통일하고, 표지와 등장인물, 줄거리 장면이 동일한 색감과 분위기로 이어지도록 해주세요.";
+        const PROMPT_STYLE_SUFFIX = ", soft dreamy pastel colors, cohesive whimsical storybook illustration, consistent color palette";
+        const MAX_IMAGE_PROMPT_LENGTH = 2000;
+        const MAX_PROMPT_CORE_LENGTH = Math.max(1, MAX_IMAGE_PROMPT_LENGTH - PROMPT_STYLE_SUFFIX.length);
+        const DEFAULT_PROMPT_FALLBACK = "Storybook illustration";
+
+        function normalizePromptText(text = "") {
+            return text.toString().replace(/\s+/g, ' ').trim();
+        }
+
+        function truncatePrompt(text = "", maxLength = MAX_PROMPT_CORE_LENGTH) {
+            if (!text) return "";
+            if (text.length <= maxLength) return text;
+            return text.slice(0, maxLength).trim();
+        }
+
+        function buildFinalImagePrompt(baseText, translatedText) {
+            const cleanedTranslated = normalizePromptText(translatedText);
+            const cleanedBase = normalizePromptText(baseText);
+            let promptCore = cleanedTranslated || cleanedBase || DEFAULT_PROMPT_FALLBACK;
+            promptCore = truncatePrompt(promptCore, MAX_PROMPT_CORE_LENGTH);
+            if (!promptCore) {
+                promptCore = DEFAULT_PROMPT_FALLBACK;
+            }
+            return `${promptCore}${PROMPT_STYLE_SUFFIX}`;
+        }
 
         async function translateToEnglish(text) {
             try {
@@ -1373,9 +1398,10 @@
             const promptParts = [text];
             if (context) promptParts.push(context);
             promptParts.push(IMAGE_STYLE_INSTRUCTION);
-            const basePrompt = promptParts.filter(Boolean).join('\n');
-            const englishPrompt = await translateToEnglish(basePrompt);
-            const finalPrompt = `${englishPrompt}, soft dreamy pastel colors, cohesive whimsical storybook illustration, consistent color palette`;
+            const basePrompt = promptParts.filter(Boolean).map(part => part.toString().trim()).filter(Boolean).join('\n');
+            const limitedBasePrompt = truncatePrompt(basePrompt);
+            const englishPrompt = await translateToEnglish(limitedBasePrompt || basePrompt);
+            const finalPrompt = buildFinalImagePrompt(limitedBasePrompt, englishPrompt);
             const res = await fetch('/.netlify/functions/stability-handler', {
                 method: 'POST',
                 headers: {
@@ -1419,9 +1445,10 @@
             const promptParts = [text];
             if (context) promptParts.push(context);
             promptParts.push(IMAGE_STYLE_INSTRUCTION);
-            const basePrompt = promptParts.filter(Boolean).join('\n');
-            const englishPrompt = await translateToEnglish(basePrompt);
-            const finalPrompt = `${englishPrompt}, soft dreamy pastel colors, cohesive whimsical storybook illustration, consistent color palette`;
+            const basePrompt = promptParts.filter(Boolean).map(part => part.toString().trim()).filter(Boolean).join('\n');
+            const limitedBasePrompt = truncatePrompt(basePrompt);
+            const englishPrompt = await translateToEnglish(limitedBasePrompt || basePrompt);
+            const finalPrompt = buildFinalImagePrompt(limitedBasePrompt, englishPrompt);
             const res = await fetch('/.netlify/functions/gpt-handler', {
                 method: 'POST',
                 headers: {
