@@ -254,7 +254,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, serverTimestamp, updateDoc, increment, collection, addDoc, getDocs, query, where, runTransaction, arrayUnion, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, serverTimestamp, updateDoc, increment, collection, addDoc, getDocs, query, where, runTransaction, arrayUnion, deleteDoc, getCountFromServer } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, getBlob } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // 전역 변수
@@ -481,9 +481,38 @@
                             console.error('Failed to load cover image:', e);
                         }
                     }
-                    books.push({ id: docSnap.id, data, coverUrl });
+                    const storedLikes = typeof data.likesCount === 'number' ? data.likesCount : Number(data.likesCount) || 0;
+                    const storedComments = typeof data.commentsCount === 'number' ? data.commentsCount : Number(data.commentsCount) || 0;
+                    books.push({
+                        id: docSnap.id,
+                        data: { ...data, likesCount: storedLikes, commentsCount: storedComments },
+                        coverUrl,
+                        storedCounts: { likesCount: storedLikes, commentsCount: storedComments }
+                    });
                 }
-                libraryBooksCache = books;
+
+                await Promise.all(books.map(async (book) => {
+                    try {
+                        const [likesSnap, commentsSnap] = await Promise.all([
+                            getCountFromServer(collection(db, 'Book', book.id, 'likes')),
+                            getCountFromServer(collection(db, 'Book', book.id, 'comments'))
+                        ]);
+                        const likesCount = likesSnap.data().count || 0;
+                        const commentsCount = commentsSnap.data().count || 0;
+                        book.data.likesCount = likesCount;
+                        book.data.commentsCount = commentsCount;
+                        if (book.storedCounts.likesCount !== likesCount || book.storedCounts.commentsCount !== commentsCount) {
+                            await updateDoc(doc(db, 'Book', book.id), {
+                                likesCount,
+                                commentsCount
+                            });
+                        }
+                    } catch (countsError) {
+                        console.error('Failed to sync book counts:', countsError);
+                    }
+                }));
+
+                libraryBooksCache = books.map(({ storedCounts, ...rest }) => rest);
                 renderLibraryBooks();
                 updateLibraryTeacherControls();
             } catch (error) {
@@ -544,7 +573,9 @@
 
                 const metaEl = document.createElement('div');
                 metaEl.className = 'text-xs text-gray-500';
-                metaEl.textContent = `좋아요 ${data.likesCount || 0} · 댓글 ${data.commentsCount || 0}`;
+                const likesDisplay = typeof data.likesCount === 'number' ? data.likesCount : Number(data.likesCount) || 0;
+                const commentsDisplay = typeof data.commentsCount === 'number' ? data.commentsCount : Number(data.commentsCount) || 0;
+                metaEl.textContent = `좋아요 ${likesDisplay} · 댓글 ${commentsDisplay}`;
                 card.appendChild(metaEl);
 
                 const codeEl = document.createElement('div');
@@ -568,6 +599,40 @@
             });
         }
 
+        function updateLibraryCacheCounts(bookId, counts = {}) {
+            if (!bookId) return;
+            let didChange = false;
+            libraryBooksCache = libraryBooksCache.map((book) => {
+                if (book.id !== bookId) return book;
+                const updatedData = { ...book.data };
+                let bookChanged = false;
+                if (counts.likesCount !== undefined) {
+                    const normalizedLikes = Number(counts.likesCount);
+                    const likesValue = Number.isFinite(normalizedLikes) ? normalizedLikes : 0;
+                    if (updatedData.likesCount !== likesValue) {
+                        updatedData.likesCount = likesValue;
+                        bookChanged = true;
+                    }
+                }
+                if (counts.commentsCount !== undefined) {
+                    const normalizedComments = Number(counts.commentsCount);
+                    const commentsValue = Number.isFinite(normalizedComments) ? normalizedComments : 0;
+                    if (updatedData.commentsCount !== commentsValue) {
+                        updatedData.commentsCount = commentsValue;
+                        bookChanged = true;
+                    }
+                }
+                if (bookChanged) {
+                    didChange = true;
+                    return { ...book, data: updatedData };
+                }
+                return book;
+            });
+            if (didChange) {
+                renderLibraryBooks();
+            }
+        }
+
         async function removeLibraryBook(bookId) {
             if (window.currentUserRole !== 'teacher') return;
             if (!confirm('정말 삭제하시겠습니까?')) return;
@@ -587,12 +652,25 @@
         async function loadBookLikes() {
             const countEl = document.getElementById('book-like-count');
             const likeBtn = document.getElementById('book-like-btn');
+            if (!countEl || !likeBtn || !bookCode) return;
             countEl.textContent = '0';
             likeBtn.disabled = false;
             try {
                 const bookRef = doc(db, 'Book', bookCode);
                 const bookSnap = await getDoc(bookRef);
-                countEl.textContent = (bookSnap.data().likesCount || 0).toString();
+                const storedLikes = Number(bookSnap.data()?.likesCount) || 0;
+                let likesCount = storedLikes;
+                try {
+                    const likesSnap = await getCountFromServer(collection(db, 'Book', bookCode, 'likes'));
+                    likesCount = likesSnap.data().count || 0;
+                    if (likesCount !== storedLikes) {
+                        await updateDoc(bookRef, { likesCount });
+                    }
+                } catch (countErr) {
+                    console.error('Failed to refresh like count:', countErr);
+                }
+                countEl.textContent = likesCount.toString();
+                updateLibraryCacheCounts(bookCode, { likesCount });
                 const user = auth.currentUser;
                 if (user) {
                     const likeDoc = await getDoc(doc(db, `Book/${bookCode}/likes`, user.uid));
@@ -629,6 +707,13 @@
             try {
                 const snap = await getDocs(collection(db, `Book/${bookCode}/comments`));
                 const comments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                const commentsCount = comments.length;
+                updateLibraryCacheCounts(bookCode, { commentsCount });
+                try {
+                    await updateDoc(doc(db, 'Book', bookCode), { commentsCount });
+                } catch (syncErr) {
+                    console.error('Failed to refresh comment count:', syncErr);
+                }
                 comments.sort((a, b) => {
                     const likeA = a.likesCount || 0;
                     const likeB = b.likesCount || 0;
