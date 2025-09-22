@@ -280,6 +280,7 @@
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, serverTimestamp, updateDoc, increment, collection, addDoc, getDocs, query, where, runTransaction, arrayUnion, deleteDoc, getCountFromServer } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, getBlob } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { fetchTeacherClass, createTeacherClass, addStudentsToTeacherClass } from "./js/classManager.js";
 
         // 전역 변수
         let bookCurrentPage = 0;
@@ -1176,45 +1177,44 @@
             if (!bookAuthorUid) {
                 teacherClasses = [];
                 currentClassStudents = [];
+                selectedClassId = null;
                 if (!skipLibraryRender) renderLibraryBooks();
                 return;
             }
             try {
-                const classCollectionRef = collection(db, 'classes', bookAuthorUid, 'classrooms');
-                const snapshot = await getDocs(classCollectionRef);
-                teacherClasses = snapshot.docs.map(docSnap => {
-                    const data = docSnap.data() || {};
-                    return {
-                        id: docSnap.id,
-                        name: data.name || '이름 없는 학급',
-                        students: Array.isArray(data.students) ? data.students : [],
-                        createdAt: data.createdAt || null
-                    };
-                }).sort((a, b) => {
-                    const aTime = a.createdAt?.seconds ?? a.createdAt?.toMillis?.() ?? 0;
-                    const bTime = b.createdAt?.seconds ?? b.createdAt?.toMillis?.() ?? 0;
-                    return aTime - bTime;
-                });
-
-                if (!keepSelection || !teacherClasses.some(cls => cls.id === selectedClassId)) {
-                    selectedClassId = teacherClasses[0]?.id || null;
+                const classData = await fetchTeacherClass(db, bookAuthorUid);
+                if (classData) {
+                    teacherClasses = [{
+                        id: classData.id,
+                        name: classData.name || '이름 없는 학급',
+                        students: Array.isArray(classData.students) ? classData.students : []
+                    }];
+                    if (!keepSelection || !selectedClassId) {
+                        selectedClassId = classData.id;
+                    }
+                    currentClassStudents = Array.isArray(classData.students) ? classData.students : [];
+                } else {
+                    teacherClasses = [];
+                    currentClassStudents = [];
+                    if (!keepSelection) {
+                        selectedClassId = null;
+                    }
                 }
-
-                const unionSet = new Set();
-                teacherClasses.forEach(cls => {
-                    (cls.students || []).forEach(id => unionSet.add(id));
-                });
-                currentClassStudents = Array.from(unionSet);
 
                 if (!skipLibraryRender) {
                     renderLibraryBooks();
                     updateLibraryTeacherControls();
                 }
+                updateAddClassButtonState();
             } catch (error) {
                 console.error('Failed to load class students:', error);
                 teacherClasses = [];
                 currentClassStudents = [];
+                if (!keepSelection) {
+                    selectedClassId = null;
+                }
                 if (!skipLibraryRender) renderLibraryBooks();
+                updateAddClassButtonState();
             }
         }
 
@@ -2604,6 +2604,7 @@
                 emptyEl.textContent = '생성된 학급이 없습니다. 학급을 추가해 주세요.';
                 myClassList.appendChild(emptyEl);
                 setAddStudentButtonState(false);
+                updateAddClassButtonState();
                 return;
             }
 
@@ -2621,6 +2622,7 @@
             });
 
             setAddStudentButtonState(Boolean(selectedClassId));
+            updateAddClassButtonState();
         }
 
         function setAddStudentButtonState(enabled) {
@@ -2628,6 +2630,14 @@
             addMyClassStudentBtn.disabled = !enabled;
             addMyClassStudentBtn.classList.toggle('opacity-50', !enabled);
             addMyClassStudentBtn.classList.toggle('cursor-not-allowed', !enabled);
+        }
+
+        function updateAddClassButtonState() {
+            if (!addClassBtn) return;
+            const canAdd = teacherClasses.length === 0;
+            addClassBtn.disabled = !canAdd;
+            addClassBtn.classList.toggle('opacity-50', !canAdd);
+            addClassBtn.classList.toggle('cursor-not-allowed', !canAdd);
         }
 
         async function renderSelectedClassStudents() {
@@ -2673,6 +2683,10 @@
         function openAddClassModal() {
             if (!bookAuthorUid) { showNotification('로그인 후 이용해주세요.'); return; }
             if (!addClassModal) return;
+            if (teacherClasses.length > 0) {
+                showNotification('이미 생성된 학급이 있습니다.');
+                return;
+            }
             newClassNameInput.value = '';
             addClassModal.classList.remove('hidden');
             setTimeout(() => newClassNameInput.focus(), 0);
@@ -2688,18 +2702,17 @@
             if (!bookAuthorUid) { showNotification('로그인 후 이용해주세요.'); return; }
             const className = newClassNameInput.value.trim();
             if (!className) { showNotification('학급 이름을 입력하세요.'); return; }
+            if (teacherClasses.length > 0) {
+                showNotification('이미 생성된 학급이 있습니다.');
+                closeAddClassModal();
+                return;
+            }
             const originalText = confirmAddClassBtn.textContent;
             confirmAddClassBtn.disabled = true;
             confirmAddClassBtn.textContent = '생성 중...';
             try {
-                const classCollectionRef = collection(db, 'classes', bookAuthorUid, 'classrooms');
-                const newClassRef = doc(classCollectionRef);
-                await setDoc(newClassRef, {
-                    name: className,
-                    students: [],
-                    createdAt: serverTimestamp()
-                });
-                selectedClassId = newClassRef.id;
+                const newClassId = await createTeacherClass(db, bookAuthorUid, className);
+                selectedClassId = newClassId;
                 closeAddClassModal();
                 await loadTeacherClassStudents({ keepSelection: true });
                 renderClassList();
@@ -2755,8 +2768,7 @@
                 return;
             }
             try {
-                const classRef = doc(db, 'classes', bookAuthorUid, 'classrooms', selectedClassId);
-                await updateDoc(classRef, { students: arrayUnion(...selected) });
+                await addStudentsToTeacherClass(db, bookAuthorUid, selected);
                 showNotification('학생이 학급에 추가되었습니다.');
             } catch (error) {
                 console.error('Failed to add students to class:', error);
