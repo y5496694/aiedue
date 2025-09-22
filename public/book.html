@@ -25,9 +25,12 @@
         .tts-word { cursor: pointer; transition: color 0.2s; }
         .tts-word:hover { color: #3b82f6; }
         .character-image-box { position: relative; overflow: hidden; }
-        .image-regen-btn { position: absolute; top: 0.5rem; right: 0.5rem; background-color: rgba(17, 24, 39, 0.85); color: white; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 9999px; display: none; z-index: 5; }
-        .image-regen-btn:hover { background-color: rgba(37, 99, 235, 0.9); }
-        .image-regen-btn.visible { display: inline-flex; align-items: center; justify-content: center; gap: 0.25rem; }
+        .image-action-btn { position: absolute; top: 0.5rem; right: 0.5rem; background-color: rgba(17, 24, 39, 0.85); color: white; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 9999px; display: none; z-index: 5; }
+        .image-action-btn:hover { background-color: rgba(37, 99, 235, 0.9); }
+        .image-action-btn.visible { display: inline-flex; align-items: center; justify-content: center; gap: 0.25rem; }
+        .image-generate-btn { background-color: rgba(16, 185, 129, 0.9); }
+        .image-generate-btn:hover { background-color: rgba(5, 150, 105, 0.95); }
+        .image-regen-btn { background-color: rgba(17, 24, 39, 0.85); }
         #notification { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background-color: #2c3e50; color: white; padding: 1rem 2rem; border-radius: 8px; z-index: 1000; transition: opacity 0.5s, transform 0.5s; opacity: 0; pointer-events: none; }
         #notification.show { opacity: 1; transform: translate(-50%, 10px); }
         .login-tab.active { border-bottom-color: #F59E0B; color: #F59E0B; }
@@ -146,10 +149,10 @@
                 </div>
                 <div id="viewer-controls" class="flex flex-wrap justify-center items-center gap-2">
                     <button id="generate-images-gpt-btn" onclick="completeManualBookGPT()" class="bg-pink-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-pink-700 disabled:bg-gray-400 disabled:cursor-not-allowed hidden">GPT 사진 만들기/1토큰</button>
-                    <button id="generate-images-btn" onclick="completeManualBook()" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed">그림 생성하기</button>
+                    <button id="generate-images-btn" onclick="completeManualBook()" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed">한번에 그림 생성하기</button>
                     <button id="save-book-btn" onclick="saveBookDraft()" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed">저장하기</button>
                     <button id="save-book-pdf-btn" onclick="downloadBookAsPDF()" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 hidden">PDF 저장</button>
-                    <button id="register-library-btn" onclick="registerToLibrary()" class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed hidden" disabled>책 완성</button>
+                    <button id="register-library-btn" onclick="registerToLibrary()" class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed hidden">책 완성</button>
                     <button id="edit-book-btn" onclick="enableEditMode()" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600 hidden">편집</button>
                 </div>
             </header>
@@ -332,11 +335,25 @@
             }, duration);
         }
 
+        function attachGenerationButton(target, handler) {
+            if (!target || target.querySelector('.image-generate-btn')) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'image-action-btn image-generate-btn';
+            btn.textContent = '그림 생성';
+            btn.addEventListener('click', async (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                await handleGenerateButtonClick(btn, handler);
+            });
+            target.appendChild(btn);
+        }
+
         function attachRegenerateButton(target, handler) {
             if (!target || target.querySelector('.image-regen-btn')) return;
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'image-regen-btn';
+            btn.className = 'image-action-btn image-regen-btn';
             btn.textContent = '재생성';
             btn.addEventListener('click', async (event) => {
                 event.preventDefault();
@@ -344,6 +361,27 @@
                 await handleRegenerateButtonClick(btn, handler);
             });
             target.appendChild(btn);
+        }
+
+        async function handleGenerateButtonClick(btn, handler) {
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '생성중...';
+            try {
+                await handler();
+                showNotification('그림을 생성했습니다.');
+            } catch (error) {
+                if (error?.message) {
+                    showNotification(error.message);
+                } else {
+                    showNotification('그림 생성에 실패했습니다.');
+                }
+                console.error('Generate image failed:', error);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+                updateRegenerateButtonsVisibility();
+            }
         }
 
         async function consumeTokenForImageRegeneration() {
@@ -416,21 +454,24 @@
             const type = spread.dataset.pageType;
             if (type === 'cover') {
                 const coverPage = spread.querySelector('.book-page:last-child');
+                attachGenerationButton(coverPage, () => regenerateCoverImage(spread));
                 attachRegenerateButton(coverPage, () => regenerateCoverImage(spread));
             } else if (type === 'character') {
                 const boxes = spread.querySelectorAll('.character-image-box');
                 boxes.forEach((box) => {
+                    attachGenerationButton(box, () => regenerateCharacterImage(spread, box));
                     attachRegenerateButton(box, () => regenerateCharacterImage(spread, box));
                 });
             } else if (type === 'story') {
                 const imagePage = spread.querySelector('.book-page:first-child');
+                attachGenerationButton(imagePage, () => regenerateStoryImage(spread));
                 attachRegenerateButton(imagePage, () => regenerateStoryImage(spread));
             }
+            updateRegenerateButtonsVisibility();
         }
 
         function setupAllRegenerateButtons() {
             document.querySelectorAll('#book-viewer .book-spread').forEach(setupRegenerateButtonsForSpread);
-            updateRegenerateButtonsVisibility();
         }
 
         function elementHasGeneratedImage(element) {
@@ -442,11 +483,20 @@
         }
 
         function updateRegenerateButtonsVisibility() {
-            const shouldShow = !isViewMode && !bookIsPublic;
+            const canEdit = !isViewMode && !bookIsPublic;
+            document.querySelectorAll('.image-generate-btn').forEach((btn) => {
+                const parent = btn.parentElement;
+                const shouldShow = canEdit && !elementHasGeneratedImage(parent);
+                if (shouldShow) {
+                    btn.classList.add('visible');
+                } else {
+                    btn.classList.remove('visible');
+                }
+            });
             document.querySelectorAll('.image-regen-btn').forEach((btn) => {
                 const parent = btn.parentElement;
-                const canShow = shouldShow && elementHasGeneratedImage(parent);
-                if (canShow) {
+                const shouldShow = canEdit && elementHasGeneratedImage(parent);
+                if (shouldShow) {
                     btn.classList.add('visible');
                 } else {
                     btn.classList.remove('visible');
@@ -1854,7 +1904,7 @@
             const registerBtn = document.getElementById('register-library-btn');
             const savePdfBtn = document.getElementById('save-book-pdf-btn');
             
-            const originalGenerateText = "그림 생성하기";
+            const originalGenerateText = "한번에 그림 생성하기";
 
             generateBtn.textContent = "생성 중...";
             generateBtn.disabled = true;
