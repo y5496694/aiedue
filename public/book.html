@@ -1862,7 +1862,7 @@
             try {
                 // 등장인물 컨텍스트 수집 및 이미지 생성
                 const charSpreads = document.querySelectorAll('.book-spread[data-page-type="character"]');
-                const contextParts = [];
+                const characterContextParts = [];
                 for (const charSpread of charSpreads) {
                     const charImageBoxes = charSpread.querySelectorAll('.character-image-box');
                     const prompts = [charSpread.dataset.promptLeft, charSpread.dataset.promptRight];
@@ -1879,7 +1879,7 @@
                             }
                         }
                         if (prompt) {
-                            contextParts.push(prompt);
+                            characterContextParts.push(prompt);
                             const charPrompt = `${prompt}, 동일한 파스텔 색감과 몽환적인 분위기를 지닌 단일 캐릭터 장면`;
                             const charImage = await generateImageForParagraph(charPrompt, '');
                             charImageBoxes[i].style.backgroundImage = `url('${charImage}')`;
@@ -1888,7 +1888,7 @@
                     }
                     setupRegenerateButtonsForSpread(charSpread);
                 }
-                const characterContext = contextParts.join('\n');
+                const characterContext = characterContextParts.join('\n');
 
                 // 표지 이미지 생성
                 const coverSpread = document.querySelector('#spread-0');
@@ -1978,7 +1978,7 @@
 
                 // 등장인물 컨텍스트 수집 및 이미지 생성
                 const charSpreads = document.querySelectorAll('.book-spread[data-page-type="character"]');
-                const contextParts = [];
+                const characterContextParts = [];
                 for (const charSpread of charSpreads) {
                     const charImageBoxes = charSpread.querySelectorAll('.character-image-box');
                     const prompts = [charSpread.dataset.promptLeft, charSpread.dataset.promptRight];
@@ -1995,7 +1995,7 @@
                             }
                         }
                         if (prompt) {
-                            contextParts.push(prompt);
+                            characterContextParts.push(prompt);
                             const charPrompt = `${prompt}, 동일한 파스텔 색감과 몽환적인 분위기를 지닌 단일 캐릭터 장면`;
                             const charImage = await generateImageForParagraphGPT(charPrompt, '');
                             charImageBoxes[i].style.backgroundImage = `url('${charImage}')`;
@@ -2004,7 +2004,7 @@
                     }
                     setupRegenerateButtonsForSpread(charSpread);
                 }
-                const characterContext = contextParts.join('\n');
+                const characterContext = characterContextParts.join('\n');
 
                 // 표지 이미지 생성
                 const coverSpread = document.querySelector('#spread-0');
