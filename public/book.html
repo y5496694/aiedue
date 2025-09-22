@@ -191,14 +191,34 @@
 
     <!-- 내 학급 팝업 -->
     <div id="my-class-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
-        <div class="bg-white p-6 rounded-lg shadow-lg w-80">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-lg">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-lg font-semibold">내 학급</h2>
                 <button id="close-my-class-modal" class="text-xl">&times;</button>
             </div>
-            <ul id="my-class-student-list" class="space-y-1 max-h-60 overflow-y-auto mb-4"></ul>
-            <div class="text-right">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">학급 선택</label>
+                <div id="my-class-list" class="flex flex-wrap gap-2"></div>
+            </div>
+            <ul id="my-class-student-list" class="space-y-1 max-h-60 overflow-y-auto mb-4 border rounded p-2 bg-gray-50"></ul>
+            <div class="flex justify-between items-center">
+                <button id="add-class-btn" class="px-3 py-1 rounded bg-green-500 text-white">학급 추가</button>
                 <button id="add-my-class-student-btn" class="px-3 py-1 rounded bg-blue-500 text-white">학생 추가</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 학급 추가 팝업 -->
+    <div id="add-class-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-80">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold">학급 추가</h2>
+                <button id="close-add-class-modal" class="text-xl">&times;</button>
+            </div>
+            <input type="text" id="new-class-name" class="w-full p-2 border border-gray-300 rounded mb-4" placeholder="학급 이름을 입력하세요" />
+            <div class="flex justify-end gap-2">
+                <button id="cancel-add-class-btn" class="px-3 py-1 rounded bg-gray-300">취소</button>
+                <button id="confirm-add-class-btn" class="px-3 py-1 rounded bg-green-500 text-white">완료</button>
             </div>
         </div>
     </div>
@@ -207,7 +227,7 @@
     <div id="class-add-students-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
         <div class="bg-white p-6 rounded-lg shadow-lg w-96">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-semibold">학생 추가</h2>
+                <h2 class="text-lg font-semibold flex items-center gap-2">학생 추가 <span id="class-add-students-class-name" class="text-sm text-gray-500"></span></h2>
                 <button id="close-class-add-students-btn" class="text-xl">&times;</button>
             </div>
             <div class="mb-2">
@@ -272,6 +292,8 @@
         let storage;
         let userTokens = 0;
         let currentClassStudents = [];
+        let teacherClasses = [];
+        let selectedClassId = null;
         let isViewMode = false;
         let canEditBook = false;
         let bookIsPublic = false;
@@ -1150,20 +1172,49 @@
             return data;
         }
 
-        async function loadTeacherClassStudents() {
+        async function loadTeacherClassStudents({ keepSelection = false, skipLibraryRender = false } = {}) {
             if (!bookAuthorUid) {
+                teacherClasses = [];
                 currentClassStudents = [];
-                renderLibraryBooks();
+                if (!skipLibraryRender) renderLibraryBooks();
                 return;
             }
             try {
-                const classDoc = await getDoc(doc(db, 'classes', bookAuthorUid));
-                currentClassStudents = classDoc.exists() ? (classDoc.data().students || []) : [];
-                renderLibraryBooks();
+                const classCollectionRef = collection(db, 'classes', bookAuthorUid, 'classrooms');
+                const snapshot = await getDocs(classCollectionRef);
+                teacherClasses = snapshot.docs.map(docSnap => {
+                    const data = docSnap.data() || {};
+                    return {
+                        id: docSnap.id,
+                        name: data.name || '이름 없는 학급',
+                        students: Array.isArray(data.students) ? data.students : [],
+                        createdAt: data.createdAt || null
+                    };
+                }).sort((a, b) => {
+                    const aTime = a.createdAt?.seconds ?? a.createdAt?.toMillis?.() ?? 0;
+                    const bTime = b.createdAt?.seconds ?? b.createdAt?.toMillis?.() ?? 0;
+                    return aTime - bTime;
+                });
+
+                if (!keepSelection || !teacherClasses.some(cls => cls.id === selectedClassId)) {
+                    selectedClassId = teacherClasses[0]?.id || null;
+                }
+
+                const unionSet = new Set();
+                teacherClasses.forEach(cls => {
+                    (cls.students || []).forEach(id => unionSet.add(id));
+                });
+                currentClassStudents = Array.from(unionSet);
+
+                if (!skipLibraryRender) {
+                    renderLibraryBooks();
+                    updateLibraryTeacherControls();
+                }
             } catch (error) {
                 console.error('Failed to load class students:', error);
+                teacherClasses = [];
                 currentClassStudents = [];
-                renderLibraryBooks();
+                if (!skipLibraryRender) renderLibraryBooks();
             }
         }
 
@@ -2483,10 +2534,19 @@
         const myClassBtn = document.getElementById('my-class-btn');
         const myClassModal = document.getElementById('my-class-modal');
         const myClassStudentList = document.getElementById('my-class-student-list');
+        const myClassList = document.getElementById('my-class-list');
+        const addClassBtn = document.getElementById('add-class-btn');
         const addMyClassStudentBtn = document.getElementById('add-my-class-student-btn');
         const closeMyClassModalBtn = document.getElementById('close-my-class-modal');
 
+        const addClassModal = document.getElementById('add-class-modal');
+        const closeAddClassModalBtn = document.getElementById('close-add-class-modal');
+        const cancelAddClassBtn = document.getElementById('cancel-add-class-btn');
+        const confirmAddClassBtn = document.getElementById('confirm-add-class-btn');
+        const newClassNameInput = document.getElementById('new-class-name');
+
         const classAddStudentsModal = document.getElementById('class-add-students-modal');
+        const classAddStudentsClassName = document.getElementById('class-add-students-class-name');
         const classStudentList = document.getElementById('class-student-list');
         const classStudentSearch = document.getElementById('class-student-search');
         const classAddStudentsConfirmBtn = document.getElementById('class-add-students-confirm-btn');
@@ -2503,10 +2563,22 @@
         const closeTokenModalBtn = document.getElementById('close-token-modal');
 
         myClassBtn.addEventListener('click', openMyClassModal);
-        closeMyClassModalBtn.addEventListener('click', () => myClassModal.classList.add('hidden'));
-        addMyClassStudentBtn.addEventListener('click', openAddStudentsModal);
-        closeClassAddStudentsBtn.addEventListener('click', () => classAddStudentsModal.classList.add('hidden'));
-        classAddStudentsConfirmBtn.addEventListener('click', confirmAddStudents);
+        closeMyClassModalBtn.addEventListener('click', () => {
+            myClassModal.classList.add('hidden');
+            closeAddClassModal();
+            classAddStudentsModal.classList.add('hidden');
+            if (classAddStudentsClassName) classAddStudentsClassName.textContent = '';
+        });
+        if (addClassBtn) addClassBtn.addEventListener('click', openAddClassModal);
+        if (closeAddClassModalBtn) closeAddClassModalBtn.addEventListener('click', closeAddClassModal);
+        if (cancelAddClassBtn) cancelAddClassBtn.addEventListener('click', closeAddClassModal);
+        if (confirmAddClassBtn) confirmAddClassBtn.addEventListener('click', confirmAddClass);
+        if (addMyClassStudentBtn) addMyClassStudentBtn.addEventListener('click', openAddStudentsModal);
+        if (closeClassAddStudentsBtn) closeClassAddStudentsBtn.addEventListener('click', () => {
+            classAddStudentsModal.classList.add('hidden');
+            if (classAddStudentsClassName) classAddStudentsClassName.textContent = '';
+        });
+        if (classAddStudentsConfirmBtn) classAddStudentsConfirmBtn.addEventListener('click', confirmAddStudents);
 
         tokenGiveBtn.addEventListener('click', () => openTokenModal());
         closeTokenModalBtn.addEventListener('click', () => tokenModal.classList.add('hidden'));
@@ -2518,29 +2590,78 @@
         async function openMyClassModal() {
             myClassModal.classList.remove('hidden');
             myClassStudentList.innerHTML = '로딩 중...';
+            await loadTeacherClassStudents({ keepSelection: true, skipLibraryRender: true });
+            renderClassList();
+            await renderSelectedClassStudents();
+        }
+
+        function renderClassList() {
+            if (!myClassList) return;
+            myClassList.innerHTML = '';
+            if (!teacherClasses.length) {
+                const emptyEl = document.createElement('div');
+                emptyEl.className = 'text-sm text-gray-500';
+                emptyEl.textContent = '생성된 학급이 없습니다. 학급을 추가해 주세요.';
+                myClassList.appendChild(emptyEl);
+                setAddStudentButtonState(false);
+                return;
+            }
+
+            teacherClasses.forEach(cls => {
+                const btn = document.createElement('button');
+                const isSelected = cls.id === selectedClassId;
+                btn.className = `px-3 py-1 rounded-full border text-sm ${isSelected ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}`;
+                btn.textContent = cls.name || '이름 없는 학급';
+                btn.addEventListener('click', async () => {
+                    selectedClassId = cls.id;
+                    renderClassList();
+                    await renderSelectedClassStudents();
+                });
+                myClassList.appendChild(btn);
+            });
+
+            setAddStudentButtonState(Boolean(selectedClassId));
+        }
+
+        function setAddStudentButtonState(enabled) {
+            if (!addMyClassStudentBtn) return;
+            addMyClassStudentBtn.disabled = !enabled;
+            addMyClassStudentBtn.classList.toggle('opacity-50', !enabled);
+            addMyClassStudentBtn.classList.toggle('cursor-not-allowed', !enabled);
+        }
+
+        async function renderSelectedClassStudents() {
+            if (!selectedClassId) {
+                myClassStudentList.innerHTML = '<li class="text-sm text-gray-500">학급을 먼저 선택하세요.</li>';
+                setAddStudentButtonState(false);
+                return;
+            }
+            setAddStudentButtonState(true);
+            myClassStudentList.innerHTML = '로딩 중...';
+            const selectedClass = teacherClasses.find(cls => cls.id === selectedClassId);
+            if (!selectedClass) {
+                myClassStudentList.innerHTML = '<li class="text-sm text-gray-500">학급 정보를 찾을 수 없습니다.</li>';
+                return;
+            }
+            const students = Array.isArray(selectedClass.students) ? selectedClass.students : [];
+            if (students.length === 0) {
+                myClassStudentList.innerHTML = '<li class="text-sm text-gray-500">학생 없음</li>';
+                return;
+            }
             try {
-                const classDoc = await getDoc(doc(db, 'classes', bookAuthorUid));
-                if (!classDoc.exists()) {
-                    myClassStudentList.innerHTML = '<li class="text-sm text-gray-500">학급이 없습니다.</li>';
-                    currentClassStudents = [];
-                    renderLibraryBooks();
-                    updateLibraryTeacherControls();
-                    return;
-                }
-                currentClassStudents = classDoc.data().students || [];
-                renderLibraryBooks();
-                updateLibraryTeacherControls();
-                let html = '';
-                for (const sid of currentClassStudents) {
+                const studentItems = await Promise.all(students.map(async (sid) => {
                     try {
                         const sdoc = await getDoc(doc(db, 'users', sid));
-                        if (sdoc.exists()) {
-                            const sdata = sdoc.data();
-                            html += `<li class="flex justify-between items-center py-1 border-b border-dotted border-gray-300 last:border-b-0"><span>${sdata.name} (코드: ${sdata.userCode})</span><button class="give-token-btn bg-purple-500 text-white px-2 py-1 rounded text-xs" data-uid="${sdoc.id}">토큰 지급</button></li>`;
-                        }
-                    } catch (_) {}
-                }
-                myClassStudentList.innerHTML = html || '<li class="text-sm text-gray-500">학생 없음</li>';
+                        if (!sdoc.exists()) return null;
+                        const sdata = sdoc.data();
+                        return `<li class="flex justify-between items-center py-1 border-b border-dotted border-gray-300 last:border-b-0"><span>${sdata.name} (코드: ${sdata.userCode})</span><button class="give-token-btn bg-purple-500 text-white px-2 py-1 rounded text-xs" data-uid="${sdoc.id}">토큰 지급</button></li>`;
+                    } catch (error) {
+                        console.error('Failed to load student info:', error);
+                        return null;
+                    }
+                }));
+                const html = studentItems.filter(Boolean).join('');
+                myClassStudentList.innerHTML = html || '<li class="text-sm text-gray-500">학생 정보를 불러올 수 없습니다.</li>';
                 myClassStudentList.querySelectorAll('.give-token-btn').forEach(btn => {
                     btn.addEventListener('click', () => openTokenModal([btn.dataset.uid]));
                 });
@@ -2549,14 +2670,67 @@
             }
         }
 
+        function openAddClassModal() {
+            if (!bookAuthorUid) { showNotification('로그인 후 이용해주세요.'); return; }
+            if (!addClassModal) return;
+            newClassNameInput.value = '';
+            addClassModal.classList.remove('hidden');
+            setTimeout(() => newClassNameInput.focus(), 0);
+        }
+
+        function closeAddClassModal() {
+            if (!addClassModal) return;
+            addClassModal.classList.add('hidden');
+            newClassNameInput.value = '';
+        }
+
+        async function confirmAddClass() {
+            if (!bookAuthorUid) { showNotification('로그인 후 이용해주세요.'); return; }
+            const className = newClassNameInput.value.trim();
+            if (!className) { showNotification('학급 이름을 입력하세요.'); return; }
+            const originalText = confirmAddClassBtn.textContent;
+            confirmAddClassBtn.disabled = true;
+            confirmAddClassBtn.textContent = '생성 중...';
+            try {
+                const classCollectionRef = collection(db, 'classes', bookAuthorUid, 'classrooms');
+                const newClassRef = doc(classCollectionRef);
+                await setDoc(newClassRef, {
+                    name: className,
+                    students: [],
+                    createdAt: serverTimestamp()
+                });
+                selectedClassId = newClassRef.id;
+                closeAddClassModal();
+                await loadTeacherClassStudents({ keepSelection: true });
+                renderClassList();
+                await renderSelectedClassStudents();
+                showNotification('새 학급이 추가되었습니다.');
+            } catch (error) {
+                console.error('Failed to add class:', error);
+                showNotification(`학급 추가 실패: ${error.message}`);
+            } finally {
+                confirmAddClassBtn.disabled = false;
+                confirmAddClassBtn.textContent = originalText;
+            }
+        }
+
         async function openAddStudentsModal() {
+            if (!selectedClassId) { showNotification('학급을 먼저 선택하세요.'); return; }
+            await loadTeacherClassStudents({ keepSelection: true, skipLibraryRender: true });
+            renderClassList();
+            const selectedClass = teacherClasses.find(cls => cls.id === selectedClassId);
+            if (!selectedClass) { showNotification('선택한 학급 정보를 찾을 수 없습니다.'); return; }
+            if (classAddStudentsClassName) {
+                classAddStudentsClassName.textContent = selectedClass.name ? `(${selectedClass.name})` : '';
+            }
             classAddStudentsModal.classList.remove('hidden');
             classStudentList.innerHTML = '학생 목록 로딩 중...';
             try {
                 const usersSnapshot = await getDocs(query(collection(db, 'users'), where('role', '==', 'student')));
+                const existingStudents = Array.isArray(selectedClass.students) ? selectedClass.students : [];
                 classStudentList.innerHTML = usersSnapshot.docs.map(d => {
                     const s = { id: d.id, ...d.data() };
-                    const checked = currentClassStudents.includes(s.id) ? 'checked disabled' : '';
+                    const checked = existingStudents.includes(s.id) ? 'checked disabled' : '';
                     return `<label class="flex items-center space-x-2 p-1"><input type="checkbox" data-studentid="${s.id}" ${checked}><span>${s.name} (코드: ${s.userCode})</span></label>`;
                 }).join('');
             } catch (err) {
@@ -2572,14 +2746,27 @@
         }
 
         async function confirmAddStudents() {
+            if (!selectedClassId) { showNotification('학급을 먼저 선택하세요.'); return; }
+            const selectedClass = teacherClasses.find(cls => cls.id === selectedClassId);
+            if (!selectedClass) { showNotification('선택한 학급 정보를 찾을 수 없습니다.'); return; }
             const selected = Array.from(document.querySelectorAll('#class-student-list input:checked:not(:disabled)')).map(i => i.dataset.studentid);
-            if (selected.length > 0) {
-                try {
-                    await updateDoc(doc(db, 'classes', bookAuthorUid), { students: arrayUnion(...selected) });
-                } catch (_) {}
+            if (selected.length === 0) {
+                showNotification('추가할 학생을 선택하세요.');
+                return;
+            }
+            try {
+                const classRef = doc(db, 'classes', bookAuthorUid, 'classrooms', selectedClassId);
+                await updateDoc(classRef, { students: arrayUnion(...selected) });
+                showNotification('학생이 학급에 추가되었습니다.');
+            } catch (error) {
+                console.error('Failed to add students to class:', error);
+                showNotification(`학생 추가 실패: ${error.message}`);
             }
             classAddStudentsModal.classList.add('hidden');
-            openMyClassModal();
+            if (classAddStudentsClassName) classAddStudentsClassName.textContent = '';
+            await loadTeacherClassStudents({ keepSelection: true });
+            renderClassList();
+            await renderSelectedClassStudents();
         }
 
         async function openTokenModal(targetUserIds = null) {
@@ -2590,12 +2777,12 @@
             tokenUserSearch.classList.toggle('hidden', restrict);
             tokenSelectClass.checked = false;
             try {
-                const classDoc = await getDoc(doc(db, 'classes', bookAuthorUid));
-                currentClassStudents = classDoc.exists() ? (classDoc.data().students || []) : [];
+                await loadTeacherClassStudents({ keepSelection: true, skipLibraryRender: true });
+                const classStudentIds = currentClassStudents || [];
                 const usersSnap = await getDocs(collection(db, 'users'));
                 tokenUserList.innerHTML = usersSnap.docs.map(d => {
                     const u = { id: d.id, ...d.data() };
-                    const inClass = currentClassStudents.includes(u.id) ? '1' : '0';
+                    const inClass = classStudentIds.includes(u.id) ? '1' : '0';
                     const checked = restrict && targetUserIds.includes(u.id) ? 'checked' : '';
                     const display = !restrict || targetUserIds.includes(u.id) ? 'flex' : 'none';
                     const code = u.userCode || '';
@@ -2686,6 +2873,8 @@
                 window.currentUserRole = 'student';
                 bookAuthorUid = null;
                 currentClassStudents = [];
+                teacherClasses = [];
+                selectedClassId = null;
                 libraryShowClassOnly = false;
                 if (libraryControls) libraryControls.classList.add('hidden');
                 if (librarySearchInput) librarySearchInput.value = '';
