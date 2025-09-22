@@ -1213,6 +1213,8 @@
         const MAX_HISTORY_LENGTH = 200;
         let currentProblemSet = null; // For AI problem creation
         let currentAssignmentId = null; // For student homework completion
+        let currentAssignmentData = null; // Current assignment metadata
+        let currentAssignmentProblem = null; // Problem definition for current assignment
         let currentAssignmentItemId = null; // For teacher assignment (homework or life rule)
         let showOnlyMyClassReadingLogs = false; // Toggle for reading log filter
         let myClassStudentIds = [];
@@ -1297,9 +1299,53 @@
             return `${datePart} ${timePart}`.trim();
         };
         const LEVEL_UP_EXP = 100;
-        const HOMEWORK_EXP_REWARD = 5;
-        const HOMEWORK_COIN_REWARD = 5;
+        const HOMEWORK_EXP_PER_PROBLEM = 5;
         const formatCoinsPlain = (amount) => formatCurrency(amount).replace(/\s?원$/, '원');
+
+        function getHomeworkProblemCount(assignmentData = {}, problemData = {}) {
+            const assignmentProblems = Array.isArray(assignmentData.problems) ? assignmentData.problems.length : 0;
+            if (assignmentProblems > 0) {
+                return assignmentProblems;
+            }
+
+            const problemProblems = Array.isArray(problemData.problems) ? problemData.problems.length : 0;
+            if (problemProblems > 0) {
+                return problemProblems;
+            }
+
+            if (problemData.type === 'manual' && Array.isArray(problemData.items)) {
+                const manualCount = problemData.items.filter(item => ['question', 'aiQuestion', 'questionNoAnswer'].includes(item.type)).length;
+                if (manualCount > 0) {
+                    return manualCount;
+                }
+            }
+
+            if (problemData.type === 'readingJournal' && Array.isArray(problemData.questions)) {
+                return problemData.questions.length;
+            }
+            if (assignmentData.type === 'readingJournal' && Array.isArray(assignmentData.questions)) {
+                return assignmentData.questions.length;
+            }
+
+            const countSources = [assignmentData.count, problemData.count].map(value => {
+                const num = Number(value);
+                return Number.isFinite(num) ? Math.max(0, Math.floor(num)) : 0;
+            }).filter(count => count > 0);
+            if (countSources.length > 0) {
+                return countSources[0];
+            }
+
+            return 0;
+        }
+
+        function calculateHomeworkRewards(assignmentData = {}, problemData = {}) {
+            const problemCount = getHomeworkProblemCount(assignmentData, problemData);
+            const expReward = problemCount * HOMEWORK_EXP_PER_PROBLEM;
+            const rawCoins = assignmentData.reward ?? problemData.reward ?? 0;
+            const coinsNumber = Number(rawCoins);
+            const coinReward = Number.isFinite(coinsNumber) ? Math.max(0, Math.floor(coinsNumber)) : 0;
+            return { exp: expReward, coins: coinReward };
+        }
 
         function getExperienceState(user) {
             const rawLevel = Number(user?.aeduLevel);
@@ -2817,10 +2863,29 @@
 
             document.querySelectorAll('.force-complete-hw-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                 const hwId = e.target.dataset.hwid;
-                await updateDoc(doc(db, `users/${studentToAdjustId}/assignedHomework`, hwId), { status: 'completed' });
-                await awardExperience(studentToAdjustId, HOMEWORK_EXP_REWARD, { coins: HOMEWORK_COIN_REWARD });
-                await refreshUserData(studentToAdjustId);
-                openAdjustModal(studentToAdjustId); // Refresh modal
+                try {
+                    const assignmentRef = doc(db, `users/${studentToAdjustId}/assignedHomework`, hwId);
+                    const assignmentSnap = await getDoc(assignmentRef);
+                    if (!assignmentSnap.exists()) {
+                        showModal('오류', '숙제 정보를 찾을 수 없습니다.');
+                        return;
+                    }
+                    const assignmentData = assignmentSnap.data();
+                    await updateDoc(assignmentRef, { status: 'completed' });
+                    let problemData = null;
+                    if (assignmentData.problemId) {
+                        const problemSnap = await getDoc(doc(db, 'learningProblems', assignmentData.problemId));
+                        if (problemSnap.exists()) {
+                            problemData = problemSnap.data();
+                        }
+                    }
+                    const { exp, coins } = calculateHomeworkRewards(assignmentData, problemData);
+                    await awardExperience(studentToAdjustId, exp, { coins });
+                    await refreshUserData(studentToAdjustId);
+                    openAdjustModal(studentToAdjustId); // Refresh modal
+                } catch (error) {
+                    showModal('오류', `숙제 완료 처리 중 문제가 발생했습니다: ${error.message}`);
+                }
             }));
 
             document.querySelectorAll('.delete-hw-btn').forEach(btn => btn.addEventListener('click', async (e) => {
@@ -4349,6 +4414,9 @@
             const assignmentData = assignmentDoc.data();
             const isCompleted = assignmentData.status === 'completed';
 
+            currentAssignmentData = { ...assignmentData };
+            currentAssignmentProblem = problemSet ? { ...problemSet } : null;
+
             document.getElementById('homework-modal-title').textContent = problemSet.title;
             const initialView = document.getElementById('homework-initial-view');
             const mainView = document.getElementById('homework-main-view');
@@ -4467,11 +4535,14 @@
                       studentAnswers: studentAnswers,
                       completedAt: serverTimestamp()
                   });
-                const rewardResult = await awardExperience(currentUserData.id, HOMEWORK_EXP_REWARD, { coins: HOMEWORK_COIN_REWARD });
+                const { exp, coins } = calculateHomeworkRewards(currentAssignmentData, currentAssignmentProblem);
+                const rewardResult = await awardExperience(currentUserData.id, exp, { coins });
                 await refreshUserData(currentUserData.id);
 
                 homeworkModal.style.display = 'none';
-                showModal('숙제 완료!', buildRewardMessage(HOMEWORK_EXP_REWARD, HOMEWORK_COIN_REWARD, rewardResult));
+                showModal('숙제 완료!', buildRewardMessage(exp, coins, rewardResult));
+                currentAssignmentData = null;
+                currentAssignmentProblem = null;
                 renderHomework();
 
             } catch (error) {
@@ -4499,6 +4570,7 @@
             }
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
             await updateDoc(assignmentRef, { problems: result.problems });
+            currentAssignmentData = { ...(currentAssignmentData || {}), problems: result.problems };
             renderHomeworkQuestions(result.problems, [], false);
         });
 
@@ -4961,6 +5033,20 @@
                 return;
             }
             const assignmentData = assignmentDoc.data();
+            const problemRef = problemId ? doc(db, "learningProblems", problemId) : null;
+            let problemData = null;
+            if (problemRef) {
+                const problemDoc = await getDoc(problemRef);
+                if (problemDoc.exists()) {
+                    problemData = problemDoc.data();
+                } else if (!assignmentData.problems || !Array.isArray(assignmentData.problems)) {
+                    showModal('오류', '받아쓰기 문제를 불러올 수 없습니다.');
+                    return;
+                }
+            }
+
+            currentAssignmentData = { ...assignmentData };
+            currentAssignmentProblem = problemData ? { ...problemData } : null;
             const isCompleted = assignmentData.status === 'completed';
 
             document.getElementById('dictation-modal-title').textContent = assignmentData.title;
@@ -4983,20 +5069,16 @@
                     document.getElementById('dictation-initial-view').style.display = 'none';
                     document.getElementById('dictation-main-view').style.display = 'block';
                     document.getElementById('dictation-footer').style.display = 'flex';
-                    const problemDoc = await getDoc(doc(db, "learningProblems", problemId));
-                    if (problemDoc.exists()) {
-                         currentDictationTemplate = problemDoc.data();
-                    }
+                    currentDictationTemplate = problemData ? { ...problemData } : currentDictationTemplate;
                     renderDictationQuestions(assignmentData.problems, [], false);
                 } else {
                     // First time opening this assignment. Show topic input.
-                    const problemDoc = await getDoc(doc(db, "learningProblems", problemId));
-                    if (!problemDoc.exists()) {
+                    if (!problemData) {
                         showModal('오류', '받아쓰기 문제를 불러올 수 없습니다.');
                         return;
                     }
-                    currentDictationTemplate = problemDoc.data();
-                    
+                    currentDictationTemplate = { ...problemData };
+
                     document.getElementById('dictation-initial-view').style.display = 'block';
                     document.getElementById('dictation-main-view').style.display = 'none';
                     document.getElementById('dictation-student-topic').value = '';
@@ -5044,8 +5126,9 @@
                 // Save generated questions to the assignment document immediately
                 const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
                 await updateDoc(assignmentRef, {
-                    problems: generatedData.items 
+                    problems: generatedData.items
                 });
+                currentAssignmentData = { ...(currentAssignmentData || {}), problems: generatedData.items };
 
                 renderDictationQuestions(generatedData.items, [], false);
 
@@ -5106,11 +5189,14 @@
                       studentAnswers: studentAnswers,
                       completedAt: serverTimestamp()
                   });
-                const rewardResult = await awardExperience(currentUserData.id, HOMEWORK_EXP_REWARD, { coins: HOMEWORK_COIN_REWARD });
+                const { exp, coins } = calculateHomeworkRewards(currentAssignmentData, currentAssignmentProblem);
+                const rewardResult = await awardExperience(currentUserData.id, exp, { coins });
                 await refreshUserData(currentUserData.id);
 
                 dictationModal.style.display = 'none';
-                showModal('숙제 완료!', buildRewardMessage(HOMEWORK_EXP_REWARD, HOMEWORK_COIN_REWARD, rewardResult));
+                showModal('숙제 완료!', buildRewardMessage(exp, coins, rewardResult));
+                currentAssignmentData = null;
+                currentAssignmentProblem = null;
                 renderHomework();
             } catch (error) {
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
@@ -5212,6 +5298,8 @@
             }
             const assignmentData = assignmentDoc.data();
             const problem = problemDoc.data();
+            currentAssignmentData = { ...assignmentData };
+            currentAssignmentProblem = problem ? { ...problem } : null;
             const isCompleted = assignmentData.status === 'completed';
             document.getElementById('manual-problem-modal-title').textContent = problem.title;
             const modalContent = document.getElementById('manual-problem-modal-content');
@@ -5319,10 +5407,13 @@
             }
             try {
                 await updateDoc(assignmentRef, { status: 'completed', studentAnswers: [...inputAnswers, answer], completedAt: serverTimestamp() });
-                const rewardResult = await awardExperience(currentUserData.id, HOMEWORK_EXP_REWARD, { coins: HOMEWORK_COIN_REWARD });
+                const { exp, coins } = calculateHomeworkRewards(currentAssignmentData, currentAssignmentProblem);
+                const rewardResult = await awardExperience(currentUserData.id, exp, { coins });
                 await refreshUserData(currentUserData.id);
                 manualProblemModal.style.display = 'none';
-                showModal('숙제 완료!', buildRewardMessage(HOMEWORK_EXP_REWARD, HOMEWORK_COIN_REWARD, rewardResult));
+                showModal('숙제 완료!', buildRewardMessage(exp, coins, rewardResult));
+                currentAssignmentData = null;
+                currentAssignmentProblem = null;
                 renderHomework();
             } catch (error) {
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
@@ -5719,6 +5810,8 @@
             }
             const assignmentData = assignmentDoc.data();
             currentWordChainProblem = problemDoc.data();
+            currentAssignmentData = { ...assignmentData };
+            currentAssignmentProblem = currentWordChainProblem ? { ...currentWordChainProblem } : null;
             const isCompleted = assignmentData.status === 'completed';
             document.getElementById('wordchain-homework-title').textContent = currentWordChainProblem.title;
 
@@ -5817,10 +5910,13 @@
                     studentAnswers: answers,
                     completedAt: serverTimestamp()
                 });
-                const rewardResult = await awardExperience(currentUserData.id, HOMEWORK_EXP_REWARD, { coins: HOMEWORK_COIN_REWARD });
+                const { exp, coins } = calculateHomeworkRewards(currentAssignmentData, currentAssignmentProblem);
+                const rewardResult = await awardExperience(currentUserData.id, exp, { coins });
                 await refreshUserData(currentUserData.id);
                 wordchainHomeworkModal.style.display = 'none';
-                showModal('숙제 완료!', buildRewardMessage(HOMEWORK_EXP_REWARD, HOMEWORK_COIN_REWARD, rewardResult));
+                showModal('숙제 완료!', buildRewardMessage(exp, coins, rewardResult));
+                currentAssignmentData = null;
+                currentAssignmentProblem = null;
                 renderHomework();
             } catch (error) {
                 showModal('오류', `숙제 완료 처리 중 오류가 발생했습니다: ${error.message}`);
@@ -5833,6 +5929,7 @@
             const words = startWords.map(w => ({ start: w }));
             const assignmentRef = doc(db, `users/${currentUserData.id}/assignedHomework`, currentAssignmentId);
             await updateDoc(assignmentRef, { problems: words });
+            currentAssignmentData = { ...(currentAssignmentData || {}), problems: words };
             renderWordChainHomework(words, [], false);
             wordchainInitialView.style.display = 'none';
             wordchainMainView.style.display = 'block';
@@ -5915,6 +6012,8 @@
             }
             const assignmentData = assignmentDoc.data();
             const problem = problemDoc.data();
+            currentAssignmentData = { ...assignmentData };
+            currentAssignmentProblem = problem ? { ...problem } : null;
             document.getElementById('reading-journal-modal-title').textContent = assignmentData.title;
             const content = document.getElementById('reading-journal-content');
             content.innerHTML = '';
@@ -5951,10 +6050,13 @@
                     answers,
                     createdAt: serverTimestamp()
                 });
-                const rewardResult = await awardExperience(currentUserData.id, HOMEWORK_EXP_REWARD, { coins: HOMEWORK_COIN_REWARD });
+                const { exp, coins } = calculateHomeworkRewards(currentAssignmentData, currentAssignmentProblem);
+                const rewardResult = await awardExperience(currentUserData.id, exp, { coins });
                 await refreshUserData(currentUserData.id);
                 readingJournalModal.style.display = 'none';
-                showModal('숙제 완료!', buildRewardMessage(HOMEWORK_EXP_REWARD, HOMEWORK_COIN_REWARD, rewardResult));
+                showModal('숙제 완료!', buildRewardMessage(exp, coins, rewardResult));
+                currentAssignmentData = null;
+                currentAssignmentProblem = null;
                 renderHomework();
                 renderReadingLog();
             } catch (error) {
