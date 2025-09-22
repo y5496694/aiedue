@@ -276,9 +276,11 @@
         let libraryShowClassOnly = false;
         // 로그인한 사용자 이름을 저장하고 책의 저자 영역을 동기화합니다.
         window.authorName = '';
+        window.bookAuthorName = '';
         window.currentUserRole = 'student';
         window.syncBookAuthor = function() {
-            document.querySelectorAll('.book-author-sync').forEach(el => el.textContent = window.authorName);
+            const authorText = window.bookAuthorName || window.authorName || '';
+            document.querySelectorAll('.book-author-sync').forEach(el => el.textContent = authorText);
         };
 
         // TTS 함수
@@ -814,7 +816,7 @@
             document.querySelectorAll('.book-title-sync').forEach(el => {
                 el.textContent = data.title || '';
             });
-            window.authorName = data.author || window.authorName;
+            window.bookAuthorName = data.author || window.bookAuthorName || window.authorName || '';
             window.syncBookAuthor();
 
             if (data.coverImage) {
@@ -899,6 +901,9 @@
                 data = userDoc.data() || {};
             }
             window.authorName = data.name || '';
+            if (!window.bookAuthorName) {
+                window.bookAuthorName = window.authorName;
+            }
             userTokens = Number(data.aeduTokens) || 0;
             window.currentUserRole = data.role || 'student';
             document.getElementById('display-user-name').textContent = window.authorName;
@@ -1312,7 +1317,7 @@
             try {
                 const data = {
                     title: document.querySelector('#spread-0 .book-title-sync')?.textContent.trim() || '',
-                    author: window.authorName || '',
+                    author: window.bookAuthorName || window.authorName || '',
                     updatedAt: serverTimestamp(),
                     totalSpreads: document.querySelectorAll('#book-viewer .book-spread').length,
                     characterSpreadCount: document.querySelectorAll('#book-viewer .book-spread[data-page-type="character"]').length,
@@ -2223,8 +2228,10 @@
                 await updateDoc(userRef, { aeduTokens: increment(-1) });
                 await updateUserInfo();
                 const newBookCode = `book${Date.now()}`;
+                const authorNameForBook = window.authorName || window.bookAuthorName || '';
+                window.bookAuthorName = authorNameForBook;
                 await setDoc(doc(db, 'Book', newBookCode), {
-                    author: window.authorName || '',
+                    author: authorNameForBook,
                     authorId: bookAuthorUid,
                     owner: bookAuthorUid,
                     createdAt: serverTimestamp(),
