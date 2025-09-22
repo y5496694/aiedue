@@ -346,11 +346,55 @@
             target.appendChild(btn);
         }
 
+        async function consumeTokenForImageRegeneration() {
+            if (!bookAuthorUid) {
+                showNotification('로그인 후 이용해주세요.');
+                return false;
+            }
+
+            const userRef = doc(db, 'users', bookAuthorUid);
+            let tokens = Number(userTokens) || 0;
+
+            if (tokens < 1) {
+                try {
+                    const snapshot = await getDoc(userRef);
+                    tokens = Number(snapshot.data()?.aeduTokens) || 0;
+                    userTokens = tokens;
+                    const display = document.getElementById('display-user-tokens');
+                    if (display) display.textContent = `${tokens}`;
+                } catch (error) {
+                    console.error('Failed to fetch user tokens for regeneration', error);
+                    showNotification('토큰 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+                    return false;
+                }
+            }
+
+            if (tokens < 1) {
+                showNotification('에이두 토큰이 부족합니다.');
+                return false;
+            }
+
+            try {
+                await updateDoc(userRef, { aeduTokens: increment(-1) });
+                tokens = Math.max(0, tokens - 1);
+                userTokens = tokens;
+                const display = document.getElementById('display-user-tokens');
+                if (display) display.textContent = `${tokens}`;
+                return true;
+            } catch (error) {
+                console.error('Failed to consume token for regeneration', error);
+                showNotification('토큰 차감에 실패했습니다. 잠시 후 다시 시도해주세요.');
+                return false;
+            }
+        }
+
         async function handleRegenerateButtonClick(btn, handler) {
             const originalText = btn.textContent;
             btn.disabled = true;
             btn.textContent = '생성중...';
             try {
+                const tokenConsumed = await consumeTokenForImageRegeneration();
+                if (!tokenConsumed) return;
                 await handler();
                 showNotification('그림을 재생성했습니다.');
             } catch (error) {
@@ -363,6 +407,7 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = originalText;
+                updateRegenerateButtonsVisibility();
             }
         }
 
@@ -388,10 +433,20 @@
             updateRegenerateButtonsVisibility();
         }
 
+        function elementHasGeneratedImage(element) {
+            if (!element) return false;
+            const inlineBg = element.style?.backgroundImage;
+            const computedBg = window.getComputedStyle(element).backgroundImage;
+            const backgroundValue = inlineBg && inlineBg !== 'none' ? inlineBg : computedBg;
+            return !!backgroundValue && backgroundValue !== 'none';
+        }
+
         function updateRegenerateButtonsVisibility() {
             const shouldShow = !isViewMode && !bookIsPublic;
             document.querySelectorAll('.image-regen-btn').forEach((btn) => {
-                if (shouldShow) {
+                const parent = btn.parentElement;
+                const canShow = shouldShow && elementHasGeneratedImage(parent);
+                if (canShow) {
                     btn.classList.add('visible');
                 } else {
                     btn.classList.remove('visible');
