@@ -31,6 +31,8 @@
         .image-generate-btn { background-color: rgba(16, 185, 129, 0.9); }
         .image-generate-btn:hover { background-color: rgba(5, 150, 105, 0.95); }
         .image-regen-btn { background-color: rgba(17, 24, 39, 0.85); }
+        .image-upload-btn { right: 4.5rem; background-color: rgba(59, 130, 246, 0.9); }
+        .image-upload-btn:hover { background-color: rgba(37, 99, 235, 0.95); }
         #notification { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background-color: #2c3e50; color: white; padding: 1rem 2rem; border-radius: 8px; z-index: 1000; transition: opacity 0.5s, transform 0.5s; opacity: 0; pointer-events: none; }
         #notification.show { opacity: 1; transform: translate(-50%, 10px); }
         .login-tab.active { border-bottom-color: #F59E0B; color: #F59E0B; }
@@ -305,6 +307,8 @@
         let imageGenerationMethod = 'stability';
         let libraryBooksCache = [];
         let libraryShowClassOnly = false;
+        let imageUploadInput = null;
+        let currentImageUploadTarget = null;
         // 로그인한 사용자 이름을 저장하고 책의 저자 영역을 동기화합니다.
         window.authorName = '';
         window.bookAuthorName = '';
@@ -333,6 +337,149 @@
             setTimeout(() => {
                 notification.classList.remove('show');
             }, duration);
+        }
+
+        function normalizeImageExtension(ext) {
+            if (!ext) return 'webp';
+            const lowered = ext.toLowerCase();
+            if (lowered === 'jpeg') return 'jpg';
+            if (lowered === 'svg+xml') return 'svg';
+            return lowered;
+        }
+
+        function getExtensionFromMime(mimeType) {
+            const match = (mimeType || '').match(/image\/([a-zA-Z0-9+.-]+)/i);
+            return normalizeImageExtension(match && match[1]);
+        }
+
+        function getExtensionFromDataUrl(dataUrl) {
+            if (typeof dataUrl !== 'string') return 'webp';
+            const match = dataUrl.match(/^data:image\/([^;]+)/i);
+            return normalizeImageExtension(match && match[1]);
+        }
+
+        function ensureImageUploadInput() {
+            if (imageUploadInput) return imageUploadInput;
+            imageUploadInput = document.createElement('input');
+            imageUploadInput.type = 'file';
+            imageUploadInput.accept = 'image/*';
+            imageUploadInput.style.display = 'none';
+            imageUploadInput.addEventListener('change', handleImageUploadChange);
+            document.body.appendChild(imageUploadInput);
+            return imageUploadInput;
+        }
+
+        function cleanupTargetAfterUpload(target) {
+            if (!target) return;
+            if (target.classList.contains('character-image-box')) {
+                const textNodes = Array.from(target.childNodes).filter(node => node.nodeType === Node.TEXT_NODE);
+                textNodes.forEach(node => target.removeChild(node));
+                return;
+            }
+            const spread = target.closest('.book-spread');
+            if (spread?.dataset.pageType === 'story') {
+                target.querySelectorAll('.text-gray-400').forEach(el => el.remove());
+                const textNodes = Array.from(target.childNodes).filter(node => node.nodeType === Node.TEXT_NODE && !node.textContent.trim());
+                textNodes.forEach(node => target.removeChild(node));
+            }
+        }
+
+        function getImageFileNameForTarget(target, extension) {
+            const ext = normalizeImageExtension(extension) || 'webp';
+            const spread = target.closest('.book-spread');
+            if (!spread) {
+                return `uploaded-${Date.now()}.${ext}`;
+            }
+            const type = spread.dataset.pageType;
+            if (type === 'cover') {
+                return `cover.${ext}`;
+            }
+            if (type === 'character') {
+                const pages = Array.from(document.querySelectorAll('.book-spread[data-page-type="character"] .book-page'));
+                const page = target.closest('.book-page');
+                const index = pages.indexOf(page);
+                if (index !== -1) {
+                    return `character${index + 1}.${ext}`;
+                }
+            }
+            if (type === 'story') {
+                const spreads = Array.from(document.querySelectorAll('.book-spread[data-page-type="story"]'));
+                const index = spreads.indexOf(spread);
+                if (index !== -1) {
+                    return `story${index + 1}.${ext}`;
+                }
+            }
+            return `uploaded-${Date.now()}.${ext}`;
+        }
+
+        function applyImageUploadToTarget(target, dataUrl, file) {
+            if (!target || !dataUrl) return;
+            cleanupTargetAfterUpload(target);
+            target.style.backgroundImage = `url('${dataUrl}')`;
+            const extFromFile = getExtensionFromMime(file?.type);
+            const finalExt = extFromFile || getExtensionFromDataUrl(dataUrl);
+            const fileName = getImageFileNameForTarget(target, finalExt);
+            target.dataset.imageName = fileName;
+            const spread = target.closest('.book-spread');
+            if (spread) {
+                setupRegenerateButtonsForSpread(spread);
+            }
+            updateRegenerateButtonsVisibility();
+        }
+
+        function openImageUploadDialog(target) {
+            if (!target) return;
+            currentImageUploadTarget = target;
+            const input = ensureImageUploadInput();
+            input.value = '';
+            input.click();
+        }
+
+        function handleImageUploadChange(event) {
+            const file = event?.target?.files?.[0] || null;
+            if (!currentImageUploadTarget || !file) {
+                currentImageUploadTarget = null;
+                if (event?.target) {
+                    event.target.value = '';
+                }
+                return;
+            }
+            if (!file.type.startsWith('image/')) {
+                showNotification('이미지 파일을 선택해주세요.');
+                currentImageUploadTarget = null;
+                event.target.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    applyImageUploadToTarget(currentImageUploadTarget, reader.result, file);
+                    showNotification('이미지를 업로드했습니다.');
+                } finally {
+                    currentImageUploadTarget = null;
+                    event.target.value = '';
+                }
+            };
+            reader.onerror = () => {
+                showNotification('이미지를 불러오지 못했습니다. 다시 시도해주세요.');
+                currentImageUploadTarget = null;
+                event.target.value = '';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function attachUploadButton(target) {
+            if (!target || target.querySelector('.image-upload-btn')) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'image-action-btn image-upload-btn';
+            btn.textContent = '업로드';
+            btn.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                openImageUploadDialog(target);
+            });
+            target.appendChild(btn);
         }
 
         function attachGenerationButton(target, handler) {
@@ -454,16 +601,19 @@
             const type = spread.dataset.pageType;
             if (type === 'cover') {
                 const coverPage = spread.querySelector('.book-page:last-child');
+                attachUploadButton(coverPage);
                 attachGenerationButton(coverPage, () => regenerateCoverImage(spread));
                 attachRegenerateButton(coverPage, () => regenerateCoverImage(spread));
             } else if (type === 'character') {
                 const boxes = spread.querySelectorAll('.character-image-box');
                 boxes.forEach((box) => {
+                    attachUploadButton(box);
                     attachGenerationButton(box, () => regenerateCharacterImage(spread, box));
                     attachRegenerateButton(box, () => regenerateCharacterImage(spread, box));
                 });
             } else if (type === 'story') {
                 const imagePage = spread.querySelector('.book-page:first-child');
+                attachUploadButton(imagePage);
                 attachGenerationButton(imagePage, () => regenerateStoryImage(spread));
                 attachRegenerateButton(imagePage, () => regenerateStoryImage(spread));
             }
@@ -484,6 +634,13 @@
 
         function updateRegenerateButtonsVisibility() {
             const canEdit = !isViewMode && !bookIsPublic;
+            document.querySelectorAll('.image-upload-btn').forEach((btn) => {
+                if (canEdit) {
+                    btn.classList.add('visible');
+                } else {
+                    btn.classList.remove('visible');
+                }
+            });
             document.querySelectorAll('.image-generate-btn').forEach((btn) => {
                 const parent = btn.parentElement;
                 const shouldShow = canEdit && !elementHasGeneratedImage(parent);
@@ -1739,10 +1896,15 @@
                     const bg = coverPage.style.backgroundImage;
                     const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
                     if (match) {
-                        coverPage.dataset.imageName = 'cover.webp';
-                        const imgRef = storageRef(storage, `Book/${bookCode}/cover.webp`);
-                        uploads.push(uploadDataUrl(imgRef, match[1]));
-                        data.coverImage = coverPage.dataset.imageName;
+                        const dataUrl = match[1];
+                        const existingName = coverPage.dataset.imageName || '';
+                        const extension = existingName.split('.').pop();
+                        const finalExt = existingName && extension ? extension : getExtensionFromDataUrl(dataUrl);
+                        const fileName = existingName || `cover.${finalExt}`;
+                        coverPage.dataset.imageName = fileName;
+                        const imgRef = storageRef(storage, `Book/${bookCode}/${fileName}`);
+                        uploads.push(uploadDataUrl(imgRef, dataUrl));
+                        data.coverImage = fileName;
                     } else if (coverPage.dataset.imageName) {
                         data.coverImage = coverPage.dataset.imageName;
                     }
@@ -1761,11 +1923,15 @@
                       if (imgBox) {
                           const bg = imgBox.style.backgroundImage;
                           const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
-                          const imageName = `character${charIndex}.webp`;
                           if (match) {
+                              const dataUrl = match[1];
+                              const existingName = imgBox.dataset.imageName || '';
+                              const existingExt = existingName.split('.').pop();
+                              const finalExt = existingName && existingExt ? existingExt : getExtensionFromDataUrl(dataUrl);
+                              const imageName = existingName || `character${charIndex}.${finalExt}`;
                               imgBox.dataset.imageName = imageName;
                               const imgRef = storageRef(storage, `Book/${bookCode}/${imageName}`);
-                              uploads.push(uploadDataUrl(imgRef, match[1]));
+                              uploads.push(uploadDataUrl(imgRef, dataUrl));
                               data[`character${charIndex}Image`] = imageName;
                           } else if (imgBox.dataset.imageName) {
                               data[`character${charIndex}Image`] = imgBox.dataset.imageName;
@@ -1797,11 +1963,15 @@
                     if (imagePage) {
                         const bg = imagePage.style.backgroundImage;
                         const match = bg.match(/url\(["']?(data:image\/[^"')]+)["']?\)/);
-                        const imageName = `story${storyIndex}.webp`;
                         if (match) {
+                            const dataUrl = match[1];
+                            const existingName = imagePage.dataset.imageName || '';
+                            const existingExt = existingName.split('.').pop();
+                            const finalExt = existingName && existingExt ? existingExt : getExtensionFromDataUrl(dataUrl);
+                            const imageName = existingName || `story${storyIndex}.${finalExt}`;
                             imagePage.dataset.imageName = imageName;
                             const imgRef = storageRef(storage, `Book/${bookCode}/${imageName}`);
-                            uploads.push(uploadDataUrl(imgRef, match[1]));
+                            uploads.push(uploadDataUrl(imgRef, dataUrl));
                             data[`story${storyIndex}Image`] = imageName;
                         } else if (imagePage.dataset.imageName) {
                             data[`story${storyIndex}Image`] = imagePage.dataset.imageName;
@@ -2280,6 +2450,8 @@
             const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
             const spreads = document.querySelectorAll(".book-spread");
             const originalPage = bookCurrentPage;
+            const previouslyVisibleButtons = Array.from(document.querySelectorAll('.image-action-btn.visible'));
+            previouslyVisibleButtons.forEach(btn => btn.classList.remove('visible'));
 
             const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -2364,6 +2536,8 @@
             originalBgs.forEach(({ el, bg }) => {
                 el.style.backgroundImage = bg;
             });
+
+            previouslyVisibleButtons.forEach(btn => btn.classList.add('visible'));
 
             button.textContent = "PDF 저장";
             button.disabled = false;
