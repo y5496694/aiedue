@@ -15,7 +15,7 @@
     <!-- Excalidraw 라이브러리 로드 -->
     <script src="https://unpkg.com/@excalidraw/excalidraw@0.17.5/dist/excalidraw.production.min.js" crossorigin></script>
     
-    <!-- JSX를 브라우저에서 직접 변환하기 위한 Babel 로드 (오타 수정) -->
+    <!-- JSX를 브라우저에서 직접 변환하기 위한 Babel 로드 -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <style>
@@ -44,10 +44,9 @@
     <script type="text/babel" data-type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, serverTimestamp, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref as storageRef, uploadBytes, getBlob, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { getFirestore, collection, doc, getDocs, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref as storageRef, uploadBytes, getBlob } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-        // 원래 설정으로 되돌렸습니다.
         const firebaseConfig = {
             apiKey: "AIzaSyDCeJPDQUNi-KmJ9DhkTRIu-9t2PGZCpt0",
             authDomain: "mansungcoin-c6e06.firebaseapp.com",
@@ -61,107 +60,40 @@
         const db = getFirestore(app);
         const storage = getStorage(app);
 
-        const SKETCH_CODE_CHARACTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        function generateUniqueSketchCode(existingCodes = new Set()) {
-            const codes = existingCodes instanceof Set ? existingCodes : new Set(existingCodes);
-            let code;
-            do {
-                code = Array.from({ length: 6 }, () => SKETCH_CODE_CHARACTERS[Math.floor(Math.random() * SKETCH_CODE_CHARACTERS.length)]).join('');
-            } while (codes.has(code));
-            return code;
-        }
-
         window.addEventListener('load', () => {
             const Excalidraw = window.ExcalidrawLib.Excalidraw;
 
             function App() {
                 const [excalidrawAPI, setExcalidrawAPI] = React.useState(null);
                 const [user, setUser] = React.useState(null);
-                const [sketches, setSketches] = React.useState([]);
                 const searchParams = React.useMemo(() => new URLSearchParams(window.location.search), []);
                 const [currentSketchId, setCurrentSketchId] = React.useState(searchParams.get('sketchId'));
-                const [currentSketchCode, setCurrentSketchCode] = React.useState(searchParams.get('code'));
-                const wrapperRef = React.useRef(null);
                 
                 const addFilesToScene = React.useCallback((filesData) => {
                     if (!excalidrawAPI || !filesData) return;
-
-                    let filesArray = [];
-                    if (filesData instanceof Map) {
-                        filesArray = Array.from(filesData.values());
-                    } else if (Array.isArray(filesData)) {
-                        filesArray = filesData;
-                    } else if (typeof filesData === 'object') {
-                        filesArray = Object.values(filesData);
-                    }
-
+                    let filesArray = Array.isArray(filesData) ? filesData : Object.values(filesData || {});
                     if (filesArray.length > 0) {
                         excalidrawAPI.addFiles(filesArray);
                     }
                 }, [excalidrawAPI]);
 
                 React.useEffect(() => {
-                    const unsub = onAuthStateChanged(auth, async (u) => {
-                        setUser(u);
-                        if (u) {
-                            try {
-                                const snap = await getDocs(collection(db, 'users', u.uid, 'sketches'));
-                                const docs = [];
-                                const existingCodes = new Set();
-
-                                snap.forEach(docSnap => {
-                                    const data = docSnap.data() || {};
-                                    if (data.code) existingCodes.add(data.code);
-                                    docs.push({ id: docSnap.id, ...data });
-                                });
-
-                                for (const sketch of docs) {
-                                    if (!sketch.code) {
-                                        const newCode = generateUniqueSketchCode(existingCodes);
-                                        existingCodes.add(newCode);
-                                        await updateDoc(doc(db, 'users', u.uid, 'sketches', sketch.id), { code: newCode });
-                                        sketch.code = newCode;
-                                    }
-                                }
-
-                                setSketches(docs);
-                            } catch (error) {
-                                console.error('스케치 목록을 불러오는 중 오류가 발생했습니다.', error);
-                            }
-                        }
-                    });
+                    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
                     return () => unsub();
                 }, []);
 
                 React.useEffect(() => {
-                    if (!currentSketchId && sketches.length > 0) {
-                        setCurrentSketchId(sketches[0].id);
+                    // URL에 sketchId가 없으면 아무것도 로드하지 않습니다.
+                    // 실제 앱에서는 목록 페이지나 기본 스케치로 리디렉션할 수 있습니다.
+                    if (!currentSketchId) {
+                         // ID가 없으면 빈 캔버스로 시작하도록 보장
+                        if (excalidrawAPI) {
+                            excalidrawAPI.updateScene({ elements: [], appState: { zenMode: false, viewMode: false } });
+                        }
+                        console.log("No sketchId found in URL.");
                     }
-                }, [sketches, currentSketchId]);
+                }, [currentSketchId, excalidrawAPI]);
 
-                React.useEffect(() => {
-                    if (!currentSketchId) return;
-                    const current = sketches.find(s => s.id === currentSketchId);
-                    if (current) {
-                        setCurrentSketchCode(current.code || null);
-                    }
-                }, [sketches, currentSketchId]);
-
-                React.useEffect(() => {
-                    if (!currentSketchId) return;
-                    const params = new URLSearchParams(window.location.search);
-                    params.set('sketchId', currentSketchId);
-                    if (currentSketchCode) {
-                        params.set('code', currentSketchCode);
-                    } else {
-                        params.delete('code');
-                    }
-                    const newQuery = params.toString();
-                    const newSearch = newQuery ? `?${newQuery}` : '';
-                    if (window.location.search !== newSearch) {
-                        window.history.replaceState({}, '', `${window.location.pathname}${newSearch}`);
-                    }
-                }, [currentSketchId, currentSketchCode]);
 
                 React.useEffect(() => {
                     if (user && excalidrawAPI && currentSketchId) {
@@ -171,19 +103,20 @@
                                 const blob = await getBlob(fileRef);
                                 const text = await blob.text();
                                 const data = JSON.parse(text);
+                                
                                 addFilesToScene(data.files);
+                                
                                 const appState = {
                                     ...data.appState,
-                                    // 젠 모드가 켜진 상태로 저장되었을 수 있으므로, 불러올 때 강제로 꺼줍니다.
                                     zenMode: false, 
+                                    viewMode: false,
                                     collaborators: new Map(Object.entries(data.appState?.collaborators || {}))
                                 };
                                 excalidrawAPI.updateScene({ elements: data.elements, appState, commitToHistory: true });
                             } catch (error) {
                                 if (error?.code === 'storage/object-not-found') {
                                     console.info('저장된 스케치가 없어 새 스케치북으로 시작합니다.');
-                                    // 새 스케치 시작 시에도 젠모드 꺼짐을 보장합니다.
-                                    excalidrawAPI.updateScene({ elements: [], appState: { zenMode: false } });
+                                    excalidrawAPI.updateScene({ elements: [], appState: { zenMode: false, viewMode: false } });
                                     return;
                                 }
                                 console.error('스케치북 데이터를 불러오는 중 오류가 발생했습니다.', error);
@@ -194,7 +127,10 @@
                 }, [user, excalidrawAPI, currentSketchId, addFilesToScene]);
 
                 const handleSave = async () => {
-                    if (!excalidrawAPI || !user || !currentSketchId) return;
+                    if (!excalidrawAPI || !user || !currentSketchId) {
+                        alert('저장할 수 없습니다. (사용자 또는 스케치 정보 없음)');
+                        return;
+                    };
                     const elements = excalidrawAPI.getSceneElements();
                     const appState = excalidrawAPI.getAppState();
                     const collaboratorsEntries = appState.collaborators instanceof Map
@@ -208,12 +144,15 @@
                     const files = filesMap instanceof Map
                         ? Object.fromEntries(filesMap.entries())
                         : Object.fromEntries(Object.entries(filesMap || {}));
+
                     const data = JSON.stringify({
                         type: 'excalidraw', version: 2, source: 'https://gemini.google.com',
                         elements, appState: appStateToSave, files,
                     }, null, 2);
+
                     const fileRef = storageRef(storage, `sketch/${user.uid}/${currentSketchId}.excalidraw`);
                     await uploadBytes(fileRef, new Blob([data], { type: 'application/json' }));
+                    
                     try {
                         await updateDoc(doc(db, 'users', user.uid, 'sketches', currentSketchId), {
                             updatedAt: serverTimestamp()
@@ -224,132 +163,47 @@
                     alert('저장되었습니다.');
                 };
 
-                const handleLoadFromFile = () => {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = ".excalidraw,.json";
-                    input.onchange = (event) => {
-                        const file = event.target.files[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = (e) => {
-                            try {
-                                const data = JSON.parse(e.target.result);
-                                if (excalidrawAPI && data.elements && data.appState) {
-                                    addFilesToScene(data.files);
-                                    const appState = {
-                                        ...data.appState,
-                                        collaborators: new Map(
-                                            Object.entries(data.appState.collaborators || {})
-                                        ),
-                                    };
-                                    excalidrawAPI.updateScene({
-                                        elements: data.elements,
-                                        appState,
-                                        commitToHistory: true,
-                                    });
-                                } else {
-                                    alert("유효하지 않은 Excalidraw 파일입니다.");
-                                }
-                            } catch (error) {
-                                console.error("파일을 읽는 중 오류가 발생했습니다.", error);
-                                alert("파일을 불러오는 데 실패했습니다.");
-                            }
-                        };
-                        reader.readAsText(file, 'utf-8');
-                    };
-                    input.click();
-                };
-
-                const handleSelectChange = (e) => {
-                    const selected = sketches.find(s => s.id === e.target.value);
-                    if (selected) {
-                        window.location.href = `?sketchId=${encodeURIComponent(selected.id)}&code=${encodeURIComponent(selected.code || '')}`;
-                    }
-                };
-
-                const handleCreateSketch = async () => {
-                    if (!user) return;
-                    const existingCodes = new Set(sketches.map(s => s.code).filter(Boolean));
-                    const newCode = generateUniqueSketchCode(existingCodes);
-                    const docRef = await addDoc(collection(db, 'users', user.uid, 'sketches'), {
-                        name: '새 스케치북',
-                        createdAt: serverTimestamp(),
-                        code: newCode
-                    });
-                    window.location.href = `?sketchId=${encodeURIComponent(docRef.id)}&code=${encodeURIComponent(newCode)}`;
-                };
-
-                const handleRenameSketch = async () => {
-                    if (!user || !currentSketchId) return;
-                    const current = sketches.find(s => s.id === currentSketchId);
-                    const newName = prompt('새 이름을 입력하세요', current?.name || '새 스케치북');
-                    if (newName) {
-                        await updateDoc(doc(db, 'users', user.uid, 'sketches', currentSketchId), { name: newName });
-                        setSketches(prev => prev.map(s => s.id === currentSketchId ? { ...s, name: newName } : s));
-                    }
-                };
-
-                const handleDeleteSketch = async () => {
-                    if (!user || !currentSketchId) return;
-                    if (!confirm('정말 삭제하시겠습니까?')) return;
-                    await deleteDoc(doc(db, 'users', user.uid, 'sketches', currentSketchId));
-                    try {
-                        await deleteObject(storageRef(storage, `sketch/${user.uid}/${currentSketchId}.excalidraw`));
-                    } catch (e) {
-                        console.error(e);
-                    }
-                    const remaining = sketches.filter(s => s.id !== currentSketchId);
-                    if (remaining.length > 0) {
-                        window.location.href = `?sketchId=${encodeURIComponent(remaining[0].id)}&code=${encodeURIComponent(remaining[0].code || '')}`;
-                    } else {
-                        window.location.href = 'index.html';
-                    }
-                };
-
                 return (
                     <>
-                        <header className="flex flex-wrap items-center justify-between gap-2 p-2 shadow-md bg-white z-10">
-                            <div className="flex items-center space-x-4">
-                                <div className="flex items-center space-x-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
-                                    <span className="font-bold text-lg text-gray-800">에이두 스케치북</span>
-                                </div>
-                                {currentSketchCode && (
-                                    <span className="text-sm text-gray-500">코드: {currentSketchCode}</span>
-                                )}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <select value={currentSketchId || ''} onChange={handleSelectChange} className="border rounded px-2 py-1">
-                                    {sketches.map(s => (
-                                        <option key={s.id} value={s.id}>
-                                            {(s.name || '새 스케치북') + (s.code ? ` (${s.code})` : '')}
-                                        </option>
-                                    ))}
-                                </select>
-                                <button onClick={handleCreateSketch} className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg shadow-md transition-all">스케치북 만들기</button>
-                                <button onClick={handleRenameSketch} className="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-3 rounded-lg shadow-md transition-all">이름 변경</button>
-                                <button onClick={handleDeleteSketch} className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg shadow-md transition-all">삭제</button>
-                                <button onClick={handleSave} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all">저장하기</button>
-                                <button onClick={handleLoadFromFile} className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all">파일 불러오기</button>
-                            </div>
-                        </header>
-                        <div className="excalidraw-wrapper" ref={wrapperRef}>
+                        {/* Excalidraw 캔버스 영역 */}
+                        <div className="excalidraw-wrapper">
                             <Excalidraw
                                 excalidrawAPI={(api) => setExcalidrawAPI(api)}
                                 langCode="ko-KR"
-                                // 젠 모드와 보기 모드 기능을 비활성화합니다.
+                                // 젠모드와 보기모드를 비활성화하여 더블클릭 문제를 해결합니다.
                                 zenModeEnabled={false}
                                 viewModeEnabled={false}
                                 UIOptions={{
+                                    // 상단 메뉴바의 대부분 기능을 숨깁니다.
                                     canvasActions: {
-                                        // 젠 모드로 들어가는 버튼 자체도 숨깁니다.
-                                        toggleZenMode: false,
-                                        toggleFullscreen: false,
+                                        clearCanvas: false,
+                                        export: false,
+                                        loadScene: false,
+                                        saveToActiveFile: false,
+                                        toggleTheme: false,
+                                        saveAsImage: false,
                                     },
+                                    // 좌측 상단 메뉴 버튼을 숨깁니다.
+                                    welcomeScreen: {
+                                        hints: {
+                                             menu: false,
+                                             toolbar: true, // 도구모음은 계속 표시
+                                             help: false
+                                         }
+                                    }
                                 }}
                             />
                         </div>
+
+                        {/* 오른쪽 하단에 고정된 저장 버튼 */}
+                        <button
+                            onClick={handleSave}
+                            className="fixed bottom-8 right-8 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-5 rounded-full shadow-lg z-20 flex items-center justify-center transition-transform transform hover:scale-105"
+                            title="스케치 저장"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                            <span className="ml-2">저장</span>
+                        </button>
                     </>
                 );
             }
