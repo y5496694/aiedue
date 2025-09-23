@@ -160,8 +160,13 @@
                                     collaborators: new Map(Object.entries(data.appState?.collaborators || {}))
                                 };
                                 excalidrawAPI.updateScene({ elements: data.elements, appState, commitToHistory: true });
-                            } catch (e) {
-                                console.log('새 스케치북입니다.', e);
+                            } catch (error) {
+                                if (error?.code === 'storage/object-not-found') {
+                                    console.info('저장된 스케치가 없어 새 스케치북으로 시작합니다.');
+                                    return;
+                                }
+                                console.error('스케치북 데이터를 불러오는 중 오류가 발생했습니다.', error);
+                                alert('스케치북을 불러오는 중 문제가 발생했습니다. 다시 시도해주세요.');
                             }
                         })();
                     }
