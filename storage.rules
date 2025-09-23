@@ -1,73 +1,30 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-
-    // 공통: 사용자 역할 조회
-    function userRole() {
-      return request.auth != null
-        ? firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role
-        : null;
-    }
-
     function isTeacher() {
-      return userRole() == 'teacher';
+      return request.auth != null &&
+             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'teacher';
     }
 
-    function isStudent() {
-      return userRole() == 'student';
-    }
+    // Book 파일: 공개 책은 누구나 읽기 가능, 작성자 또는 교사만 쓰기 가능
+    match /Book/{bookId}/{allPaths=**} {
+      allow read: if request.auth != null &&
+        (
+          firestore.get(/databases/(default)/documents/Book/$(bookId)).data.isPublic == true ||
+          firestore.get(/databases/(default)/documents/Book/$(bookId)).data.authorId == request.auth.uid ||
+          isTeacher()
+        );
 
-    function isPreflight() {
-      return request.method == 'OPTIONS';
-    }
-
-    // Book 문서 헬퍼
-    function bookData(bookId) {
-      return firestore.get(/databases/(default)/documents/Book/$(bookId)).data;
-    }
-
-    function isBookAuthor(bookId) {
-      return request.auth != null && bookData(bookId).authorId == request.auth.uid;
-    }
-
-    function isBookPublic(bookId) {
-      return bookData(bookId).isPublic == true;
-    }
-
-    function bookStorageRoot() {
-      return 'Book';
-    }
-
-    // Book 파일: 공개 책은 교사/학생이 읽기 가능, 작성자만 쓰기 가능
-    match /{bookFolder}/{bookId}/{allPaths=**} {
-      // CORS preflight 허용 및 Book 디렉터리 접근 통일
-      allow read: if (bookFolder == bookStorageRoot() && (
-                      isPreflight()
-                      || (request.auth != null && (
-                            isBookAuthor(bookId) ||
-                            isTeacher() ||
-                            (isStudent() && isBookPublic(bookId))
-                         ))
-                    ))
-                    || (bookFolder != bookStorageRoot() && (
-                      isPreflight() || request.auth != null
-                    ));
-
-      // 작성자만 쓰기, 기타 디렉터리는 기존 기본 규칙 적용
-      allow write: if (bookFolder == bookStorageRoot() && isBookAuthor(bookId))
-                    || (bookFolder != bookStorageRoot() && request.auth != null);
-    }
-
-    // 스케치북 파일 (스케치 ID 기반)
-    match /sketches/{fileId} {
-      allow read: if isPreflight() || request.auth != null;
-      allow write: if request.auth != null;
+      allow write: if request.auth != null &&
+        (
+          firestore.get(/databases/(default)/documents/Book/$(bookId)).data.authorId == request.auth.uid ||
+          isTeacher()
+        );
     }
 
     // 그 외 경로: 로그인한 사용자에게만 접근 허용
     match /{allPaths=**} {
-      allow read: if isPreflight() || request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if request.auth != null;
     }
   }
 }
