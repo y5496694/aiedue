@@ -13,6 +13,36 @@
     <style>
         html { scroll-behavior: smooth; }
         body { font-family: 'Noto Sans KR', sans-serif; }
+        .view {
+            display: none;
+        }
+        .view.active {
+            display: block;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .login-tab {
+            border-bottom: 2px solid transparent;
+            color: #475569;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        .login-tab.active {
+            border-bottom-color: #0ea5e9;
+            color: #0ea5e9;
+            font-weight: 600;
+        }
+        .form-input {
+            transition: all 0.3s;
+        }
+        .form-input:focus {
+            border-color: #0ea5e9;
+            box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+            outline: none;
+        }
         .content-section {
             border: 1px solid #e2e8f0;
             border-radius: 0.75rem;
@@ -177,31 +207,71 @@
         <!-- Auth View (Login/Signup) -->
         <div id="auth-view" class="min-h-screen flex items-center justify-center bg-gray-100">
             <div class="w-full max-w-md bg-white rounded-lg shadow-md p-8">
-                <h2 class="text-2xl font-bold text-center text-sky-600 mb-6">에이두 스페셜 시작하기</h2>
-                <form id="auth-form" onsubmit="return false;">
+                <div id="login-view" class="view active">
+                    <h2 class="text-2xl font-bold text-center text-sky-600 mb-6">에이두 스페셜 시작하기</h2>
+                    <div class="border-b border-gray-200">
+                        <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                            <button id="student-login-tab" class="login-tab whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm">🧑‍🎓 학생</button>
+                            <button id="teacher-login-tab" class="login-tab whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm">🧑‍🏫 교사</button>
+                        </nav>
+                    </div>
+                    <div id="student-login-content" class="tab-content pt-6">
+                        <div class="mb-4">
+                            <label for="student-code" class="block text-sm font-medium text-gray-700 mb-1">고유 숫자 코드</label>
+                            <input type="text" id="student-code" class="w-full border border-gray-300 rounded-md p-2 form-input" placeholder="발급받은 코드를 입력하세요">
+                        </div>
+                        <p id="student-login-error" class="text-red-500 text-sm mb-4 hidden"></p>
+                        <button id="student-login-btn" class="w-full py-2 rounded-md bg-sky-600 hover:bg-sky-700 text-white font-semibold transition-colors">학생 로그인</button>
+                    </div>
+                    <div id="teacher-login-content" class="tab-content pt-6">
+                        <div class="mb-4">
+                            <label for="teacher-email" class="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+                            <input type="email" id="teacher-email" class="w-full border border-gray-300 rounded-md p-2 form-input" placeholder="example@email.com">
+                        </div>
+                        <div class="mb-6">
+                            <label for="teacher-password" class="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+                            <input type="password" id="teacher-password" class="w-full border border-gray-300 rounded-md p-2 form-input" placeholder="••••••••">
+                        </div>
+                        <p id="teacher-login-error" class="text-red-500 text-sm mb-4 hidden"></p>
+                        <button id="teacher-login-btn" class="w-full py-2 rounded-md bg-sky-600 hover:bg-sky-700 text-white font-semibold transition-colors">교사 로그인</button>
+                        <button id="teacher-google-login-btn" class="w-full py-2 mt-2 rounded-md border border-gray-300 bg-white text-gray-700 font-semibold flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
+                            <svg class="w-5 h-5" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></svg>
+                            Google 계정으로 로그인
+                        </button>
+                    </div>
+                    <div class="mt-6 text-center space-y-2">
+                        <button id="show-student-register-btn" class="w-full text-sm text-sky-600 hover:underline">처음이신가요? 학생 등록하기</button>
+                        <button id="show-teacher-register-btn" class="w-full text-sm text-sky-600 hover:underline">교사이신가요? 회원가입하기</button>
+                    </div>
+                </div>
+                <div id="student-register-view" class="view">
+                    <h2 class="text-2xl font-bold text-center text-sky-600 mb-6">🧑‍🎓 학생 등록</h2>
                     <div class="mb-4">
-                        <label for="email" class="block text-gray-700 text-sm font-bold mb-2">이메일</label>
-                        <input type="email" id="email" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                        <label for="student-name" class="block text-sm font-medium text-gray-700 mb-1">이름</label>
+                        <input type="text" id="student-name" class="w-full border border-gray-300 rounded-md p-2 form-input" placeholder="이름을 입력하세요">
+                    </div>
+                    <p id="student-register-error" class="text-red-500 text-sm mb-4 hidden"></p>
+                    <button id="student-register-btn" class="w-full py-2 rounded-md bg-sky-600 hover:bg-sky-700 text-white font-semibold transition-colors mb-4">등록하고 코드 받기</button>
+                    <button id="back-to-login-btn" class="w-full text-sm text-gray-600 hover:underline">로그인 화면으로 돌아가기</button>
+                </div>
+                <div id="teacher-register-view" class="view">
+                    <h2 class="text-2xl font-bold text-center text-sky-600 mb-6">🧑‍🏫 교사 회원가입</h2>
+                    <div class="mb-4">
+                        <label for="teacher-register-name" class="block text-sm font-medium text-gray-700 mb-1">이름</label>
+                        <input type="text" id="teacher-register-name" class="w-full border border-gray-300 rounded-md p-2 form-input" placeholder="이름을 입력하세요">
+                    </div>
+                    <div class="mb-4">
+                        <label for="teacher-register-email" class="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+                        <input type="email" id="teacher-register-email" class="w-full border border-gray-300 rounded-md p-2 form-input" placeholder="example@email.com">
                     </div>
                     <div class="mb-6">
-                        <label for="password" class="block text-gray-700 text-sm font-bold mb-2">비밀번호</label>
-                        <input type="password" id="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" required>
+                        <label for="teacher-register-password" class="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+                        <input type="password" id="teacher-register-password" class="w-full border border-gray-300 rounded-md p-2 form-input" placeholder="6자리 이상 비밀번호를 입력하세요">
                     </div>
-                    <p id="auth-error" class="text-red-500 text-xs italic mb-4 hidden"></p>
-                    <div class="flex items-center justify-between">
-                        <button type="button" id="login-btn" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">로그인</button>
-                        <button type="button" id="signup-btn" class="inline-block align-baseline font-bold text-sm text-sky-600 hover:text-sky-800">계정이 없으신가요? 회원가입</button>
-                    </div>
-                    <div class="my-4 flex items-center">
-                        <div class="flex-grow border-t border-gray-300"></div>
-                        <span class="flex-shrink mx-4 text-gray-400 text-sm">또는</span>
-                        <div class="flex-grow border-t border-gray-300"></div>
-                    </div>
-                    <button type="button" id="google-login-btn" class="w-full bg-white border border-gray-300 text-gray-700 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
-                        <svg class="w-5 h-5" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></svg>
-                        Google 계정으로 로그인
-                    </button>
-                </form>
+                    <p id="teacher-register-error" class="text-red-500 text-sm mb-4 hidden"></p>
+                    <button id="teacher-register-btn" class="w-full py-2 rounded-md bg-sky-600 hover:bg-sky-700 text-white font-semibold transition-colors mb-4">회원가입</button>
+                    <button id="teacher-back-to-login-btn" class="w-full text-sm text-gray-600 hover:underline">로그인 화면으로 돌아가기</button>
+                </div>
             </div>
         </div>
 
@@ -478,7 +548,7 @@
         // Firebase v10 SDK
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, where, orderBy, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         const firebaseConfig = {
             // Your web app's Firebase configuration
@@ -497,13 +567,34 @@
         // --- DOM Elements ---
         const authView = document.getElementById('auth-view');
         const mainAppView = document.getElementById('main-app-view');
-        const emailInput = document.getElementById('email');
-        const passwordInput = document.getElementById('password');
-        const loginBtn = document.getElementById('login-btn');
-        const signupBtn = document.getElementById('signup-btn');
-        const googleLoginBtn = document.getElementById('google-login-btn');
+        const loginView = document.getElementById('login-view');
+        const studentRegisterView = document.getElementById('student-register-view');
+        const teacherRegisterView = document.getElementById('teacher-register-view');
+        const studentLoginTab = document.getElementById('student-login-tab');
+        const teacherLoginTab = document.getElementById('teacher-login-tab');
+        const studentLoginContent = document.getElementById('student-login-content');
+        const teacherLoginContent = document.getElementById('teacher-login-content');
+        const studentCodeInput = document.getElementById('student-code');
+        const teacherEmailInput = document.getElementById('teacher-email');
+        const teacherPasswordInput = document.getElementById('teacher-password');
+        const studentLoginError = document.getElementById('student-login-error');
+        const teacherLoginError = document.getElementById('teacher-login-error');
+        const studentNameInput = document.getElementById('student-name');
+        const studentRegisterError = document.getElementById('student-register-error');
+        const teacherRegisterNameInput = document.getElementById('teacher-register-name');
+        const teacherRegisterEmailInput = document.getElementById('teacher-register-email');
+        const teacherRegisterPasswordInput = document.getElementById('teacher-register-password');
+        const teacherRegisterError = document.getElementById('teacher-register-error');
+        const studentLoginBtn = document.getElementById('student-login-btn');
+        const teacherLoginBtn = document.getElementById('teacher-login-btn');
+        const teacherGoogleLoginBtn = document.getElementById('teacher-google-login-btn');
+        const showStudentRegisterBtn = document.getElementById('show-student-register-btn');
+        const showTeacherRegisterBtn = document.getElementById('show-teacher-register-btn');
+        const backToLoginBtn = document.getElementById('back-to-login-btn');
+        const teacherBackToLoginBtn = document.getElementById('teacher-back-to-login-btn');
+        const studentRegisterBtn = document.getElementById('student-register-btn');
+        const teacherRegisterBtn = document.getElementById('teacher-register-btn');
         const logoutBtn = document.getElementById('logout-btn');
-        const authError = document.getElementById('auth-error');
         const userEmailSpan = document.getElementById('user-email');
         const homeUserEmailSpan = document.getElementById('home-user-email');
         const toast = document.getElementById('toast');
@@ -562,6 +653,274 @@
         let isMajorEvalModifying = false;
 
         // --- AUTHENTICATION ---
+        const authSections = {
+            login: loginView,
+            studentRegister: studentRegisterView,
+            teacherRegister: teacherRegisterView,
+        };
+
+        const showAuthView = (view) => {
+            Object.values(authSections).forEach(section => section && section.classList.remove('active'));
+            if (authSections[view]) {
+                authSections[view].classList.add('active');
+            }
+        };
+
+        const showError = (element, message) => {
+            if (!element) return;
+            if (message) {
+                element.textContent = message;
+                element.classList.remove('hidden');
+            } else {
+                element.textContent = '';
+                element.classList.add('hidden');
+            }
+        };
+
+        const clearAuthMessages = () => {
+            showError(studentLoginError, '');
+            showError(teacherLoginError, '');
+            showError(studentRegisterError, '');
+            showError(teacherRegisterError, '');
+        };
+
+        const switchLoginTab = (tabName) => {
+            [studentLoginTab, teacherLoginTab].forEach(tab => tab && tab.classList.remove('active'));
+            [studentLoginContent, teacherLoginContent].forEach(content => content && content.classList.remove('active'));
+
+            if (tabName === 'teacher') {
+                if (teacherLoginTab) teacherLoginTab.classList.add('active');
+                if (teacherLoginContent) teacherLoginContent.classList.add('active');
+            } else {
+                if (studentLoginTab) studentLoginTab.classList.add('active');
+                if (studentLoginContent) studentLoginContent.classList.add('active');
+            }
+
+            clearAuthMessages();
+        };
+
+        if (studentLoginTab) {
+            studentLoginTab.addEventListener('click', () => switchLoginTab('student'));
+        }
+        if (teacherLoginTab) {
+            teacherLoginTab.addEventListener('click', () => switchLoginTab('teacher'));
+        }
+
+        if (showStudentRegisterBtn) {
+            showStudentRegisterBtn.addEventListener('click', () => {
+                clearAuthMessages();
+                showAuthView('studentRegister');
+            });
+        }
+
+        if (showTeacherRegisterBtn) {
+            showTeacherRegisterBtn.addEventListener('click', () => {
+                clearAuthMessages();
+                showAuthView('teacherRegister');
+            });
+        }
+
+        if (backToLoginBtn) {
+            backToLoginBtn.addEventListener('click', () => {
+                showAuthView('login');
+                switchLoginTab('student');
+            });
+        }
+
+        if (teacherBackToLoginBtn) {
+            teacherBackToLoginBtn.addEventListener('click', () => {
+                showAuthView('login');
+                switchLoginTab('teacher');
+            });
+        }
+
+        if (studentRegisterBtn) {
+            studentRegisterBtn.addEventListener('click', async () => {
+                clearAuthMessages();
+                const name = studentNameInput.value.trim();
+                if (!name) {
+                    showError(studentRegisterError, '이름을 입력해주세요.');
+                    return;
+                }
+
+                try {
+                    const counterRef = doc(db, 'metadata', 'counters');
+                    const newCode = await runTransaction(db, async (transaction) => {
+                        const counterDoc = await transaction.get(counterRef);
+                        let nextCode = 1;
+                        if (counterDoc.exists() && counterDoc.data().lastUserCode) {
+                            nextCode = counterDoc.data().lastUserCode + 1;
+                        }
+                        transaction.set(counterRef, { lastUserCode: nextCode }, { merge: true });
+                        return nextCode;
+                    });
+
+                    const email = `${newCode}@abc.com`;
+                    const password = `${newCode}qwerty`;
+
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+                    await setDoc(doc(db, 'users', userCredential.user.uid), {
+                        uid: userCredential.user.uid,
+                        name: name,
+                        email: email,
+                        userCode: newCode,
+                        role: 'student',
+                        coins: 0,
+                        balance: 0,
+                        portfolio: {},
+                        aeduExperience: 0,
+                        aeduLevel: 1,
+                        warningTokens: 0,
+                        createdAt: serverTimestamp()
+                    });
+
+                    await addDoc(collection(db, 'signupLog'), {
+                        name: name,
+                        userCode: newCode,
+                        role: 'student',
+                        signedUpAt: serverTimestamp()
+                    });
+
+                    studentNameInput.value = '';
+                    alert(`환영합니다, ${name} 학생!\n당신의 고유 코드는 ${newCode} 입니다.\n이 코드를 꼭 기억하고 로그인해주세요.`);
+                    showAuthView('login');
+                    switchLoginTab('student');
+                } catch (error) {
+                    console.error('Student registration error:', error);
+                    if (error.code === 'auth/email-already-in-use') {
+                        showError(studentRegisterError, '이미 사용 중인 계정 정보입니다. 다른 코드를 시도해주세요.');
+                    } else {
+                        showError(studentRegisterError, '학생 등록 중 문제가 발생했습니다.');
+                    }
+                }
+            });
+        }
+
+        if (teacherRegisterBtn) {
+            teacherRegisterBtn.addEventListener('click', async () => {
+                clearAuthMessages();
+                const name = teacherRegisterNameInput.value.trim();
+                const email = teacherRegisterEmailInput.value.trim();
+                const password = teacherRegisterPasswordInput.value;
+
+                if (!name || !email || !password) {
+                    showError(teacherRegisterError, '이름, 이메일, 비밀번호를 모두 입력해주세요.');
+                    return;
+                }
+
+                try {
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+                    await setDoc(doc(db, 'users', userCredential.user.uid), {
+                        uid: userCredential.user.uid,
+                        name,
+                        email,
+                        role: 'teacher',
+                        userCode: null,
+                        coins: 0,
+                        balance: 0,
+                        portfolio: {},
+                        aeduTokens: 0,
+                        aeduExperience: 0,
+                        aeduLevel: 1,
+                        warningTokens: 0,
+                        createdAt: serverTimestamp()
+                    }, { merge: true });
+
+                    await addDoc(collection(db, 'signupLog'), {
+                        name,
+                        email,
+                        role: 'teacher',
+                        signedUpAt: serverTimestamp()
+                    });
+
+                    teacherRegisterNameInput.value = '';
+                    teacherRegisterEmailInput.value = '';
+                    teacherRegisterPasswordInput.value = '';
+                    alert(`환영합니다, ${name} 선생님!\n이제 교사용 기능을 이용해보세요.`);
+                    showAuthView('login');
+                    switchLoginTab('teacher');
+                } catch (error) {
+                    console.error('Teacher registration error:', error);
+                    if (error.code === 'auth/email-already-in-use') {
+                        showError(teacherRegisterError, '이미 사용 중인 이메일입니다. 다른 이메일을 사용해주세요.');
+                    } else if (error.code === 'auth/invalid-email') {
+                        showError(teacherRegisterError, '유효한 이메일 주소를 입력해주세요.');
+                    } else if (error.code === 'auth/weak-password') {
+                        showError(teacherRegisterError, '비밀번호는 6자 이상이어야 합니다.');
+                    } else {
+                        showError(teacherRegisterError, '교사 회원가입 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.');
+                    }
+                }
+            });
+        }
+
+        if (studentLoginBtn) {
+            studentLoginBtn.addEventListener('click', async () => {
+                clearAuthMessages();
+                const codeInput = studentCodeInput.value.trim();
+
+                const normalizedCode = codeInput.replace(/[\uFF10-\uFF19]/g, (m) => String.fromCharCode(m.charCodeAt(0) - 0xFEE0));
+
+                if (!normalizedCode || !/^\d+$/.test(normalizedCode)) {
+                    showError(studentLoginError, '유효한 숫자 코드를 입력해주세요.');
+                    return;
+                }
+
+                const codeAsInt = parseInt(normalizedCode, 10);
+                const email = `${codeAsInt}@abc.com`;
+                const password = `${codeAsInt}qwerty`;
+
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } catch (error) {
+                    console.error('Student login error:', error);
+                    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                        showError(studentLoginError, '고유 코드가 올바르지 않거나 해당 학생을 찾을 수 없습니다.');
+                    } else if (error.code === 'permission-denied') {
+                        showError(studentLoginError, '데이터베이스 접근 권한이 없습니다. 관리자에게 문의하여 Firestore 보안 규칙을 확인해주세요.');
+                    } else {
+                        showError(studentLoginError, `알 수 없는 오류가 발생했습니다: ${error.message}`);
+                    }
+                }
+            });
+        }
+
+        if (teacherLoginBtn) {
+            teacherLoginBtn.addEventListener('click', async () => {
+                clearAuthMessages();
+                const email = teacherEmailInput.value.trim();
+                const password = teacherPasswordInput.value;
+                if (!email || !password) {
+                    showError(teacherLoginError, '이메일과 비밀번호를 모두 입력해주세요.');
+                    return;
+                }
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } catch (error) {
+                    showError(teacherLoginError, '이메일 또는 비밀번호가 올바르지 않습니다.');
+                }
+            });
+        }
+
+        if (teacherGoogleLoginBtn) {
+            teacherGoogleLoginBtn.addEventListener('click', async () => {
+                clearAuthMessages();
+                const provider = new GoogleAuthProvider();
+                try {
+                    await signInWithPopup(auth, provider);
+                } catch (error) {
+                    showError(teacherLoginError, 'Google 로그인 중 오류가 발생했습니다.');
+                }
+            });
+        }
+
+        logoutBtn.addEventListener('click', () => signOut(auth));
+
+        showAuthView('login');
+        switchLoginTab('student');
+
         onAuthStateChanged(auth, user => {
             if (user) {
                 authView.classList.add('hidden');
@@ -569,36 +928,20 @@
                 mainAppView.classList.add('flex');
                 userEmailSpan.textContent = user.email;
                 homeUserEmailSpan.textContent = user.email;
-                // Handle routing based on hash
                 const currentView = window.location.hash.replace('#', '') || 'home';
                 switchView(currentView);
             } else {
                 authView.classList.remove('hidden');
                 mainAppView.classList.add('hidden');
                 mainAppView.classList.remove('flex');
+                showAuthView('login');
+                switchLoginTab('student');
+                clearAuthMessages();
+                if (studentCodeInput) studentCodeInput.value = '';
+                if (teacherEmailInput) teacherEmailInput.value = '';
+                if (teacherPasswordInput) teacherPasswordInput.value = '';
             }
         });
-
-        signupBtn.addEventListener('click', () => {
-            createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value)
-                .catch(error => authError.textContent = error.message);
-        });
-
-        loginBtn.addEventListener('click', () => {
-            signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value)
-                .catch(error => authError.textContent = error.message);
-        });
-
-        googleLoginBtn.addEventListener('click', async () => {
-            const provider = new GoogleAuthProvider();
-            try {
-                await signInWithPopup(auth, provider);
-            } catch (error) {
-                authError.textContent = error.message;
-            }
-        });
-
-        logoutBtn.addEventListener('click', () => signOut(auth));
 
         // --- NAVIGATION ---
         const switchView = (view) => {
