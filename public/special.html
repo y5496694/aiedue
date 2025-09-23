@@ -216,6 +216,7 @@
                         <a href="#my-class" id="nav-my-class" class="nav-link">내 학급 관리</a>
                         <!-- IEP navigation link; '개별화교육계획' is commonly referred to as 'IEP'. Modify this section when updating 'iep'. -->
                         <a href="#iep" id="nav-iep" class="nav-link">개별화교육계획(IEP)</a>
+                        <a href="#templates" id="nav-templates" class="nav-link">서식 생성</a>
                         <a href="#behavior" id="nav-behavior" class="nav-link">행동 중재</a>
                         <button id="logout-btn" class="text-sm bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md transition-colors">로그아웃</button>
                     </nav>
@@ -305,6 +306,76 @@
                     </div>
                 </div>
 
+                <!-- Template Generator View -->
+                <div id="templates-view" class="hidden">
+                    <h2 class="text-3xl font-bold mb-6">AI 서식 생성</h2>
+                    <div class="bg-white p-6 rounded-lg shadow-lg">
+                        <h3 class="text-xl font-bold mb-4">카테고리</h3>
+                        <div id="template-category-buttons" class="flex flex-wrap gap-3">
+                            <button type="button" data-template-category="major-eval" class="tab-btn py-2 px-4 rounded">전공과 심사표</button>
+                        </div>
+                    </div>
+                    <div id="major-eval-workspace" class="hidden mt-6">
+                        <div class="flex flex-col lg:flex-row gap-6">
+                            <aside class="w-full lg:w-1/3 bg-white p-6 rounded-lg shadow-lg space-y-6">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-lg font-semibold">전공과 심사표 목록</h3>
+                                    <button type="button" id="major-eval-add-btn" class="bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold px-3 py-2 rounded">추가</button>
+                                </div>
+                                <div>
+                                    <ul id="major-eval-list" class="space-y-2"></ul>
+                                    <p id="major-eval-empty" class="text-sm text-gray-500">추가 버튼을 눌러 심사표를 생성해보세요.</p>
+                                </div>
+                                <div id="major-eval-input-section" class="hidden space-y-4">
+                                    <div>
+                                        <h4 class="text-base font-semibold mb-2">입력 테이블</h4>
+                                        <table class="w-full border border-gray-200 text-sm">
+                                            <tbody class="divide-y divide-gray-200">
+                                                <tr>
+                                                    <th scope="row" class="bg-gray-50 px-3 py-2 text-left font-medium w-28">학교 이름</th>
+                                                    <td class="px-3 py-2">
+                                                        <input type="text" id="major-eval-school" class="w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="예: 행복학교">
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row" class="bg-gray-50 px-3 py-2 text-left font-medium">영역</th>
+                                                    <td class="px-3 py-2">
+                                                        <input type="text" id="major-eval-domain" class="w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="예: 호텔 서비스">
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row" class="bg-gray-50 px-3 py-2 text-left font-medium">문항 수</th>
+                                                    <td class="px-3 py-2">
+                                                        <input type="number" id="major-eval-questions" class="w-full border border-gray-300 rounded-md p-2 text-sm" min="1" value="5">
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row" class="bg-gray-50 px-3 py-2 text-left font-medium">평가 주제</th>
+                                                    <td class="px-3 py-2">
+                                                        <input type="text" id="major-eval-topic" class="w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="예: 객실 정리">
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <button type="button" id="major-eval-generate-btn" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2 rounded">생성</button>
+                                </div>
+                                <div id="major-eval-modify-section" class="hidden space-y-3">
+                                    <h4 class="text-base font-semibold">수정 테이블</h4>
+                                    <p class="text-xs text-gray-500">수정 내용을 입력하고 엔터 또는 수정 버튼을 눌러주세요.</p>
+                                    <textarea id="major-eval-modify-input" class="w-full border border-gray-300 rounded-md p-2 text-sm" rows="4" placeholder="예: 3번 문항을 난이도를 낮추어 수정해줘"></textarea>
+                                    <button type="button" id="major-eval-modify-btn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 rounded">수정</button>
+                                </div>
+                            </aside>
+                            <section class="flex-1">
+                                <div id="major-eval-output" class="bg-white p-6 rounded-lg shadow-lg min-h-[320px] text-sm text-gray-700">
+                                    <p class="text-gray-500">왼쪽 목록에서 심사표를 선택하면 결과가 표시됩니다.</p>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Behavior Intervention View -->
                 <div id="behavior-view" class="hidden">
                     <h2 class="text-3xl font-bold mb-6">행동 중재</h2>
@@ -384,6 +455,19 @@
             </main>
         </div>
         
+        <!-- Major Evaluation Modal -->
+        <div id="major-eval-modal" class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+                <h3 class="text-xl font-semibold mb-4">전공과 심사표 추가</h3>
+                <label for="major-eval-modal-title" class="block text-sm font-medium text-gray-700 mb-2">제목</label>
+                <input type="text" id="major-eval-modal-title" class="w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="예: 2024학년도 호텔조리 전형">
+                <div class="mt-6 flex justify-end gap-2">
+                    <button type="button" id="major-eval-modal-cancel" class="px-4 py-2 rounded border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50">취소</button>
+                    <button type="button" id="major-eval-modal-confirm" class="px-4 py-2 rounded bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold">완료</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast Message -->
         <div id="toast" class="fixed bottom-10 right-10 bg-gray-900 text-white py-2 px-5 rounded-lg shadow-lg opacity-0 transition-opacity duration-300">
              복사되었습니다!
@@ -429,6 +513,25 @@
         const saveAchievementBtn = document.getElementById('save-achievement-btn');
         const achievementTableContainer = document.getElementById('achievement-table');
         const backToClassBtn = document.getElementById('back-to-class-btn');
+        const templateCategoryButtons = document.getElementById('template-category-buttons');
+        const majorEvalWorkspace = document.getElementById('major-eval-workspace');
+        const majorEvalAddBtn = document.getElementById('major-eval-add-btn');
+        const majorEvalList = document.getElementById('major-eval-list');
+        const majorEvalEmpty = document.getElementById('major-eval-empty');
+        const majorEvalInputSection = document.getElementById('major-eval-input-section');
+        const majorEvalModifySection = document.getElementById('major-eval-modify-section');
+        const majorEvalOutput = document.getElementById('major-eval-output');
+        const majorEvalSchoolInput = document.getElementById('major-eval-school');
+        const majorEvalDomainInput = document.getElementById('major-eval-domain');
+        const majorEvalQuestionsInput = document.getElementById('major-eval-questions');
+        const majorEvalTopicInput = document.getElementById('major-eval-topic');
+        const majorEvalGenerateBtn = document.getElementById('major-eval-generate-btn');
+        const majorEvalModifyInput = document.getElementById('major-eval-modify-input');
+        const majorEvalModifyBtn = document.getElementById('major-eval-modify-btn');
+        const majorEvalModal = document.getElementById('major-eval-modal');
+        const majorEvalModalTitle = document.getElementById('major-eval-modal-title');
+        const majorEvalModalCancel = document.getElementById('major-eval-modal-cancel');
+        const majorEvalModalConfirm = document.getElementById('major-eval-modal-confirm');
         let currentAchievementStudent = '';
         let currentAchievementData = {};
 
@@ -437,6 +540,7 @@
             home: document.getElementById('home-view'),
             'my-class': document.getElementById('my-class-view'),
             iep: document.getElementById('iep-view'),
+            templates: document.getElementById('templates-view'),
             behavior: document.getElementById('behavior-view'),
             achievement: document.getElementById('achievement-view'),
         };
@@ -444,12 +548,18 @@
             home: document.getElementById('nav-home'),
             'my-class': document.getElementById('nav-my-class'),
             iep: document.getElementById('nav-iep'),
+            templates: document.getElementById('nav-templates'),
             behavior: document.getElementById('nav-behavior'),
         };
         
         let statsChartInstance = null;
         let behaviorChartInstance = null;
         let isLoadingHomeData = false;
+        let majorEvalEntries = [];
+        let activeMajorEvalId = '';
+        let activeTemplateCategory = '';
+        let isMajorEvalGenerating = false;
+        let isMajorEvalModifying = false;
 
         // --- AUTHENTICATION ---
         onAuthStateChanged(auth, user => {
@@ -509,6 +619,8 @@
                     if (iepOutputContainer) {
                         iepOutputContainer.innerHTML = '<p class="text-gray-500">학생을 선택하면 IEP 정보가 표시됩니다.</p>';
                     }
+                } else if (view === 'templates') {
+                    activateTemplateCategory('major-eval');
                 } else if (view === 'behavior') {
                     initBehaviorChart();
                 }
@@ -710,6 +822,471 @@
                 loadHomeData();
             }
         });
+
+        // --- Template Generator Logic ---
+        function activateTemplateCategory(category) {
+            if (!templateCategoryButtons) return;
+            activeTemplateCategory = category;
+            const buttons = templateCategoryButtons.querySelectorAll('button[data-template-category]');
+            buttons.forEach(btn => {
+                const isActive = btn.dataset.templateCategory === category;
+                btn.classList.toggle('active', isActive);
+            });
+            if (!majorEvalWorkspace) return;
+            if (category === 'major-eval') {
+                majorEvalWorkspace.classList.remove('hidden');
+                renderMajorEvalList();
+                updateMajorEvalWorkspace();
+            } else {
+                majorEvalWorkspace.classList.add('hidden');
+            }
+        }
+
+        function getActiveMajorEvalEntry() {
+            return majorEvalEntries.find(entry => entry.id === activeMajorEvalId) || null;
+        }
+
+        function renderMajorEvalList() {
+            if (!majorEvalList) return;
+            majorEvalList.innerHTML = '';
+            if (!Array.isArray(majorEvalEntries)) {
+                majorEvalEntries = [];
+            }
+            if (!majorEvalEntries.length) {
+                activeMajorEvalId = '';
+                if (majorEvalEmpty) majorEvalEmpty.classList.remove('hidden');
+                return;
+            }
+
+            if (majorEvalEmpty) majorEvalEmpty.classList.add('hidden');
+
+            majorEvalEntries.forEach(entry => {
+                const li = document.createElement('li');
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.dataset.entryId = entry.id;
+                button.className = `w-full text-left px-3 py-2 rounded border transition ${entry.id === activeMajorEvalId ? 'border-sky-500 bg-sky-50 text-sky-700' : 'border-gray-200 hover:border-sky-400 hover:bg-sky-50'}`;
+                const statusBadge = entry.aiData && entry.aiData.length ? '<span class="text-xs font-medium text-emerald-600">완료</span>' : '';
+                button.innerHTML = `
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="truncate">${escapeHtml(entry.title)}</span>
+                        ${statusBadge}
+                    </div>
+                `;
+                li.appendChild(button);
+                majorEvalList.appendChild(li);
+            });
+
+            if (!activeMajorEvalId && majorEvalEntries.length) {
+                activeMajorEvalId = majorEvalEntries[0].id;
+            }
+        }
+
+        function updateMajorEvalWorkspace() {
+            if (!majorEvalWorkspace) return;
+            if (!majorEvalEntries.length) {
+                majorEvalInputSection?.classList.add('hidden');
+                majorEvalModifySection?.classList.add('hidden');
+                renderMajorEvalOutput(null);
+                return;
+            }
+
+            let entry = getActiveMajorEvalEntry();
+            if (!entry) {
+                entry = majorEvalEntries[0];
+                activeMajorEvalId = entry.id;
+            }
+
+            if (!entry.details) {
+                entry.details = { schoolName: '', domain: '', numQuestions: 5, evaluationTopic: '' };
+            }
+
+            populateMajorEvalInputs(entry);
+
+            if (entry.aiData && entry.aiData.length) {
+                majorEvalInputSection?.classList.add('hidden');
+                majorEvalModifySection?.classList.remove('hidden');
+                if (majorEvalModifyInput) majorEvalModifyInput.value = '';
+            } else {
+                majorEvalInputSection?.classList.remove('hidden');
+                majorEvalModifySection?.classList.add('hidden');
+            }
+
+            renderMajorEvalOutput(entry);
+        }
+
+        function populateMajorEvalInputs(entry) {
+            if (!entry || !entry.details) return;
+            if (majorEvalSchoolInput) majorEvalSchoolInput.value = entry.details.schoolName || '';
+            if (majorEvalDomainInput) majorEvalDomainInput.value = entry.details.domain || '';
+            if (majorEvalQuestionsInput) majorEvalQuestionsInput.value = entry.details.numQuestions || 5;
+            if (majorEvalTopicInput) majorEvalTopicInput.value = entry.details.evaluationTopic || '';
+        }
+
+        function createMajorEvalEntry(title) {
+            const newEntry = {
+                id: `major-eval-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                title: title.trim() || '새 심사표',
+                details: { schoolName: '', domain: '', numQuestions: 5, evaluationTopic: '' },
+                aiData: []
+            };
+            majorEvalEntries = [newEntry, ...majorEvalEntries];
+            activeMajorEvalId = newEntry.id;
+            renderMajorEvalList();
+            updateMajorEvalWorkspace();
+        }
+
+        function showMajorEvalModal() {
+            if (!majorEvalModal) return;
+            majorEvalModal.classList.remove('hidden');
+            majorEvalModal.classList.add('flex');
+            majorEvalModalTitle.value = '';
+            setTimeout(() => majorEvalModalTitle.focus(), 50);
+        }
+
+        function hideMajorEvalModal() {
+            if (!majorEvalModal) return;
+            majorEvalModal.classList.add('hidden');
+            majorEvalModal.classList.remove('flex');
+            majorEvalModalTitle.value = '';
+        }
+
+        function renderMajorEvalOutput(entry) {
+            if (!majorEvalOutput) return;
+            if (!entry) {
+                majorEvalOutput.innerHTML = '<p class="text-gray-500">왼쪽 목록에서 심사표를 선택하면 결과가 표시됩니다.</p>';
+                return;
+            }
+
+            const details = entry.details || {};
+            const items = Array.isArray(entry.aiData) ? entry.aiData : [];
+
+            if (!items.length) {
+                majorEvalOutput.innerHTML = '<p class="text-gray-500">입력 정보를 작성한 뒤 생성 버튼을 눌러 심사표를 만들어보세요.</p>';
+                return;
+            }
+
+            const normalizedItems = normalizeMajorEvalData(items, details.numQuestions || items.length);
+            if (!normalizedItems.length) {
+                majorEvalOutput.innerHTML = '<p class="text-red-500">AI가 결과를 생성하지 못했습니다. 다시 시도해주세요.</p>';
+                return;
+            }
+
+            const currentYear = new Date().getFullYear();
+            const schoolName = details.schoolName || '[학교 이름]';
+            const domain = details.domain || '영역';
+            const evaluationTopic = details.evaluationTopic || '평가 주제';
+
+            const evaluationRows = normalizedItems.map((item, index) => {
+                const domainCell = index === 0 ? `<td rowspan="${normalizedItems.length}" class="border px-2 py-2 align-middle font-medium">${escapeHtml(domain)}</td>` : '';
+                return `
+                    <tr>
+                        ${domainCell}
+                        <td class="border px-2 py-2">${index + 1}</td>
+                        <td class="border px-2 py-2 text-left">${formatCellText(item.content)}</td>
+                        <td class="border px-2 py-2">2</td>
+                        <td class="border px-2 py-2 text-left">${formatCellText(item.materials || '필요 준비물 없음')}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            const recordRows = normalizedItems.map((item, index) => {
+                const domainCell = index === 0 ? `<td rowspan="${normalizedItems.length}" class="border px-2 py-2 align-middle font-medium">${escapeHtml(domain)}</td>` : '';
+                return `
+                    <tr>
+                        ${domainCell}
+                        <td class="border px-2 py-2">${index + 1}</td>
+                        <td class="border px-2 py-2 text-left">${formatCellText(item.content)}</td>
+                        <td class="border px-2 py-2"></td>
+                    </tr>
+                `;
+            }).join('');
+
+            majorEvalOutput.innerHTML = `
+                <div class="space-y-6">
+                    <div class="text-center space-y-1">
+                        <p class="text-sm text-gray-600">${currentYear}학년도 ${escapeHtml(schoolName)} 전공과 입학 전형</p>
+                        <h3 class="text-xl font-bold text-gray-800">직업능력평가 (${escapeHtml(evaluationTopic)} 심사표)</h3>
+                    </div>
+                    <div class="space-y-3">
+                        <h4 class="font-semibold text-lg text-gray-800">1페이지 · 직업능력평가 심사표</h4>
+                        <div class="text-sm text-gray-600">
+                            <p>○ 평가 기준: 100% 수행(2점), 못함(0점)</p>
+                            <p>○ 제한 시간: 문항당 30초 / ○ 준비물: 초시계</p>
+                        </div>
+                        <table class="w-full border border-gray-300 text-sm">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="border px-2 py-2 w-32">영역</th>
+                                    <th class="border px-2 py-2 w-16">문항</th>
+                                    <th class="border px-2 py-2">내용</th>
+                                    <th class="border px-2 py-2 w-16">배점</th>
+                                    <th class="border px-2 py-2 w-32">자료(수)</th>
+                                </tr>
+                            </thead>
+                            <tbody>${evaluationRows}</tbody>
+                        </table>
+                    </div>
+                    <div class="space-y-3">
+                        <h4 class="font-semibold text-lg text-gray-800">2페이지 · 직업능력평가 기록지</h4>
+                        <table class="w-full border border-gray-300 text-sm">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="border px-2 py-2 w-32">영역</th>
+                                    <th class="border px-2 py-2 w-16">문항</th>
+                                    <th class="border px-2 py-2">내용</th>
+                                    <th class="border px-2 py-2 w-24">취득점수</th>
+                                </tr>
+                            </thead>
+                            <tbody>${recordRows}</tbody>
+                            <tfoot>
+                                <tr>
+                                    <th colspan="3" class="border px-2 py-2 text-right">합계</th>
+                                    <td class="border px-2 py-2"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function normalizeMajorEvalData(raw, count) {
+            let items = [];
+            if (Array.isArray(raw)) {
+                items = raw;
+            } else if (Array.isArray(raw?.items)) {
+                items = raw.items;
+            } else if (Array.isArray(raw?.data)) {
+                items = raw.data;
+            }
+
+            if (!items.length) {
+                return [];
+            }
+
+            const total = Math.max(1, count || items.length);
+            const normalized = [];
+
+            for (let i = 0; i < total; i++) {
+                const source = items[i] || {};
+                const content = typeof source.content === 'string' ? source.content.trim() : '';
+                const materials = typeof source.materials === 'string' ? source.materials.trim() : '';
+                normalized.push({
+                    content: content || '내용을 확인해주세요.',
+                    materials: materials || '필요 준비물 없음'
+                });
+            }
+
+            return normalized;
+        }
+
+        if (templateCategoryButtons) {
+            templateCategoryButtons.addEventListener('click', (event) => {
+                const button = event.target.closest('button[data-template-category]');
+                if (!button) return;
+                activateTemplateCategory(button.dataset.templateCategory);
+            });
+        }
+
+        if (majorEvalAddBtn) {
+            majorEvalAddBtn.addEventListener('click', () => {
+                showMajorEvalModal();
+            });
+        }
+
+        if (majorEvalModalCancel) {
+            majorEvalModalCancel.addEventListener('click', () => {
+                hideMajorEvalModal();
+            });
+        }
+
+        if (majorEvalModal) {
+            majorEvalModal.addEventListener('click', (event) => {
+                if (event.target === majorEvalModal) {
+                    hideMajorEvalModal();
+                }
+            });
+        }
+
+        if (majorEvalModalConfirm) {
+            majorEvalModalConfirm.addEventListener('click', () => {
+                const title = majorEvalModalTitle.value.trim();
+                if (!title) {
+                    alert('제목을 입력해주세요.');
+                    return;
+                }
+                createMajorEvalEntry(title);
+                hideMajorEvalModal();
+            });
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && majorEvalModal && !majorEvalModal.classList.contains('hidden')) {
+                hideMajorEvalModal();
+            }
+        });
+
+        if (majorEvalList) {
+            majorEvalList.addEventListener('click', (event) => {
+                const button = event.target.closest('button[data-entry-id]');
+                if (!button) return;
+                activeMajorEvalId = button.dataset.entryId;
+                renderMajorEvalList();
+                updateMajorEvalWorkspace();
+            });
+        }
+
+        const majorEvalInputs = [
+            [majorEvalSchoolInput, 'schoolName'],
+            [majorEvalDomainInput, 'domain'],
+            [majorEvalQuestionsInput, 'numQuestions'],
+            [majorEvalTopicInput, 'evaluationTopic']
+        ];
+
+        majorEvalInputs.forEach(([input, key]) => {
+            if (!input) return;
+            input.addEventListener('input', () => {
+                const entry = getActiveMajorEvalEntry();
+                if (!entry) return;
+                if (!entry.details) entry.details = { schoolName: '', domain: '', numQuestions: 5, evaluationTopic: '' };
+                if (key === 'numQuestions') {
+                    let value = parseInt(input.value, 10);
+                    if (!Number.isFinite(value) || value < 1) {
+                        value = 1;
+                    }
+                    entry.details[key] = value;
+                    input.value = value;
+                } else {
+                    entry.details[key] = input.value;
+                }
+            });
+        });
+
+        if (majorEvalGenerateBtn) {
+            majorEvalGenerateBtn.addEventListener('click', async () => {
+                const entry = getActiveMajorEvalEntry();
+                if (!entry || isMajorEvalGenerating) return;
+
+                const schoolName = (majorEvalSchoolInput?.value || '').trim();
+                const domain = (majorEvalDomainInput?.value || '').trim();
+                const evaluationTopic = (majorEvalTopicInput?.value || '').trim();
+                let numQuestions = parseInt(majorEvalQuestionsInput?.value || '0', 10);
+                if (!Number.isFinite(numQuestions) || numQuestions < 1) {
+                    numQuestions = 1;
+                }
+
+                if (!domain || !evaluationTopic) {
+                    alert('영역과 평가 주제를 입력해주세요.');
+                    return;
+                }
+
+                entry.details = {
+                    schoolName,
+                    domain,
+                    evaluationTopic,
+                    numQuestions
+                };
+
+                const prompt = `너는 특수학교 전공과 입학 전형 심사표를 만드는 전문가야. 아래 정보를 참고하여 직업능력평가 심사표 문항을 JSON 배열로 작성해줘.
+
+학교 이름: ${schoolName || '[학교 이름]'}
+영역: ${domain}
+평가 주제: ${evaluationTopic}
+문항 수: ${numQuestions}
+
+요구사항:
+1. JSON 배열의 길이는 반드시 ${numQuestions}개여야 해.
+2. 각 요소는 {"content":"지시문", "materials":"준비물 목록"} 형식이어야 하며 다른 속성은 포함하지 마.
+3. content는 학생에게 명확히 지시하는 문장으로 작성하고 반드시 '~하시오.'로 끝내.
+4. materials는 과제 수행에 필요한 준비물을 쉼표로 구분된 한 줄 문자열로 작성해. 준비물이 없으면 '필요 준비물 없음'이라고 적어.
+5. 설명이나 주석 없이 JSON 배열만 반환해.`;
+
+                const originalText = majorEvalGenerateBtn.textContent;
+                majorEvalGenerateBtn.textContent = '생성 중...';
+                majorEvalGenerateBtn.disabled = true;
+                isMajorEvalGenerating = true;
+
+                try {
+                    const result = await callGemini(prompt, true);
+                    const normalized = normalizeMajorEvalData(result, numQuestions);
+                    if (!normalized.length) {
+                        throw new Error('empty');
+                    }
+                    entry.aiData = normalized;
+                    renderMajorEvalList();
+                    updateMajorEvalWorkspace();
+                    showToast('심사표가 생성되었습니다.');
+                } catch (error) {
+                    console.error('Failed to generate major evaluation sheet', error);
+                    alert('심사표를 생성하지 못했습니다. 잠시 후 다시 시도해주세요.');
+                } finally {
+                    isMajorEvalGenerating = false;
+                    majorEvalGenerateBtn.disabled = false;
+                    majorEvalGenerateBtn.textContent = originalText;
+                }
+            });
+        }
+
+        if (majorEvalModifyBtn) {
+            majorEvalModifyBtn.addEventListener('click', async () => {
+                const entry = getActiveMajorEvalEntry();
+                if (!entry || !entry.aiData?.length || isMajorEvalModifying) return;
+
+                const instruction = (majorEvalModifyInput?.value || '').trim();
+                if (!instruction) {
+                    alert('수정할 내용을 입력해주세요.');
+                    return;
+                }
+
+                const prompt = `너는 특수학교 전공과 직업능력평가 심사표를 다듬는 전문가야. 아래 JSON 데이터를 사용자의 요청에 맞게 수정해줘.
+
+현재 데이터:
+${JSON.stringify(entry.aiData, null, 2)}
+
+사용자 요청: ${instruction}
+
+조건:
+1. 배열 길이는 ${entry.details?.numQuestions || entry.aiData.length}개로 유지해.
+2. 각 요소는 {"content":"지시문", "materials":"준비물"} 형식을 따르고 다른 속성은 추가하지 마.
+3. content는 '~하시오.'로 끝나는 지시문 형태로 작성하고, materials는 쉼표로 구분된 준비물 목록을 제공해. 준비물이 없다면 '필요 준비물 없음'이라고 작성해.
+4. 설명 없이 JSON 배열만 반환해.`;
+
+                const originalText = majorEvalModifyBtn.textContent;
+                majorEvalModifyBtn.textContent = '수정 중...';
+                majorEvalModifyBtn.disabled = true;
+                isMajorEvalModifying = true;
+
+                try {
+                    const result = await callGemini(prompt, true);
+                    const normalized = normalizeMajorEvalData(result, entry.details?.numQuestions || entry.aiData.length);
+                    if (!normalized.length) {
+                        throw new Error('empty');
+                    }
+                    entry.aiData = normalized;
+                    renderMajorEvalList();
+                    renderMajorEvalOutput(entry);
+                    if (majorEvalModifyInput) majorEvalModifyInput.value = '';
+                    showToast('수정된 내용이 적용되었습니다.');
+                } catch (error) {
+                    console.error('Failed to modify major evaluation sheet', error);
+                    alert('출력을 수정하지 못했습니다. 다시 시도해주세요.');
+                } finally {
+                    isMajorEvalModifying = false;
+                    majorEvalModifyBtn.disabled = false;
+                    majorEvalModifyBtn.textContent = originalText;
+                }
+            });
+        }
+
+        if (majorEvalModifyInput) {
+            majorEvalModifyInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    majorEvalModifyBtn?.click();
+                }
+            });
+        }
         const achievementTables = {
             elementary: {
                 korean: `| **학년(군)** | **듣기⋅말하기** | **읽기** | **쓰기** | **문법** | **문학** | **매체** |
@@ -2500,6 +3077,23 @@
         }
 
         // --- UTILITY FUNCTIONS ---
+        function escapeHtml(text) {
+            return (text || '').replace(/[&<>"']/g, (char) => {
+                switch (char) {
+                    case '&': return '&amp;';
+                    case '<': return '&lt;';
+                    case '>': return '&gt;';
+                    case '"': return '&quot;';
+                    case "'": return '&#39;';
+                    default: return char;
+                }
+            });
+        }
+
+        function formatCellText(text) {
+            return escapeHtml(text || '').replace(/\n/g, '<br>');
+        }
+
         function showToast(message) {
             toast.textContent = message;
             toast.classList.remove('opacity-0');
