@@ -287,6 +287,12 @@
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, getBlob } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         import { fetchTeacherClass, createTeacherClass, addStudentsToTeacherClass } from "./js/classManager.js";
 
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialBookId = urlParams.get('bookId');
+        const viewerParam = urlParams.get('viewer');
+        const forceViewerMode = viewerParam === '1' || viewerParam === 'true';
+        let hasAttemptedInitialBookLoad = false;
+
         // 전역 변수
         let bookCurrentPage = 0;
         let totalBookSpreads = 0;
@@ -3209,6 +3215,18 @@
                 await updateUserInfo(ensuredData);
                 await loadUserBooks();
                 await loadLibraryBooks();
+                if (initialBookId && !hasAttemptedInitialBookLoad) {
+                    hasAttemptedInitialBookLoad = true;
+                    try {
+                        await loadBook(initialBookId);
+                        if (forceViewerMode) {
+                            setViewMode(true);
+                        }
+                    } catch (error) {
+                        console.error('Failed to open initial book:', error);
+                        showNotification('책을 불러오지 못했습니다.');
+                    }
+                }
             } else {
                 loginView.classList.remove('hidden');
                 studentRegisterView.classList.add('hidden');
