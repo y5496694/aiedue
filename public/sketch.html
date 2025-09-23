@@ -81,6 +81,23 @@
                 const [currentSketchId, setCurrentSketchId] = React.useState(searchParams.get('sketchId'));
                 const [currentSketchCode, setCurrentSketchCode] = React.useState(searchParams.get('code'));
 
+                const addFilesToScene = React.useCallback((filesData) => {
+                    if (!excalidrawAPI || !filesData) return;
+
+                    let filesArray = [];
+                    if (filesData instanceof Map) {
+                        filesArray = Array.from(filesData.values());
+                    } else if (Array.isArray(filesData)) {
+                        filesArray = filesData;
+                    } else if (typeof filesData === 'object') {
+                        filesArray = Object.values(filesData);
+                    }
+
+                    if (filesArray.length > 0) {
+                        excalidrawAPI.addFiles(filesArray);
+                    }
+                }, [excalidrawAPI]);
+
                 React.useEffect(() => {
                     const unsub = onAuthStateChanged(auth, async (u) => {
                         setUser(u);
@@ -153,8 +170,7 @@
                                 const blob = await getBlob(fileRef);
                                 const text = await blob.text();
                                 const data = JSON.parse(text);
-                                const files = data.files ? new Map(Object.entries(data.files)) : null;
-                                if (files) excalidrawAPI.addFiles(files);
+                                addFilesToScene(data.files);
                                 const appState = {
                                     ...data.appState,
                                     collaborators: new Map(Object.entries(data.appState?.collaborators || {}))
@@ -170,7 +186,7 @@
                             }
                         })();
                     }
-                }, [user, excalidrawAPI, currentSketchId]);
+                }, [user, excalidrawAPI, currentSketchId, addFilesToScene]);
 
                 const handleSave = async () => {
                     if (!excalidrawAPI || !user || !currentSketchId) return;
@@ -216,10 +232,7 @@
                             try {
                                 const data = JSON.parse(e.target.result);
                                 if (excalidrawAPI && data.elements && data.appState) {
-                                    const files = data.files ? new Map(Object.entries(data.files)) : null;
-                                    if (files) {
-                                        excalidrawAPI.addFiles(files);
-                                    }
+                                    addFilesToScene(data.files);
                                     const appState = {
                                         ...data.appState,
                                         collaborators: new Map(
