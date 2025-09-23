@@ -7,13 +7,16 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap');
-        body { font-family: 'Gowun Dodum', sans-serif; }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f7fafc; }
+        .view { display: none; }
+        .view.active { display: block; }
         .loader { border: 8px solid #f3f3f3; border-radius: 50%; width: 60px; height: 60px; animation: spin 2s linear infinite; border-top: 8px solid #10b981; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
+
         .book-viewer { aspect-ratio: 2 / 1.414; width: 100%; display: flex; }
         .book-page { position: relative; width: 50%; height: 100%; background-size: cover; background-position: center; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 2rem; box-sizing: border-box; }
         .book-spread { display: none; }
@@ -35,11 +38,11 @@
         .image-upload-btn:hover { background-color: rgba(37, 99, 235, 0.95); }
         #notification { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background-color: #2c3e50; color: white; padding: 1rem 2rem; border-radius: 8px; z-index: 1000; transition: opacity 0.5s, transform 0.5s; opacity: 0; pointer-events: none; }
         #notification.show { opacity: 1; transform: translate(-50%, 10px); }
-        .login-tab.active { border-bottom-color: #10B981; color: #10B981; }
+        .login-tab.active { border-bottom-color: #F59E0B; color: #F59E0B; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .form-input { transition: all 0.3s; }
-        .form-input:focus { border-color: #10B981; box-shadow: 0 0 0 2px rgba(16,185,129,0.2); }
+        .form-input:focus { border-color: #F59E0B; box-shadow: 0 0 0 2px rgba(245,158,11,0.2); }
         .btn { transition: background-color 0.3s; }
         .btn-primary { background-color: #10B981; color: white; }
         .btn-primary:hover { background-color: #059669; }
@@ -48,17 +51,18 @@
         .btn-disabled { background-color: #D1D5DB; cursor: not-allowed; }
         .book-view { display: none; }
         .book-view.active { display: block; }
+        .book-page, .manual-text-area, .text-box { font-family: 'Gowun Dodum', sans-serif; }
 </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="text-gray-800 min-h-screen">
 
-    <div id="book-auth-container" class="min-h-screen flex flex-col items-center justify-center px-4 py-10">
-        <div id="book-login-view" class="book-view active w-full">
-            <div class="text-center mb-10">
-                <h1 class="text-4xl font-bold text-emerald-600">에이두 북메이커</h1>
+    <div id="book-auth-container" class="max-w-7xl mx-auto p-4 md:p-8 w-full">
+        <div id="book-login-view" class="book-view view active">
+            <div class="text-center mb-12">
+                <h1 class="text-4xl font-bold text-amber-600">에이두 북메이커</h1>
                 <p class="text-gray-600 mt-2">나만의 이야기 책을 만들어 보세요</p>
             </div>
-            <div class="bg-white p-8 rounded-lg shadow-lg max-w-md mx-auto">
+            <div class="bg-white p-8 rounded-lg shadow-md max-w-md mx-auto">
                 <div class="border-b border-gray-200">
                     <nav class="-mb-px flex space-x-6" aria-label="Tabs">
                         <button id="book-student-login-tab" class="login-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">🧑‍🎓 학생</button>
@@ -85,14 +89,14 @@
                     <button id="book-teacher-google-login-btn" class="w-full py-2 mt-2 rounded-md btn btn-secondary"><i class="fab fa-google mr-2"></i>Google로 로그인</button>
                 </div>
                 <div class="mt-6 text-center space-y-2">
-                    <button id="book-show-student-register-btn" class="w-full text-center text-sm text-emerald-600 hover:underline">처음이신가요? 학생 등록하기</button>
-                    <button id="book-show-teacher-register-btn" class="w-full text-center text-sm text-emerald-600 hover:underline">교사이신가요? 회원가입하기</button>
+                    <button id="book-show-student-register-btn" class="w-full text-center text-sm text-amber-600 hover:underline">처음이신가요? 학생 등록하기</button>
+                    <button id="book-show-teacher-register-btn" class="w-full text-center text-sm text-amber-600 hover:underline">교사이신가요? 회원가입하기</button>
                 </div>
             </div>
         </div>
 
-        <div id="book-student-register-view" class="book-view w-full">
-            <div class="bg-white p-8 rounded-lg shadow-lg max-w-md mx-auto">
+        <div id="book-student-register-view" class="book-view view">
+            <div class="bg-white p-8 rounded-lg shadow-md max-w-md mx-auto">
                 <h2 class="text-2xl font-bold mb-6 text-center">🧑‍🎓 학생 등록</h2>
                 <div class="mb-4">
                     <label for="book-student-name" class="block text-sm font-medium text-gray-700 mb-1">이름</label>
@@ -103,8 +107,8 @@
             </div>
         </div>
 
-        <div id="book-teacher-register-view" class="book-view w-full">
-            <div class="bg-white p-8 rounded-lg shadow-lg max-w-md mx-auto">
+        <div id="book-teacher-register-view" class="book-view view">
+            <div class="bg-white p-8 rounded-lg shadow-md max-w-md mx-auto">
                 <h2 class="text-2xl font-bold mb-6 text-center">🧑‍🏫 교사 회원가입</h2>
                 <div class="mb-4">
                     <label for="book-teacher-register-name" class="block text-sm font-medium text-gray-700 mb-1">이름</label>
