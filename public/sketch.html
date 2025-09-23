@@ -60,6 +60,16 @@
         const db = getFirestore(app);
         const storage = getStorage(app);
 
+        const SKETCH_CODE_CHARACTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        function generateUniqueSketchCode(existingCodes = new Set()) {
+            const codes = existingCodes instanceof Set ? existingCodes : new Set(existingCodes);
+            let code;
+            do {
+                code = Array.from({ length: 6 }, () => SKETCH_CODE_CHARACTERS[Math.floor(Math.random() * SKETCH_CODE_CHARACTERS.length)]).join('');
+            } while (codes.has(code));
+            return code;
+        }
+
         window.addEventListener('load', () => {
             const Excalidraw = window.ExcalidrawLib.Excalidraw;
 
@@ -67,18 +77,72 @@
                 const [excalidrawAPI, setExcalidrawAPI] = React.useState(null);
                 const [user, setUser] = React.useState(null);
                 const [sketches, setSketches] = React.useState([]);
-                const [currentSketchId, setCurrentSketchId] = React.useState(new URLSearchParams(window.location.search).get('sketchId'));
+                const searchParams = React.useMemo(() => new URLSearchParams(window.location.search), []);
+                const [currentSketchId, setCurrentSketchId] = React.useState(searchParams.get('sketchId'));
+                const [currentSketchCode, setCurrentSketchCode] = React.useState(searchParams.get('code'));
 
                 React.useEffect(() => {
                     const unsub = onAuthStateChanged(auth, async (u) => {
                         setUser(u);
                         if (u) {
-                            const snap = await getDocs(collection(db, 'users', u.uid, 'sketches'));
-                            setSketches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                            try {
+                                const snap = await getDocs(collection(db, 'users', u.uid, 'sketches'));
+                                const docs = [];
+                                const existingCodes = new Set();
+
+                                snap.forEach(docSnap => {
+                                    const data = docSnap.data() || {};
+                                    if (data.code) existingCodes.add(data.code);
+                                    docs.push({ id: docSnap.id, ...data });
+                                });
+
+                                for (const sketch of docs) {
+                                    if (!sketch.code) {
+                                        const newCode = generateUniqueSketchCode(existingCodes);
+                                        existingCodes.add(newCode);
+                                        await updateDoc(doc(db, 'users', u.uid, 'sketches', sketch.id), { code: newCode });
+                                        sketch.code = newCode;
+                                    }
+                                }
+
+                                setSketches(docs);
+                            } catch (error) {
+                                console.error('스케치 목록을 불러오는 중 오류가 발생했습니다.', error);
+                            }
                         }
                     });
                     return () => unsub();
                 }, []);
+
+                React.useEffect(() => {
+                    if (!currentSketchId && sketches.length > 0) {
+                        setCurrentSketchId(sketches[0].id);
+                    }
+                }, [sketches, currentSketchId]);
+
+                React.useEffect(() => {
+                    if (!currentSketchId) return;
+                    const current = sketches.find(s => s.id === currentSketchId);
+                    if (current) {
+                        setCurrentSketchCode(current.code || null);
+                    }
+                }, [sketches, currentSketchId]);
+
+                React.useEffect(() => {
+                    if (!currentSketchId) return;
+                    const params = new URLSearchParams(window.location.search);
+                    params.set('sketchId', currentSketchId);
+                    if (currentSketchCode) {
+                        params.set('code', currentSketchCode);
+                    } else {
+                        params.delete('code');
+                    }
+                    const newQuery = params.toString();
+                    const newSearch = newQuery ? `?${newQuery}` : '';
+                    if (window.location.search !== newSearch) {
+                        window.history.replaceState({}, '', `${window.location.pathname}${newSearch}`);
+                    }
+                }, [currentSketchId, currentSketchCode]);
 
                 React.useEffect(() => {
                     if (user && excalidrawAPI && currentSketchId) {
@@ -107,13 +171,31 @@
                     if (!excalidrawAPI || !user || !currentSketchId) return;
                     const elements = excalidrawAPI.getSceneElements();
                     const appState = excalidrawAPI.getAppState();
+                    const collaboratorsEntries = appState.collaborators instanceof Map
+                        ? Array.from(appState.collaborators.entries())
+                        : Object.entries(appState.collaborators || {});
+                    const appStateToSave = {
+                        ...appState,
+                        collaborators: Object.fromEntries(collaboratorsEntries),
+                    };
+                    const filesMap = excalidrawAPI.getFiles ? excalidrawAPI.getFiles() : new Map();
+                    const files = filesMap instanceof Map
+                        ? Object.fromEntries(filesMap.entries())
+                        : Object.fromEntries(Object.entries(filesMap || {}));
                     const data = JSON.stringify({
                         type: 'excalidraw', version: 2, source: 'https://gemini.google.com',
-                        elements, appState,
+                        elements, appState: appStateToSave, files,
                     }, null, 2);
                     // 사용자별 경로를 포함하여 파일을 저장합니다
                     const fileRef = storageRef(storage, `sketch/${user.uid}/${currentSketchId}.excalidraw`);
                     await uploadBytes(fileRef, new Blob([data], { type: 'application/json' }));
+                    try {
+                        await updateDoc(doc(db, 'users', user.uid, 'sketches', currentSketchId), {
+                            updatedAt: serverTimestamp()
+                        });
+                    } catch (error) {
+                        console.error('스케치 정보를 업데이트하는 데 실패했습니다.', error);
+                    }
                     alert('저장되었습니다.');
                 };
 
@@ -158,16 +240,22 @@
                 };
 
                 const handleSelectChange = (e) => {
-                    window.location.href = `sketch.html?sketchId=${e.target.value}`;
+                    const selected = sketches.find(s => s.id === e.target.value);
+                    if (selected) {
+                        window.location.href = `sketch.html?sketchId=${encodeURIComponent(selected.id)}&code=${encodeURIComponent(selected.code || '')}`;
+                    }
                 };
 
                 const handleCreateSketch = async () => {
                     if (!user) return;
+                    const existingCodes = new Set(sketches.map(s => s.code).filter(Boolean));
+                    const newCode = generateUniqueSketchCode(existingCodes);
                     const docRef = await addDoc(collection(db, 'users', user.uid, 'sketches'), {
                         name: '새 스케치북',
-                        createdAt: serverTimestamp()
+                        createdAt: serverTimestamp(),
+                        code: newCode
                     });
-                    window.location.href = `sketch.html?sketchId=${docRef.id}`;
+                    window.location.href = `sketch.html?sketchId=${encodeURIComponent(docRef.id)}&code=${encodeURIComponent(newCode)}`;
                 };
 
                 const handleRenameSketch = async () => {
@@ -176,7 +264,7 @@
                     const newName = prompt('새 이름을 입력하세요', current?.name || '새 스케치북');
                     if (newName) {
                         await updateDoc(doc(db, 'users', user.uid, 'sketches', currentSketchId), { name: newName });
-                        setSketches(sketches.map(s => s.id === currentSketchId ? { ...s, name: newName } : s));
+                        setSketches(prev => prev.map(s => s.id === currentSketchId ? { ...s, name: newName } : s));
                     }
                 };
 
@@ -192,7 +280,7 @@
                     }
                     const remaining = sketches.filter(s => s.id !== currentSketchId);
                     if (remaining.length > 0) {
-                        window.location.href = `sketch.html?sketchId=${remaining[0].id}`;
+                        window.location.href = `sketch.html?sketchId=${encodeURIComponent(remaining[0].id)}&code=${encodeURIComponent(remaining[0].code || '')}`;
                     } else {
                         window.location.href = 'index.html';
                     }
@@ -200,14 +288,23 @@
 
                 return (
                     <>
-                        <header className="flex items-center justify-between p-2 shadow-md bg-white z-10">
-                            <div className="flex items-center space-x-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
-                                <span className="font-bold text-lg text-gray-800">에이두 스케치북</span>
+                        <header className="flex flex-wrap items-center justify-between gap-2 p-2 shadow-md bg-white z-10">
+                            <div className="flex items-center space-x-4">
+                                <div className="flex items-center space-x-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                                    <span className="font-bold text-lg text-gray-800">에이두 스케치북</span>
+                                </div>
+                                {currentSketchCode && (
+                                    <span className="text-sm text-gray-500">코드: {currentSketchCode}</span>
+                                )}
                             </div>
-                            <div className="flex space-x-2">
-                                <select value={currentSketchId || ''} onChange={handleSelectChange} className="border rounded px-2">
-                                    {sketches.map(s => <option key={s.id} value={s.id}>{s.name || '새 스케치북'}</option>)}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <select value={currentSketchId || ''} onChange={handleSelectChange} className="border rounded px-2 py-1">
+                                    {sketches.map(s => (
+                                        <option key={s.id} value={s.id}>
+                                            {(s.name || '새 스케치북') + (s.code ? ` (${s.code})` : '')}
+                                        </option>
+                                    ))}
                                 </select>
                                 <button onClick={handleCreateSketch} className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg shadow-md transition-all">스케치북 만들기</button>
                                 <button onClick={handleRenameSketch} className="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-3 rounded-lg shadow-md transition-all">이름 변경</button>

@@ -22,6 +22,10 @@ service firebase.storage {
         );
     }
 
+    match /sketch/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && (request.auth.uid == userId || isTeacher());
+    }
+
     // 그 외 경로: 로그인한 사용자에게만 접근 허용
     match /{allPaths=**} {
       allow read, write: if request.auth != null;
