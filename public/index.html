@@ -318,11 +318,11 @@
             <div id="copy-promises-tab-content" class="tab-content">
                 <div class="flex flex-col gap-2 mb-4 md:flex-row md:items-center md:justify-between">
                     <h2 class="text-2xl font-bold">📝 내 약속</h2>
-                    <p class="text-sm text-gray-500">따라쓰기 약속을 완료하면 기록이 여기에 남아요.</p>
+                    <p class="text-sm text-gray-500">약속을 완료하면 기록이 여기에 남아요.</p>
                 </div>
                 <div id="copy-promise-history-container" class="bg-white rounded-lg shadow-md overflow-hidden">
                     <div id="copy-promise-history-loading" class="hidden p-6 text-center text-sm text-gray-500">기록을 불러오는 중이에요...</div>
-                    <div id="copy-promise-history-empty" class="p-6 text-center text-sm text-gray-500">완료한 따라쓰기 약속이 아직 없어요.</div>
+                    <div id="copy-promise-history-empty" class="p-6 text-center text-sm text-gray-500">완료한 약속이 아직 없어요.</div>
                     <div id="copy-promise-history-list" class="hidden divide-y divide-gray-200"></div>
                 </div>
             </div>
@@ -366,6 +366,7 @@
                     <div class="flex flex-wrap gap-2">
                         <button id="add-life-rule-btn" class="btn bg-green-500 hover:bg-green-600 text-white">+ 간단 규칙 만들기</button>
                         <button id="add-copy-promise-btn" class="btn bg-amber-500 hover:bg-amber-600 text-white">+ 따라쓰기 약속</button>
+                        <button id="add-choice-promise-btn" class="btn bg-indigo-500 hover:bg-indigo-600 text-white">+ 선택형 약속</button>
                     </div>
                 </div>
                 <div id="life-rule-list" class="bg-white p-4 rounded-lg shadow">
@@ -627,6 +628,34 @@
             </form>
         </div>
     </div>
+    <div id="choice-promise-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-choice-promise-modal-btn">&times;</span>
+            <h3 id="choice-promise-modal-title" class="text-xl font-bold mb-4">선택형 약속 만들기</h3>
+            <form id="choice-promise-form" class="text-left space-y-3">
+                <input type="hidden" id="choice-promise-id">
+                <div>
+                    <label for="choice-promise-text" class="block text-sm font-medium">약속 이름</label>
+                    <input type="text" id="choice-promise-text" required class="w-full p-2 border rounded-md form-input" placeholder="예: 생활 습관 약속 퀴즈">
+                </div>
+                <div>
+                    <label for="choice-promise-reward" class="block text-sm font-medium">경험치 보상 (EXP)</label>
+                    <input type="number" id="choice-promise-reward" required min="0" class="w-full p-2 border rounded-md form-input" placeholder="예: 30">
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-sm font-medium">선택형 문항</label>
+                        <button type="button" id="add-choice-question-btn" class="btn btn-secondary text-xs px-3 py-1">문항 추가</button>
+                    </div>
+                    <div id="choice-promise-questions" class="space-y-2"></div>
+                    <p class="text-xs text-gray-500">각 문항에 정답과 오답을 입력해주세요. 학생은 모든 문항을 맞혀야 약속을 완료할 수 있어요.</p>
+                </div>
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
     <div id="copy-promise-practice-modal" class="modal-overlay hidden">
         <div class="modal-content modal-content-lg">
             <span class="close-button" id="close-copy-promise-practice-modal-btn">&times;</span>
@@ -636,6 +665,18 @@
             <p id="copy-promise-practice-feedback" class="text-sm text-rose-500 hidden mt-4"></p>
             <div class="flex justify-end mt-6">
                 <button id="copy-promise-promise-btn" class="btn btn-primary btn-disabled" disabled>약속</button>
+            </div>
+        </div>
+    </div>
+    <div id="choice-promise-practice-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg">
+            <span class="close-button" id="close-choice-promise-practice-modal-btn">&times;</span>
+            <h3 id="choice-promise-practice-title" class="text-xl font-bold mb-2">선택형 약속</h3>
+            <p id="choice-promise-practice-subtitle" class="text-sm text-gray-600 mb-4"></p>
+            <div id="choice-promise-practice-list" class="space-y-4 max-h-[60vh] overflow-y-auto"></div>
+            <p id="choice-promise-practice-feedback" class="text-sm text-rose-500 hidden mt-4"></p>
+            <div class="flex justify-end mt-6">
+                <button id="choice-promise-complete-btn" class="btn btn-primary btn-disabled" disabled>완료하기</button>
             </div>
         </div>
     </div>
@@ -1254,6 +1295,14 @@
         const copyPromisePracticeSubtitle = document.getElementById('copy-promise-practice-subtitle');
         const copyPromisePracticeFeedback = document.getElementById('copy-promise-practice-feedback');
         const copyPromisePromiseBtn = document.getElementById('copy-promise-promise-btn');
+        const choicePromiseModal = document.getElementById('choice-promise-modal');
+        const choicePromiseQuestionsContainer = document.getElementById('choice-promise-questions');
+        const choicePromisePracticeModal = document.getElementById('choice-promise-practice-modal');
+        const choicePromisePracticeList = document.getElementById('choice-promise-practice-list');
+        const choicePromisePracticeTitle = document.getElementById('choice-promise-practice-title');
+        const choicePromisePracticeSubtitle = document.getElementById('choice-promise-practice-subtitle');
+        const choicePromisePracticeFeedback = document.getElementById('choice-promise-practice-feedback');
+        const choicePromiseCompleteBtn = document.getElementById('choice-promise-complete-btn');
         const copyPromiseHistoryList = document.getElementById('copy-promise-history-list');
         const copyPromiseHistoryLoading = document.getElementById('copy-promise-history-loading');
         const copyPromiseHistoryEmpty = document.getElementById('copy-promise-history-empty');
@@ -1285,6 +1334,7 @@
         const editInfoModal = document.getElementById('edit-info-modal');
         let studentToAdjustId = null;
         let currentCopyPromiseAssignment = null;
+        let currentChoicePromiseAssignment = null;
 
 
         // --- Utility & Modal Functions ---
@@ -3175,8 +3225,14 @@
                     const type = rule.type || 'simple';
                     const rewardExp = Number(rule.rewardExp ?? rule.reward ?? 0) || 0;
                     const repeatLabel = rule.repeatType === 'daily' ? '매일' : '한 번';
-                    const typeLabel = type === 'copyPromise' ? '따라쓰기 약속' : '간단 규칙';
+                    const typeLabelMap = {
+                        simple: '간단 규칙',
+                        copyPromise: '따라쓰기 약속',
+                        choicePromise: '선택형 약속'
+                    };
+                    const typeLabel = typeLabelMap[type] || '생활 규칙';
                     const sentenceCount = Array.isArray(rule.sentences) ? rule.sentences.length : 0;
+                    const questionCount = Array.isArray(rule.questions) ? rule.questions.length : 0;
 
                     const item = document.createElement('div');
                     item.className = 'flex flex-col gap-2 rounded-md border border-gray-200 bg-gray-50 p-3 shadow-sm md:flex-row md:items-center md:justify-between';
@@ -3186,6 +3242,8 @@
                     const detailParts = [`${typeLabel}`, `${repeatLabel}`];
                     if (type === 'copyPromise') {
                         detailParts.push(`문항 ${sentenceCount}개`);
+                    } else if (type === 'choicePromise') {
+                        detailParts.push(`문항 ${questionCount}개`);
                     }
                     detailParts.push(`경험치 ${rewardExp} EXP`);
                     info.innerHTML = `
@@ -3216,6 +3274,25 @@
                             copyBtn.classList.add('btn-disabled');
                         }
                         actions.appendChild(copyBtn);
+                    } else if (type === 'choicePromise') {
+                        const choiceBtn = document.createElement('button');
+                        choiceBtn.className = `${isCompletedToday ? 'bg-gray-300 text-white' : 'bg-indigo-500 hover:bg-indigo-600 text-white'} text-xs font-bold py-1 px-3 rounded-full`;
+                        choiceBtn.textContent = isCompletedToday ? '완료됨' : '약속 선택하기';
+                        choiceBtn.disabled = isCompletedToday || isAdminViewing;
+                        if (!choiceBtn.disabled) {
+                            choiceBtn.addEventListener('click', () => {
+                                openChoicePromisePracticeModal({
+                                    id: rule.id,
+                                    text: rule.text,
+                                    rewardExp,
+                                    questions: Array.isArray(rule.questions) ? rule.questions : [],
+                                    repeatType: rule.repeatType
+                                });
+                            });
+                        } else if (isAdminViewing) {
+                            choiceBtn.classList.add('btn-disabled');
+                        }
+                        actions.appendChild(choiceBtn);
                     } else {
                         const completeBtn = document.createElement('button');
                         completeBtn.className = `complete-rule-btn ${isCompletedToday ? 'bg-gray-300 text-white' : 'bg-green-500 hover:bg-green-600 text-white'} text-xs font-bold py-1 px-3 rounded-full`;
@@ -3328,15 +3405,34 @@
                     typed: typeof detail?.typed === 'string' ? detail.typed : String(detail?.typed ?? '')
                 }))
                 : [];
+            const questions = Array.isArray(entry.questions)
+                ? entry.questions.map(detail => ({
+                    question: typeof detail?.question === 'string' ? detail.question : String(detail?.question ?? ''),
+                    correctAnswer: typeof detail?.correctAnswer === 'string' ? detail.correctAnswer : String(detail?.correctAnswer ?? ''),
+                    wrongAnswer: typeof detail?.wrongAnswer === 'string' ? detail.wrongAnswer : String(detail?.wrongAnswer ?? detail?.incorrectAnswer ?? '')
+                }))
+                : [];
+            const responses = Array.isArray(entry.responses)
+                ? entry.responses.map(detail => ({
+                    question: typeof detail?.question === 'string' ? detail.question : String(detail?.question ?? ''),
+                    selectedAnswer: typeof detail?.selectedAnswer === 'string' ? detail.selectedAnswer : String(detail?.selectedAnswer ?? ''),
+                    correctAnswer: typeof detail?.correctAnswer === 'string' ? detail.correctAnswer : String(detail?.correctAnswer ?? ''),
+                    isCorrect: Boolean(detail?.isCorrect)
+                }))
+                : [];
+            const type = entry.type || 'copyPromise';
             return {
                 id: entry.id || null,
-                title: entry.title || '따라쓰기 약속',
+                title: entry.title || (type === 'choicePromise' ? '선택형 약속' : '따라쓰기 약속'),
+                type,
                 rewardExp: Number(entry.rewardExp ?? 0) || 0,
                 repeatType: entry.repeatType || null,
                 sentences: Array.isArray(entry.sentences)
                     ? entry.sentences.map(sentence => typeof sentence === 'string' ? sentence : String(sentence ?? ''))
                     : [],
                 typedSentences,
+                questions,
+                responses,
                 completedAt
             };
         }
@@ -3352,26 +3448,47 @@
                 original: typeof detail?.original === 'string' ? detail.original : String(detail?.original ?? ''),
                 typed: typeof detail?.typed === 'string' ? detail.typed : String(detail?.typed ?? '')
             }));
+            const type = assignment.type || 'copyPromise';
+            const sanitizedQuestions = Array.isArray(assignment.questions)
+                ? assignment.questions.map(question => ({
+                    question: typeof question?.question === 'string' ? question.question : String(question?.question ?? ''),
+                    correctAnswer: typeof question?.correctAnswer === 'string' ? question.correctAnswer : String(question?.correctAnswer ?? ''),
+                    wrongAnswer: typeof question?.wrongAnswer === 'string' ? question.wrongAnswer : String(question?.wrongAnswer ?? question?.incorrectAnswer ?? '')
+                }))
+                : [];
+            const rawResponses = Array.isArray(record.responses) ? record.responses : [];
+            const sanitizedResponses = rawResponses.map(detail => ({
+                question: typeof detail?.question === 'string' ? detail.question : String(detail?.question ?? ''),
+                selectedAnswer: typeof detail?.selectedAnswer === 'string' ? detail.selectedAnswer : String(detail?.selectedAnswer ?? ''),
+                correctAnswer: typeof detail?.correctAnswer === 'string' ? detail.correctAnswer : String(detail?.correctAnswer ?? ''),
+                isCorrect: Boolean(detail?.isCorrect)
+            }));
             const now = new Date();
             const completedAtIso = now.toISOString();
             const localEntry = {
                 id: assignment.id ? `${assignment.id}_${now.getTime()}` : `local_${now.getTime()}`,
-                title: assignment.text || '따라쓰기 약속',
+                title: assignment.text || (type === 'choicePromise' ? '선택형 약속' : '따라쓰기 약속'),
+                type,
                 rewardExp: Number(assignment.rewardExp ?? 0) || 0,
                 repeatType: assignment.repeatType || null,
                 sentences: sanitizedSentences,
                 typedSentences: sanitizedTyped,
+                questions: sanitizedQuestions,
+                responses: sanitizedResponses,
                 completedAt: completedAtIso
             };
             addCopyPromiseHistoryToLocal(userId, localEntry);
 
             const payload = {
                 ruleId: assignment.id || null,
-                title: assignment.text || '따라쓰기 약속',
+                title: assignment.text || (type === 'choicePromise' ? '선택형 약속' : '따라쓰기 약속'),
+                type,
                 rewardExp: Number(assignment.rewardExp ?? 0) || 0,
                 repeatType: assignment.repeatType || null,
                 sentences: sanitizedSentences,
                 typedSentences: sanitizedTyped,
+                questions: sanitizedQuestions,
+                responses: sanitizedResponses,
                 completedAt: serverTimestamp()
             };
             await addDoc(collection(db, `users/${userId}/copyPromiseHistory`), payload);
@@ -3379,7 +3496,7 @@
 
         async function renderCopyPromiseHistory() {
             if (!copyPromiseHistoryList || !copyPromiseHistoryEmpty || !copyPromiseHistoryLoading) return;
-            const defaultEmptyMessage = '완료한 따라쓰기 약속이 아직 없어요.';
+            const defaultEmptyMessage = '완료한 약속이 아직 없어요.';
             copyPromiseHistoryEmpty.textContent = defaultEmptyMessage;
             copyPromiseHistoryList.innerHTML = '';
             copyPromiseHistoryList.classList.add('hidden');
@@ -3394,19 +3511,29 @@
                 return;
             }
 
+            const typeLabelMap = {
+                copyPromise: '따라쓰기 약속',
+                choicePromise: '선택형 약속'
+            };
             const showEntries = (entries) => {
                 copyPromiseHistoryList.innerHTML = '';
                 entries.forEach(entry => {
                     const item = document.createElement('button');
                     item.type = 'button';
                     item.className = 'w-full px-4 py-3 text-left transition hover:bg-amber-50 flex flex-col gap-1 md:flex-row md:items-center md:justify-between';
+                    const infoWrapper = document.createElement('div');
+                    infoWrapper.className = 'flex flex-col';
+                    const typeBadge = document.createElement('span');
+                    typeBadge.className = 'text-xs font-semibold text-amber-600 uppercase tracking-wide';
+                    typeBadge.textContent = typeLabelMap[entry.type] || '약속';
                     const titleSpan = document.createElement('span');
                     titleSpan.className = 'font-medium text-gray-800';
                     titleSpan.textContent = entry.title;
                     const dateSpan = document.createElement('span');
                     dateSpan.className = 'text-sm text-gray-500 md:text-right';
                     dateSpan.textContent = entry.completedAt ? formatDateOnly(entry.completedAt) : '일자 미확인';
-                    item.appendChild(titleSpan);
+                    infoWrapper.append(typeBadge, titleSpan);
+                    item.appendChild(infoWrapper);
                     item.appendChild(dateSpan);
                     item.addEventListener('click', () => openCopyPromiseHistoryModal(entry));
                     copyPromiseHistoryList.appendChild(item);
@@ -3445,14 +3572,33 @@
                             typed: typeof detail?.typed === 'string' ? detail.typed : String(detail?.typed ?? '')
                         }))
                         : [];
+                    const type = data.type || 'copyPromise';
+                    const questions = Array.isArray(data.questions)
+                        ? data.questions.map(detail => ({
+                            question: typeof detail?.question === 'string' ? detail.question : String(detail?.question ?? ''),
+                            correctAnswer: typeof detail?.correctAnswer === 'string' ? detail.correctAnswer : String(detail?.correctAnswer ?? ''),
+                            wrongAnswer: typeof detail?.wrongAnswer === 'string' ? detail.wrongAnswer : String(detail?.wrongAnswer ?? detail?.incorrectAnswer ?? '')
+                        }))
+                        : [];
+                    const responses = Array.isArray(data.responses)
+                        ? data.responses.map(detail => ({
+                            question: typeof detail?.question === 'string' ? detail.question : String(detail?.question ?? ''),
+                            selectedAnswer: typeof detail?.selectedAnswer === 'string' ? detail.selectedAnswer : String(detail?.selectedAnswer ?? ''),
+                            correctAnswer: typeof detail?.correctAnswer === 'string' ? detail.correctAnswer : String(detail?.correctAnswer ?? ''),
+                            isCorrect: Boolean(detail?.isCorrect)
+                        }))
+                        : [];
                     const entry = {
                         id: docSnap.id,
-                        title: data.title || '따라쓰기 약속',
+                        title: data.title || (type === 'choicePromise' ? '선택형 약속' : '따라쓰기 약속'),
+                        type,
                         rewardExp: Number(data.rewardExp ?? 0) || 0,
                         repeatType: data.repeatType || null,
                         completedAt,
                         sentences,
-                        typedSentences
+                        typedSentences,
+                        questions,
+                        responses
                     };
                     entries.push(entry);
                 });
@@ -3461,10 +3607,13 @@
                 const entriesForLocal = entries.map(entry => ({
                     id: entry.id,
                     title: entry.title,
+                    type: entry.type,
                     rewardExp: entry.rewardExp,
                     repeatType: entry.repeatType,
                     sentences: entry.sentences,
                     typedSentences: entry.typedSentences,
+                    questions: entry.questions,
+                    responses: entry.responses,
                     completedAt: entry.completedAt instanceof Date ? entry.completedAt.toISOString() : null
                 }));
                 saveCopyPromiseHistoryToLocal(dataToShow.id, entriesForLocal);
@@ -3485,14 +3634,51 @@
 
         function openCopyPromiseHistoryModal(entry) {
             if (!copyPromiseHistoryModal || !copyPromiseHistoryModalTitle || !copyPromiseHistoryModalDate || !copyPromiseHistoryModalContent) return;
-            copyPromiseHistoryModalTitle.textContent = entry?.title || '따라쓰기 약속';
+            const type = entry?.type || 'copyPromise';
+            const typeLabelMap = {
+                copyPromise: '따라쓰기 약속',
+                choicePromise: '선택형 약속'
+            };
+            const typeLabel = typeLabelMap[type] || '약속';
+            copyPromiseHistoryModalTitle.textContent = entry?.title || (type === 'choicePromise' ? '선택형 약속' : '따라쓰기 약속');
             if (entry?.completedAt instanceof Date) {
                 copyPromiseHistoryModalDate.textContent = `${formatDateTime(entry.completedAt)} 완료`;
             } else {
                 copyPromiseHistoryModalDate.textContent = '완료 일자 정보가 없어요.';
             }
+
+            const sentences = Array.isArray(entry?.typedSentences) && entry.typedSentences.length > 0
+                ? entry.typedSentences
+                : (Array.isArray(entry?.sentences) ? entry.sentences.map(sentence => ({ original: sentence, typed: sentence })) : []);
+            const normalizedResponses = Array.isArray(entry?.responses)
+                ? entry.responses.map(detail => ({
+                    question: typeof detail?.question === 'string' ? detail.question : String(detail?.question ?? ''),
+                    selectedAnswer: typeof detail?.selectedAnswer === 'string' ? detail.selectedAnswer : String(detail?.selectedAnswer ?? ''),
+                    correctAnswer: typeof detail?.correctAnswer === 'string' ? detail.correctAnswer : String(detail?.correctAnswer ?? ''),
+                    isCorrect: Boolean(detail?.isCorrect)
+                }))
+                : [];
+            const questionFallback = Array.isArray(entry?.questions)
+                ? entry.questions.map(detail => ({
+                    question: typeof detail?.question === 'string' ? detail.question : String(detail?.question ?? ''),
+                    selectedAnswer: typeof detail?.correctAnswer === 'string' ? detail.correctAnswer : String(detail?.correctAnswer ?? ''),
+                    correctAnswer: typeof detail?.correctAnswer === 'string' ? detail.correctAnswer : String(detail?.correctAnswer ?? ''),
+                    isCorrect: true
+                }))
+                : [];
+            const choiceResponses = normalizedResponses.length > 0 ? normalizedResponses : questionFallback;
+            const sentenceCount = sentences.length;
+            const questionCount = choiceResponses.length;
+
             if (copyPromiseHistoryModalMeta) {
                 const metaParts = [];
+                metaParts.push(typeLabel);
+                if (type === 'copyPromise' && sentenceCount > 0) {
+                    metaParts.push(`문항 ${sentenceCount}개`);
+                }
+                if (type === 'choicePromise' && questionCount > 0) {
+                    metaParts.push(`문항 ${questionCount}개`);
+                }
                 if (entry?.rewardExp) {
                     metaParts.push(`보상 ${entry.rewardExp} EXP`);
                 }
@@ -3511,37 +3697,71 @@
             }
 
             copyPromiseHistoryModalContent.innerHTML = '';
-            const sentences = Array.isArray(entry?.typedSentences) && entry.typedSentences.length > 0
-                ? entry.typedSentences
-                : (Array.isArray(entry?.sentences) ? entry.sentences.map(sentence => ({ original: sentence, typed: sentence })) : []);
 
-            if (!sentences || sentences.length === 0) {
-                const empty = document.createElement('p');
-                empty.className = 'text-sm text-gray-500';
-                empty.textContent = '기록된 문장이 없어요. 바로 약속을 완료했어요.';
-                copyPromiseHistoryModalContent.appendChild(empty);
+            if (type === 'choicePromise') {
+                if (!choiceResponses || choiceResponses.length === 0) {
+                    const empty = document.createElement('p');
+                    empty.className = 'text-sm text-gray-500';
+                    empty.textContent = '기록된 선택형 문항이 없어요. 바로 약속을 완료했어요.';
+                    copyPromiseHistoryModalContent.appendChild(empty);
+                } else {
+                    choiceResponses.forEach((detail, index) => {
+                        const block = document.createElement('div');
+                        block.className = 'border border-gray-200 rounded-lg p-4 bg-gray-50 shadow-sm space-y-3';
+                        const title = document.createElement('p');
+                        title.className = 'text-sm font-semibold text-gray-700';
+                        title.textContent = `${index + 1}. 약속 문항`;
+                        const questionText = document.createElement('p');
+                        questionText.className = 'text-sm text-gray-800';
+                        questionText.textContent = detail?.question || '';
+                        const statusBadge = document.createElement('span');
+                        statusBadge.className = `inline-flex items-center gap-1 text-xs font-semibold ${detail?.isCorrect ? 'text-emerald-600' : 'text-rose-600'}`;
+                        statusBadge.innerHTML = detail?.isCorrect ? '<i class="fas fa-circle-check"></i> 정답' : '<i class="fas fa-circle-xmark"></i> 오답';
+                        const selectedLabel = document.createElement('p');
+                        selectedLabel.className = 'text-xs font-medium text-gray-500 uppercase tracking-wide';
+                        selectedLabel.textContent = '내가 고른 답';
+                        const selectedText = document.createElement('p');
+                        selectedText.className = `text-sm border rounded-md p-2 ${detail?.isCorrect ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`;
+                        selectedText.textContent = detail?.selectedAnswer ? detail.selectedAnswer : '선택하지 않았어요.';
+                        const correctLabel = document.createElement('p');
+                        correctLabel.className = 'text-xs font-medium text-emerald-600 uppercase tracking-wide';
+                        correctLabel.textContent = '정답';
+                        const correctText = document.createElement('p');
+                        correctText.className = 'text-sm text-gray-900 border border-emerald-200 rounded-md p-2 bg-white';
+                        correctText.textContent = detail?.correctAnswer || '';
+                        block.append(title, questionText, statusBadge, selectedLabel, selectedText, correctLabel, correctText);
+                        copyPromiseHistoryModalContent.appendChild(block);
+                    });
+                }
             } else {
-                sentences.forEach((detail, index) => {
-                    const block = document.createElement('div');
-                    block.className = 'border border-gray-200 rounded-lg p-4 bg-gray-50 shadow-sm';
-                    const title = document.createElement('p');
-                    title.className = 'text-sm font-semibold text-gray-700 mb-2';
-                    title.textContent = `${index + 1}. 약속 문장`;
-                    const originalLabel = document.createElement('p');
-                    originalLabel.className = 'text-xs font-medium text-gray-500 uppercase tracking-wide';
-                    originalLabel.textContent = '원문';
-                    const originalText = document.createElement('p');
-                    originalText.className = 'text-sm text-gray-700 whitespace-pre-line mb-3';
-                    originalText.textContent = detail?.original ?? '';
-                    const typedLabel = document.createElement('p');
-                    typedLabel.className = 'text-xs font-medium text-amber-600 uppercase tracking-wide';
-                    typedLabel.textContent = '내가 적은 문장';
-                    const typedText = document.createElement('p');
-                    typedText.className = 'text-sm text-gray-900 whitespace-pre-line bg-white border border-amber-200 rounded-md p-3 mt-1';
-                    typedText.textContent = detail?.typed ?? detail?.original ?? '';
-                    block.append(title, originalLabel, originalText, typedLabel, typedText);
-                    copyPromiseHistoryModalContent.appendChild(block);
-                });
+                if (!sentences || sentences.length === 0) {
+                    const empty = document.createElement('p');
+                    empty.className = 'text-sm text-gray-500';
+                    empty.textContent = '기록된 문장이 없어요. 바로 약속을 완료했어요.';
+                    copyPromiseHistoryModalContent.appendChild(empty);
+                } else {
+                    sentences.forEach((detail, index) => {
+                        const block = document.createElement('div');
+                        block.className = 'border border-gray-200 rounded-lg p-4 bg-gray-50 shadow-sm';
+                        const title = document.createElement('p');
+                        title.className = 'text-sm font-semibold text-gray-700 mb-2';
+                        title.textContent = `${index + 1}. 약속 문장`;
+                        const originalLabel = document.createElement('p');
+                        originalLabel.className = 'text-xs font-medium text-gray-500 uppercase tracking-wide';
+                        originalLabel.textContent = '원문';
+                        const originalText = document.createElement('p');
+                        originalText.className = 'text-sm text-gray-700 whitespace-pre-line mb-3';
+                        originalText.textContent = detail?.original ?? '';
+                        const typedLabel = document.createElement('p');
+                        typedLabel.className = 'text-xs font-medium text-amber-600 uppercase tracking-wide';
+                        typedLabel.textContent = '내가 적은 문장';
+                        const typedText = document.createElement('p');
+                        typedText.className = 'text-sm text-gray-900 whitespace-pre-line bg-white border border-amber-200 rounded-md p-3 mt-1';
+                        typedText.textContent = detail?.typed ?? detail?.original ?? '';
+                        block.append(title, originalLabel, originalText, typedLabel, typedText);
+                        copyPromiseHistoryModalContent.appendChild(block);
+                    });
+                }
             }
 
             copyPromiseHistoryModal.style.display = 'flex';
@@ -3750,6 +3970,257 @@
                 showModal('오류', `약속을 완료하는 중 문제가 발생했습니다: ${error.message}`);
             }
         });
+
+        function resetChoicePromisePracticeModal() {
+            if (!choicePromisePracticeList) return;
+            choicePromisePracticeList.innerHTML = '';
+            if (choicePromisePracticeSubtitle) {
+                choicePromisePracticeSubtitle.textContent = '';
+            }
+            if (choicePromisePracticeFeedback) {
+                choicePromisePracticeFeedback.classList.add('hidden');
+                choicePromisePracticeFeedback.textContent = '';
+            }
+            if (choicePromiseCompleteBtn) {
+                choicePromiseCompleteBtn.disabled = true;
+                choicePromiseCompleteBtn.classList.add('btn-disabled');
+            }
+        }
+
+        function updateChoicePromiseConfirmState() {
+            if (!choicePromiseCompleteBtn) return;
+            const items = choicePromisePracticeList ? choicePromisePracticeList.querySelectorAll('.choice-promise-item') : [];
+            if (!items || items.length === 0) {
+                choicePromiseCompleteBtn.disabled = false;
+                choicePromiseCompleteBtn.classList.remove('btn-disabled');
+                return;
+            }
+            const allDone = Array.from(items).every(item => item.dataset.completed === 'true');
+            if (allDone) {
+                choicePromiseCompleteBtn.disabled = false;
+                choicePromiseCompleteBtn.classList.remove('btn-disabled');
+            } else {
+                choicePromiseCompleteBtn.disabled = true;
+                choicePromiseCompleteBtn.classList.add('btn-disabled');
+            }
+        }
+
+        function openChoicePromisePracticeModal(assignment) {
+            if (!assignment || !choicePromisePracticeModal || !choicePromisePracticeList) return;
+            currentChoicePromiseAssignment = assignment;
+            resetChoicePromisePracticeModal();
+            const questions = Array.isArray(assignment.questions) ? assignment.questions : [];
+            const summaryParts = [];
+            if (questions.length > 0) summaryParts.push(`총 문항 ${questions.length}개`);
+            if (assignment.rewardExp) summaryParts.push(`완료하면 ${assignment.rewardExp} EXP를 받을 수 있어요.`);
+            if (choicePromisePracticeTitle) {
+                choicePromisePracticeTitle.textContent = assignment.text || '선택형 약속';
+            }
+            if (choicePromisePracticeSubtitle) {
+                choicePromisePracticeSubtitle.textContent = summaryParts.join(' • ') || '문제를 잘 읽고 알맞은 답을 골라보세요.';
+            }
+
+            if (questions.length === 0) {
+                const info = document.createElement('p');
+                info.className = 'text-sm text-gray-500';
+                info.textContent = '등록된 문항이 없어요. 바로 약속을 완료할 수 있습니다.';
+                choicePromisePracticeList.appendChild(info);
+                updateChoicePromiseConfirmState();
+            } else {
+                questions.forEach((question, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'choice-promise-item border border-gray-200 rounded-md p-3 bg-white space-y-3';
+                    item.dataset.completed = 'false';
+                    const questionText = typeof question?.question === 'string' ? question.question : String(question?.question ?? '');
+                    const correctAnswer = typeof question?.correctAnswer === 'string' ? question.correctAnswer : String(question?.correctAnswer ?? '');
+                    const wrongAnswerRaw = question?.wrongAnswer ?? question?.incorrectAnswer ?? '';
+                    const wrongAnswer = typeof wrongAnswerRaw === 'string' ? wrongAnswerRaw : String(wrongAnswerRaw ?? '');
+                    item.dataset.question = questionText;
+                    item.dataset.correctAnswer = correctAnswer;
+                    item.dataset.wrongAnswer = wrongAnswer;
+
+                    const header = document.createElement('div');
+                    header.className = 'flex items-start gap-2 justify-between';
+
+                    const leftWrap = document.createElement('div');
+                    leftWrap.className = 'flex items-start gap-2 flex-1';
+
+                    const status = document.createElement('span');
+                    status.className = 'choice-promise-status w-6 text-lg text-gray-300 text-center mt-0.5';
+                    status.textContent = '•';
+
+                    const questionWrap = document.createElement('div');
+                    questionWrap.className = 'flex items-start gap-2 flex-1';
+
+                    const speakBtn = document.createElement('button');
+                    speakBtn.type = 'button';
+                    speakBtn.className = 'text-amber-500 hover:text-amber-600 text-lg';
+                    speakBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                    speakBtn.addEventListener('click', () => speak(questionText));
+
+                    const questionLabel = document.createElement('span');
+                    questionLabel.className = 'text-sm text-gray-700 flex-1';
+                    questionLabel.textContent = `${index + 1}. ${questionText}`;
+
+                    questionWrap.append(speakBtn, questionLabel);
+                    leftWrap.append(status, questionWrap);
+
+                    const gradeBtn = document.createElement('button');
+                    gradeBtn.type = 'button';
+                    gradeBtn.className = 'btn btn-secondary text-xs px-3 py-1 self-start';
+                    gradeBtn.textContent = '채점';
+
+                    header.append(leftWrap, gradeBtn);
+
+                    const optionsWrap = document.createElement('div');
+                    optionsWrap.className = 'space-y-2';
+
+                    const answers = [
+                        { text: correctAnswer, isCorrect: true },
+                        { text: wrongAnswer, isCorrect: false }
+                    ];
+                    for (let i = answers.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [answers[i], answers[j]] = [answers[j], answers[i]];
+                    }
+
+                    const feedback = document.createElement('p');
+                    feedback.className = 'text-xs text-rose-500 hidden';
+
+                    answers.forEach(answer => {
+                        const optionRow = document.createElement('div');
+                        optionRow.className = 'flex items-center gap-2';
+
+                        const answerSpeak = document.createElement('button');
+                        answerSpeak.type = 'button';
+                        answerSpeak.className = 'text-amber-500 hover:text-amber-600 text-lg';
+                        answerSpeak.innerHTML = '<i class="fas fa-volume-up"></i>';
+                        answerSpeak.addEventListener('click', (event) => {
+                            event.stopPropagation();
+                            speak(answer.text);
+                        });
+
+                        const optionBtn = document.createElement('button');
+                        optionBtn.type = 'button';
+                        optionBtn.className = 'choice-answer flex-1 border border-gray-200 rounded-md p-2 text-left hover:border-amber-400';
+                        optionBtn.dataset.value = answer.isCorrect ? 'correct' : 'wrong';
+                        optionBtn.textContent = answer.text;
+                        optionBtn.addEventListener('click', () => {
+                            const buttons = optionsWrap.querySelectorAll('.choice-answer');
+                            buttons.forEach(btn => {
+                                btn.classList.remove('border-amber-500', 'bg-amber-50');
+                                btn.dataset.selected = 'false';
+                            });
+                            optionBtn.classList.add('border-amber-500', 'bg-amber-50');
+                            optionBtn.dataset.selected = 'true';
+                            item.dataset.selectedAnswer = answer.text;
+                            if (item.dataset.completed === 'true') {
+                                item.dataset.completed = 'false';
+                                status.textContent = '•';
+                                status.className = 'choice-promise-status w-6 text-lg text-gray-300 text-center mt-0.5';
+                                feedback.classList.add('hidden');
+                                feedback.classList.remove('text-emerald-600');
+                                feedback.classList.add('text-rose-500');
+                            }
+                            if (choicePromisePracticeFeedback) {
+                                choicePromisePracticeFeedback.classList.add('hidden');
+                            }
+                            updateChoicePromiseConfirmState();
+                        });
+
+                        optionRow.append(answerSpeak, optionBtn);
+                        optionsWrap.appendChild(optionRow);
+                    });
+
+                    gradeBtn.addEventListener('click', () => {
+                        const selected = optionsWrap.querySelector('.choice-answer[data-selected="true"]');
+                        if (!selected) {
+                            feedback.textContent = '먼저 답을 선택해주세요.';
+                            feedback.classList.remove('hidden');
+                            feedback.classList.remove('text-emerald-600');
+                            feedback.classList.add('text-rose-500');
+                            if (choicePromisePracticeFeedback) {
+                                choicePromisePracticeFeedback.textContent = `${index + 1}번 문항의 답을 먼저 선택하세요.`;
+                                choicePromisePracticeFeedback.classList.remove('hidden');
+                            }
+                            return;
+                        }
+                        const isCorrect = selected.dataset.value === 'correct';
+                        if (isCorrect) {
+                            status.textContent = '⭕';
+                            status.classList.remove('text-gray-300', 'text-rose-500');
+                            status.classList.add('text-emerald-500');
+                            feedback.textContent = '정답이에요!';
+                            feedback.classList.remove('hidden', 'text-rose-500');
+                            feedback.classList.add('text-emerald-600');
+                            item.dataset.completed = 'true';
+                            item.dataset.isCorrect = 'true';
+                            if (choicePromisePracticeFeedback) {
+                                choicePromisePracticeFeedback.classList.add('hidden');
+                            }
+                        } else {
+                            status.textContent = '✖';
+                            status.classList.remove('text-gray-300', 'text-emerald-500');
+                            status.classList.add('text-rose-500');
+                            feedback.textContent = '다시 생각해보세요. 정답을 찾아볼까요?';
+                            feedback.classList.remove('hidden', 'text-emerald-600');
+                            feedback.classList.add('text-rose-500');
+                            item.dataset.completed = 'false';
+                            item.dataset.isCorrect = 'false';
+                            if (choicePromisePracticeFeedback) {
+                                choicePromisePracticeFeedback.textContent = `${index + 1}번 문항을 다시 확인해보세요.`;
+                                choicePromisePracticeFeedback.classList.remove('hidden');
+                            }
+                        }
+                        updateChoicePromiseConfirmState();
+                    });
+
+                    item.append(header, optionsWrap, feedback);
+                    choicePromisePracticeList.appendChild(item);
+                });
+                updateChoicePromiseConfirmState();
+            }
+
+            choicePromisePracticeModal.style.display = 'flex';
+        }
+
+        if (choicePromiseCompleteBtn) {
+            choicePromiseCompleteBtn.addEventListener('click', async () => {
+                if (!currentChoicePromiseAssignment || choicePromiseCompleteBtn.disabled || isAdminViewing) return;
+                choicePromiseCompleteBtn.disabled = true;
+                choicePromiseCompleteBtn.classList.add('btn-disabled');
+                try {
+                    const responses = [];
+                    const items = Array.from(choicePromisePracticeList.querySelectorAll('.choice-promise-item'));
+                    items.forEach(item => {
+                        responses.push({
+                            question: item.dataset.question || '',
+                            correctAnswer: item.dataset.correctAnswer || '',
+                            selectedAnswer: item.dataset.selectedAnswer || '',
+                            isCorrect: item.dataset.completed === 'true'
+                        });
+                    });
+                    await finalizeLifeRuleCompletion(
+                        currentChoicePromiseAssignment.id,
+                        currentChoicePromiseAssignment.rewardExp,
+                        '약속 완료!',
+                        {
+                            copyPromiseRecord: {
+                                assignment: currentChoicePromiseAssignment,
+                                responses
+                            }
+                        }
+                    );
+                    choicePromisePracticeModal.style.display = 'none';
+                    resetChoicePromisePracticeModal();
+                    currentChoicePromiseAssignment = null;
+                } catch (error) {
+                    showModal('오류', `약속을 완료하는 중 문제가 발생했습니다: ${error.message}`);
+                    choicePromiseCompleteBtn.disabled = false;
+                    choicePromiseCompleteBtn.classList.remove('btn-disabled');
+                }
+            });
+        }
 
         // --- TTS ---
         function speak(text) {
@@ -4286,6 +4757,7 @@
                     const ruleType = rule?.type || 'simple';
                     const rewardExp = Number(rule?.rewardExp ?? rule?.reward ?? 0) || 0;
                     const sentences = Array.isArray(rule?.sentences) ? rule.sentences : [];
+                    const questions = Array.isArray(rule?.questions) ? rule.questions : [];
                     for (const studentId of selectedStudentIds) {
                         const assignmentData = {
                             ruleId: currentAssignmentItemId,
@@ -4294,6 +4766,7 @@
                             rewardExp: rewardExp,
                             type: ruleType,
                             sentences,
+                            questions,
                             repeatType: repeatType,
                             assignedAt: serverTimestamp(),
                             lastCompletedAt: null
@@ -4576,6 +5049,7 @@
         // --- Teacher: Life Rule Management ---
         document.getElementById('add-life-rule-btn').addEventListener('click', () => openLifeRuleModal());
         document.getElementById('add-copy-promise-btn').addEventListener('click', () => openCopyPromiseCreationModal());
+        document.getElementById('add-choice-promise-btn').addEventListener('click', () => openChoicePromiseCreationModal());
 
         async function loadLifeRules() {
             const container = document.getElementById('life-rule-list');
@@ -4597,8 +5071,19 @@
                         ${rules.map(rule => {
                             const type = rule.type || 'simple';
                             const rewardExp = Number(rule.rewardExp ?? rule.reward ?? 0) || 0;
-                            const detailParts = [`경험치 ${rewardExp} EXP`, type === 'copyPromise' ? `문항 ${(Array.isArray(rule.sentences) ? rule.sentences.length : 0)}개` : null].filter(Boolean);
-                            const typeLabel = type === 'copyPromise' ? '따라쓰기 약속' : '간단 규칙';
+                            const sentenceCount = Array.isArray(rule.sentences) ? rule.sentences.length : 0;
+                            const questionCount = Array.isArray(rule.questions) ? rule.questions.length : 0;
+                            const detailParts = [
+                                `경험치 ${rewardExp} EXP`,
+                                type === 'copyPromise' ? `문항 ${sentenceCount}개` : null,
+                                type === 'choicePromise' ? `문항 ${questionCount}개` : null
+                            ].filter(Boolean);
+                            const typeLabelMap = {
+                                simple: '간단 규칙',
+                                copyPromise: '따라쓰기 약속',
+                                choicePromise: '선택형 약속'
+                            };
+                            const typeLabel = typeLabelMap[type] || '생활 규칙';
                             return `
                             <div class="p-3 flex justify-between items-center">
                                 <div>
@@ -4619,8 +5104,11 @@
                 container.querySelectorAll('.edit-rule-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                     const ruleDoc = await getDoc(doc(db, "lifeRules", e.target.dataset.id));
                     const ruleData = {id: ruleDoc.id, ...ruleDoc.data()};
-                    if ((ruleData.type || 'simple') === 'copyPromise') {
+                    const type = ruleData.type || 'simple';
+                    if (type === 'copyPromise') {
                         openCopyPromiseCreationModal(ruleData);
+                    } else if (type === 'choicePromise') {
+                        openChoicePromiseCreationModal(ruleData);
                     } else {
                         openLifeRuleModal(ruleData);
                     }
@@ -4687,6 +5175,104 @@
             sentences.forEach(sentence => addCopyPromiseItem(sentence));
         }
 
+        function openChoicePromiseCreationModal(rule = null) {
+            if (!choicePromiseModal) return;
+            choicePromiseModal.style.display = 'flex';
+            const form = document.getElementById('choice-promise-form');
+            if (!form) return;
+            form.reset();
+            const titleEl = document.getElementById('choice-promise-modal-title');
+            if (titleEl) {
+                titleEl.textContent = rule ? '선택형 약속 수정' : '선택형 약속 만들기';
+            }
+            document.getElementById('choice-promise-id').value = rule?.id || '';
+            document.getElementById('choice-promise-text').value = rule?.text || '';
+            document.getElementById('choice-promise-reward').value = rule ? (rule.rewardExp ?? rule.reward ?? 0) : '';
+            if (choicePromiseQuestionsContainer) {
+                choicePromiseQuestionsContainer.innerHTML = '';
+            }
+            const questions = Array.isArray(rule?.questions) && rule.questions.length > 0
+                ? rule.questions
+                : [{ question: '', correctAnswer: '', wrongAnswer: '' }];
+            questions.forEach(question => addChoicePromiseQuestion(question));
+            updateChoiceQuestionNumbers();
+        }
+
+        function addChoicePromiseQuestion(question = {}) {
+            if (!choicePromiseQuestionsContainer) return;
+            const wrapper = document.createElement('div');
+            wrapper.className = 'choice-promise-question border border-gray-200 rounded-md p-3 bg-white space-y-3';
+
+            const header = document.createElement('div');
+            header.className = 'flex items-center justify-between';
+            const title = document.createElement('span');
+            title.className = 'choice-promise-question-title text-sm font-semibold text-gray-700';
+            title.textContent = '문항';
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1';
+            removeBtn.textContent = '삭제';
+            removeBtn.addEventListener('click', () => {
+                wrapper.remove();
+                if (choicePromiseQuestionsContainer.children.length === 0) {
+                    addChoicePromiseQuestion();
+                }
+                updateChoiceQuestionNumbers();
+            });
+            header.append(title, removeBtn);
+            wrapper.appendChild(header);
+
+            const questionRow = document.createElement('div');
+            questionRow.className = 'space-y-1';
+            const questionLabel = document.createElement('label');
+            questionLabel.className = 'block text-xs font-medium text-gray-500';
+            questionLabel.textContent = '문항 질문';
+            const questionInput = document.createElement('textarea');
+            questionInput.className = 'choice-promise-question-text w-full p-2 border rounded-md form-input';
+            questionInput.rows = 2;
+            questionInput.placeholder = '예: 학교에 오면 가장 먼저 해야 할 일은?';
+            questionInput.value = question?.question || '';
+            questionRow.append(questionLabel, questionInput);
+            wrapper.appendChild(questionRow);
+
+            const correctRow = document.createElement('div');
+            correctRow.className = 'space-y-1';
+            const correctLabel = document.createElement('label');
+            correctLabel.className = 'block text-xs font-medium text-emerald-600';
+            correctLabel.textContent = '정답';
+            const correctInput = document.createElement('input');
+            correctInput.type = 'text';
+            correctInput.className = 'choice-promise-correct-answer w-full p-2 border rounded-md form-input';
+            correctInput.placeholder = '정답을 입력하세요';
+            correctInput.value = question?.correctAnswer || '';
+            correctRow.append(correctLabel, correctInput);
+            wrapper.appendChild(correctRow);
+
+            const wrongRow = document.createElement('div');
+            wrongRow.className = 'space-y-1';
+            const wrongLabel = document.createElement('label');
+            wrongLabel.className = 'block text-xs font-medium text-rose-600';
+            wrongLabel.textContent = '오답';
+            const wrongInput = document.createElement('input');
+            wrongInput.type = 'text';
+            wrongInput.className = 'choice-promise-wrong-answer w-full p-2 border rounded-md form-input';
+            wrongInput.placeholder = '오답을 입력하세요';
+            wrongInput.value = question?.wrongAnswer || question?.incorrectAnswer || '';
+            wrongRow.append(wrongLabel, wrongInput);
+            wrapper.appendChild(wrongRow);
+
+            choicePromiseQuestionsContainer.appendChild(wrapper);
+            updateChoiceQuestionNumbers();
+        }
+
+        function updateChoiceQuestionNumbers() {
+            if (!choicePromiseQuestionsContainer) return;
+            const titles = choicePromiseQuestionsContainer.querySelectorAll('.choice-promise-question-title');
+            titles.forEach((title, index) => {
+                title.textContent = `문항 ${index + 1}`;
+            });
+        }
+
         function addCopyPromiseItem(value = '') {
             const wrapper = document.createElement('div');
             wrapper.className = 'flex items-center gap-2';
@@ -4706,6 +5292,7 @@
         }
 
         document.getElementById('add-copy-promise-item-btn').addEventListener('click', () => addCopyPromiseItem());
+        document.getElementById('add-choice-question-btn').addEventListener('click', () => addChoicePromiseQuestion());
 
         document.getElementById('copy-promise-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -4740,6 +5327,54 @@
                     await addDoc(collection(db, 'lifeRules'), data);
                 }
                 copyPromiseModal.style.display = 'none';
+                loadLifeRules();
+            } catch (error) {
+                showModal('저장 실패', `오류: ${error.message}`);
+            }
+        });
+
+        document.getElementById('choice-promise-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const promiseId = document.getElementById('choice-promise-id').value;
+            const rewardValue = Number(document.getElementById('choice-promise-reward').value);
+            if (!Number.isFinite(rewardValue) || rewardValue < 0) {
+                showModal('오류', '경험치 보상은 0 이상으로 입력해주세요.');
+                return;
+            }
+            const questionElements = Array.from(choicePromiseQuestionsContainer?.querySelectorAll('.choice-promise-question') || []);
+            if (questionElements.length === 0) {
+                showModal('오류', '최소 한 개 이상의 문항을 추가해주세요.');
+                return;
+            }
+            const questions = [];
+            for (const element of questionElements) {
+                const questionText = element.querySelector('.choice-promise-question-text')?.value.trim() || '';
+                const correctAnswer = element.querySelector('.choice-promise-correct-answer')?.value.trim() || '';
+                const wrongAnswer = element.querySelector('.choice-promise-wrong-answer')?.value.trim() || '';
+                if (!questionText || !correctAnswer || !wrongAnswer) {
+                    showModal('오류', '모든 문항의 질문과 정답, 오답을 빠짐없이 입력해주세요.');
+                    return;
+                }
+                questions.push({ question: questionText, correctAnswer, wrongAnswer });
+            }
+            const data = {
+                text: document.getElementById('choice-promise-text').value,
+                rewardExp: rewardValue,
+                reward: rewardValue,
+                type: 'choicePromise',
+                questions,
+                teacherId: currentUserData?.id || currentAuthUser.uid,
+            };
+
+            try {
+                if (promiseId) {
+                    data.updatedAt = serverTimestamp();
+                    await setDoc(doc(db, 'lifeRules', promiseId), data, { merge: true });
+                } else {
+                    data.createdAt = serverTimestamp();
+                    await addDoc(collection(db, 'lifeRules'), data);
+                }
+                choicePromiseModal.style.display = 'none';
                 loadLifeRules();
             } catch (error) {
                 showModal('저장 실패', `오류: ${error.message}`);
@@ -6331,6 +6966,7 @@
         document.getElementById('close-assignment-modal-btn').addEventListener('click', () => assignmentModal.style.display = 'none');
         document.getElementById('close-life-rule-modal-btn').addEventListener('click', () => lifeRuleModal.style.display = 'none');
         document.getElementById('close-copy-promise-modal-btn').addEventListener('click', () => copyPromiseModal.style.display = 'none');
+        document.getElementById('close-choice-promise-modal-btn').addEventListener('click', () => choicePromiseModal.style.display = 'none');
         document.getElementById('close-copy-promise-history-modal-btn').addEventListener('click', () => copyPromiseHistoryModal.style.display = 'none');
         if (copyPromiseHistoryModal) {
             copyPromiseHistoryModal.addEventListener('click', (event) => {
@@ -6343,6 +6979,11 @@
             copyPromisePracticeModal.style.display = 'none';
             resetCopyPromisePracticeModal();
             currentCopyPromiseAssignment = null;
+        });
+        document.getElementById('close-choice-promise-practice-modal-btn').addEventListener('click', () => {
+            choicePromisePracticeModal.style.display = 'none';
+            resetChoicePromisePracticeModal();
+            currentChoicePromiseAssignment = null;
         });
         document.getElementById('close-dictation-creation-modal-btn').addEventListener('click', () => dictationCreationModal.style.display = 'none');
         document.getElementById('close-dictation-modal-btn').addEventListener('click', () => dictationModal.style.display = 'none');
