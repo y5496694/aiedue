@@ -1615,50 +1615,105 @@
         const createSketchBtn = document.getElementById('create-sketch-btn');
         const sketchbookListEl = document.getElementById('sketchbook-list');
 
+        function generateUniqueSketchCode(existingCodes = new Set()) {
+            const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            const codeLength = 6;
+            const codes = existingCodes instanceof Set ? existingCodes : new Set(existingCodes);
+            let code;
+            do {
+                code = Array.from({ length: codeLength }, () => characters[Math.floor(Math.random() * characters.length)]).join('');
+            } while (codes.has(code));
+            return code;
+        }
+
+        function escapeHtml(value = '') {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
         async function renderSketchbookList() {
             if (!currentAuthUser || !sketchbookListEl) return;
             const snap = await getDocs(collection(db, 'users', currentAuthUser.uid, 'sketches'));
-            sketchbookListEl.innerHTML = '';
-            snap.forEach(docSnap => {
-                const li = document.createElement('li');
-                li.className = 'p-2 bg-white rounded shadow flex justify-between items-center';
-                // 각 항목에 스케치 고유 코드를 저장합니다
-                li.dataset.sketchId = docSnap.id;
+            const sketches = [];
+            const existingCodes = new Set();
 
-                const nameSpan = document.createElement('span');
-                nameSpan.className = 'flex-1 cursor-pointer';
-                nameSpan.textContent = docSnap.data().name || '새 스케치북';
-                nameSpan.addEventListener('click', () => {
-                    window.open(`sketch.html?sketchId=${docSnap.id}`, '_blank');
+            snap.forEach(docSnap => {
+                const data = docSnap.data() || {};
+                if (data.code) existingCodes.add(data.code);
+                sketches.push({ id: docSnap.id, ...data });
+            });
+
+            for (const sketch of sketches) {
+                if (!sketch.code) {
+                    const newCode = generateUniqueSketchCode(existingCodes);
+                    existingCodes.add(newCode);
+                    try {
+                        await updateDoc(doc(db, 'users', currentAuthUser.uid, 'sketches', sketch.id), { code: newCode });
+                    } catch (error) {
+                        console.error('Failed to assign sketch code', error);
+                    }
+                    sketch.code = newCode;
+                }
+            }
+
+            sketchbookListEl.innerHTML = '';
+
+            if (sketches.length === 0) {
+                const emptyMessage = document.createElement('li');
+                emptyMessage.className = 'p-4 bg-white rounded shadow text-center text-gray-500';
+                emptyMessage.textContent = '아직 만든 스케치북이 없습니다. 새로운 스케치북을 만들어보세요!';
+                sketchbookListEl.appendChild(emptyMessage);
+                return;
+            }
+
+            sketches.forEach(sketch => {
+                const li = document.createElement('li');
+                li.className = 'p-3 bg-white rounded shadow flex justify-between items-center gap-4';
+                li.dataset.sketchId = sketch.id;
+
+                const sketchInfoBtn = document.createElement('button');
+                sketchInfoBtn.type = 'button';
+                sketchInfoBtn.className = 'flex-1 text-left';
+                const sketchName = escapeHtml(sketch.name || '새 스케치북');
+                const sketchCode = escapeHtml(sketch.code || '생성 중');
+                sketchInfoBtn.innerHTML = `
+                    <div class="font-semibold text-gray-800">${sketchName}</div>
+                    <div class="text-xs text-gray-500 mt-1">코드: ${sketchCode}</div>
+                `;
+                sketchInfoBtn.addEventListener('click', () => {
+                    window.open(`sketch.html?sketchId=${encodeURIComponent(sketch.id)}&code=${encodeURIComponent(sketch.code)}`, '_blank');
                 });
-                li.appendChild(nameSpan);
+                li.appendChild(sketchInfoBtn);
 
                 const btnContainer = document.createElement('div');
                 btnContainer.className = 'flex space-x-2';
 
                 const renameBtn = document.createElement('button');
+                renameBtn.type = 'button';
                 renameBtn.className = 'text-blue-500';
                 renameBtn.textContent = '이름 변경';
                 renameBtn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    const newName = prompt('새 이름을 입력하세요', nameSpan.textContent);
+                    e.preventDefault();
+                    const newName = prompt('새 이름을 입력하세요', sketch.name || '새 스케치북');
                     if (newName) {
-                        await updateDoc(doc(db, 'users', currentAuthUser.uid, 'sketches', docSnap.id), { name: newName });
+                        await updateDoc(doc(db, 'users', currentAuthUser.uid, 'sketches', sketch.id), { name: newName });
                         renderSketchbookList();
                     }
                 });
                 btnContainer.appendChild(renameBtn);
 
                 const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
                 deleteBtn.className = 'text-red-500';
                 deleteBtn.textContent = '삭제';
                 deleteBtn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
+                    e.preventDefault();
                     if (confirm('정말 삭제하시겠습니까?')) {
-                        await deleteDoc(doc(db, 'users', currentAuthUser.uid, 'sketches', docSnap.id));
+                        await deleteDoc(doc(db, 'users', currentAuthUser.uid, 'sketches', sketch.id));
                         try {
-                            // 사용자별 경로를 포함하여 파일을 삭제합니다
-                            await deleteObject(storageRef(storage, `sketch/${currentAuthUser.uid}/${docSnap.id}.excalidraw`));
+                            await deleteObject(storageRef(storage, `sketch/${currentAuthUser.uid}/${sketch.id}.excalidraw`));
                         } catch (err) {
                             console.error(err);
                         }
@@ -1676,12 +1731,20 @@
         if (createSketchBtn) {
             createSketchBtn.addEventListener('click', async () => {
                 if (!currentAuthUser) return;
+                const snap = await getDocs(collection(db, 'users', currentAuthUser.uid, 'sketches'));
+                const existingCodes = new Set();
+                snap.forEach(docSnap => {
+                    const data = docSnap.data();
+                    if (data && data.code) existingCodes.add(data.code);
+                });
+                const newCode = generateUniqueSketchCode(existingCodes);
                 const docRef = await addDoc(collection(db, 'users', currentAuthUser.uid, 'sketches'), {
                     name: '새 스케치북',
-                    createdAt: serverTimestamp()
+                    createdAt: serverTimestamp(),
+                    code: newCode
                 });
                 await renderSketchbookList();
-                window.open(`sketch.html?sketchId=${docRef.id}`, '_blank');
+                window.open(`sketch.html?sketchId=${encodeURIComponent(docRef.id)}&code=${encodeURIComponent(newCode)}`, '_blank');
             });
         }
         document.querySelectorAll('.admin-tab').forEach(tab => {
