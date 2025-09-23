@@ -1975,27 +1975,40 @@
 
                 // 각 이야기 페이지 이미지 생성
                 const storySpreads = document.querySelectorAll('.book-spread[data-page-type="story"]');
-                const storyContextParts = [];
-                if (characterContext) {
-                    storyContextParts.push(`등장인물 정보: ${characterContext}`);
-                }
+                let previousStoryText = '';
+                let previousStoryPrompt = '';
                 for (const spread of storySpreads) {
-                    const storyText = spread.querySelector("textarea").value;
-                    const extra = spread.dataset.prompt || '';
-                    const prompt = `${storyText}\n${extra}`.trim();
-                    if (prompt) {
-                        const combinedContext = storyContextParts.join('\n');
+                    const storyText = (spread.querySelector("textarea")?.value || '').trim();
+                    const extra = (spread.dataset.prompt || '').trim();
+                    const promptParts = [storyText, extra].filter(Boolean);
+                    const imagePage = spread.querySelector(".book-page:first-child");
+                    const pageNumHTML = imagePage.querySelector('.page-number')?.outerHTML || '';
+
+                    if (promptParts.length === 0) {
+                        setupRegenerateButtonsForSpread(spread);
+                        continue;
+                    }
+
+                    const prompt = promptParts.join('\n');
+                    const contextParts = [];
+                    if (characterContext) {
+                        contextParts.push(`등장인물 정보: ${characterContext}`);
+                    }
+                    if (previousStoryText) {
+                        contextParts.push(`이전 줄거리: ${previousStoryText}`);
+                    }
+                    if (previousStoryPrompt) {
+                        contextParts.push(`이전 추가 설명: ${previousStoryPrompt}`);
+                    }
+                    const combinedContext = contextParts.join('\n');
+
+                    try {
                         const imageUrl = await generateImageForParagraph(prompt, combinedContext);
-                        const imagePage = spread.querySelector(".book-page:first-child");
-                        const pageNumHTML = imagePage.querySelector('.page-number')?.outerHTML || '';
                         imagePage.style.backgroundImage = `url('${imageUrl}')`;
                         imagePage.innerHTML = pageNumHTML;
-                        if (storyText) {
-                            storyContextParts.push(`이전 줄거리: ${storyText}`);
-                        }
-                        if (extra) {
-                            storyContextParts.push(`이전 추가 설명: ${extra}`);
-                        }
+                        previousStoryText = storyText;
+                        previousStoryPrompt = extra;
+                    } finally {
                         setupRegenerateButtonsForSpread(spread);
                     }
                 }
@@ -2091,27 +2104,40 @@
 
                 // 각 이야기 페이지 이미지 생성
                 const storySpreads = document.querySelectorAll('.book-spread[data-page-type="story"]');
-                const storyContextParts = [];
-                if (characterContext) {
-                    storyContextParts.push(`등장인물 정보: ${characterContext}`);
-                }
+                let previousStoryText = '';
+                let previousStoryPrompt = '';
                 for (const spread of storySpreads) {
-                    const storyText = spread.querySelector("textarea").value;
-                    const extra = spread.dataset.prompt || '';
-                    const prompt = `${storyText}\n${extra}`.trim();
-                    if (prompt) {
-                        const combinedContext = storyContextParts.join('\n');
+                    const storyText = (spread.querySelector("textarea")?.value || '').trim();
+                    const extra = (spread.dataset.prompt || '').trim();
+                    const promptParts = [storyText, extra].filter(Boolean);
+                    const imagePage = spread.querySelector(".book-page:first-child");
+                    const pageNumHTML = imagePage.querySelector('.page-number')?.outerHTML || '';
+
+                    if (promptParts.length === 0) {
+                        setupRegenerateButtonsForSpread(spread);
+                        continue;
+                    }
+
+                    const prompt = promptParts.join('\n');
+                    const contextParts = [];
+                    if (characterContext) {
+                        contextParts.push(`등장인물 정보: ${characterContext}`);
+                    }
+                    if (previousStoryText) {
+                        contextParts.push(`이전 줄거리: ${previousStoryText}`);
+                    }
+                    if (previousStoryPrompt) {
+                        contextParts.push(`이전 추가 설명: ${previousStoryPrompt}`);
+                    }
+                    const combinedContext = contextParts.join('\n');
+
+                    try {
                         const imageUrl = await generateImageForParagraphGPT(prompt, combinedContext);
-                        const imagePage = spread.querySelector(".book-page:first-child");
-                        const pageNumHTML = imagePage.querySelector('.page-number')?.outerHTML || '';
                         imagePage.style.backgroundImage = `url('${imageUrl}')`;
                         imagePage.innerHTML = pageNumHTML;
-                        if (storyText) {
-                            storyContextParts.push(`이전 줄거리: ${storyText}`);
-                        }
-                        if (extra) {
-                            storyContextParts.push(`이전 추가 설명: ${extra}`);
-                        }
+                        previousStoryText = storyText;
+                        previousStoryPrompt = extra;
+                    } finally {
                         setupRegenerateButtonsForSpread(spread);
                     }
                 }
