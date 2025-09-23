@@ -1237,7 +1237,7 @@
         import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, runTransaction, updateDoc, increment, deleteField, serverTimestamp, Timestamp, orderBy, addDoc, deleteDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
         import { getStorage, ref as storageRef, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
-        import { createTeacherClass, fetchTeacherClasses, fetchClassesForStudent } from "./js/classManager.js";
+        import { fetchClassesForStudent } from "./js/classManager.js";
 
         // IMPORTANT: Replace with your actual Firebase config
         const firebaseConfig = {
@@ -1282,7 +1282,6 @@
         let currentClassIndex = 0;
         let currentClassId = null;
         let currentClassStudents = [];
-        let pendingClassFocusId = null;
         let studentClassTeacherIdsCache = null;
 
         // --- DOM Elements ---
@@ -1324,7 +1323,6 @@
             currentClassIndex = 0;
             currentClassId = null;
             currentClassStudents = [];
-            pendingClassFocusId = null;
             studentClassTeacherIdsCache = null;
             myClassStudentIds = [];
         }
@@ -1355,22 +1353,69 @@
             myClassStudentIds = Array.from(allIds);
         }
 
-        async function refreshTeacherClasses(focusClassId = null) {
+        async function fetchSingleTeacherClass(teacherId) {
+            if (!teacherId) return null;
+            try {
+                const classRef = doc(db, 'classes', teacherId);
+                const classSnap = await getDoc(classRef);
+                if (!classSnap.exists()) {
+                    return null;
+                }
+                const data = classSnap.data() || {};
+                if (!data.teacherId) {
+                    try {
+                        await updateDoc(classRef, { teacherId });
+                    } catch (updateError) {
+                        console.warn('학급 teacherId 업데이트 실패:', updateError);
+                    }
+                }
+                return {
+                    id: classRef.id,
+                    name: data.name || '내 학급',
+                    teacherId: data.teacherId || teacherId,
+                    students: Array.isArray(data.students) ? data.students : [],
+                    createdAt: data.createdAt || null,
+                };
+            } catch (error) {
+                console.error('학급 정보를 불러오는 중 오류가 발생했습니다:', error);
+                return null;
+            }
+        }
+
+        async function createSingleTeacherClass(teacherId, className) {
+            if (!teacherId) {
+                throw new Error('교사 정보를 찾을 수 없습니다.');
+            }
+            const trimmedName = (className || '').trim();
+            if (!trimmedName) {
+                throw new Error('학급 이름을 입력해주세요.');
+            }
+            const classRef = doc(db, 'classes', teacherId);
+            const classSnap = await getDoc(classRef);
+            if (classSnap.exists()) {
+                const error = new Error('이미 학급이 존재합니다.');
+                error.code = 'class-exists';
+                throw error;
+            }
+            await setDoc(classRef, {
+                teacherId,
+                name: trimmedName,
+                students: [],
+                createdAt: serverTimestamp(),
+            });
+            return classRef.id;
+        }
+
+        async function refreshTeacherClasses() {
             if (!currentUserData || currentUserData.role !== 'teacher') {
                 teacherClasses = [];
                 updateCurrentClassState();
                 updateMyClassStudentIds();
                 return teacherClasses;
             }
-            teacherClasses = await fetchTeacherClasses(db, currentUserData.id);
-            const focusId = focusClassId || pendingClassFocusId;
-            if (focusId) {
-                const idx = teacherClasses.findIndex(cls => cls.id === focusId);
-                if (idx >= 0) {
-                    currentClassIndex = idx;
-                }
-                pendingClassFocusId = null;
-            }
+            const singleClass = await fetchSingleTeacherClass(currentUserData.id);
+            teacherClasses = singleClass ? [singleClass] : [];
+            currentClassIndex = 0;
             updateCurrentClassState();
             updateMyClassStudentIds();
             return teacherClasses;
@@ -4525,37 +4570,47 @@
                 updateMyClassStudentIds();
 
                 if (!teacherClasses.length) {
-                    container.innerHTML = '<h2 class="text-xl font-bold mb-4">🏫 내 학급</h2><button id="create-class-btn" class="btn btn-primary w-full">내 학급 만들기</button>';
-                    document.getElementById('create-class-btn').onclick = async () => {
-                        const name = prompt('학급 이름을 입력하세요');
-                        if (!name) return;
-                        try {
-                            const newClassId = await createTeacherClass(db, currentUserData.id, name);
-                            pendingClassFocusId = newClassId;
-                            await refreshTeacherClasses(newClassId);
-                            loadMyClass({ refresh: false });
-                        } catch (err) {
-                            container.innerHTML = '<p class="text-red-500 text-center">학급 생성 실패</p>';
-                            showModal('오류', `학급 생성 중 오류가 발생했습니다: ${err.message}`);
-                        }
-                    };
+                    container.innerHTML = `
+                        <div class="space-y-4">
+                            <h2 class="text-xl font-bold text-center md:text-left">🏫 내 학급</h2>
+                            <p class="text-sm text-gray-500 text-center md:text-left">아직 생성된 학급이 없습니다.</p>
+                            <button id="create-class-btn" class="btn btn-primary w-full">내 학급 만들기</button>
+                        </div>
+                    `;
+                    const createBtn = container.querySelector('#create-class-btn');
+                    if (createBtn) {
+                        createBtn.addEventListener('click', async () => {
+                            const name = prompt('학급 이름을 입력하세요');
+                            if (!name) return;
+                            try {
+                                await createSingleTeacherClass(currentUserData.id, name);
+                                await refreshTeacherClasses();
+                                loadMyClass({ refresh: false });
+                            } catch (err) {
+                                if (err?.code === 'class-exists') {
+                                    showModal('알림', '이미 생성된 학급이 있습니다.');
+                                } else {
+                                    showModal('오류', `학급을 생성하는 중 문제가 발생했습니다: ${err.message}`);
+                                }
+                            }
+                        });
+                    }
                     return;
                 }
 
-                const currentClass = teacherClasses[currentClassIndex];
-                const studentIds = Array.isArray(currentClass.students) ? currentClass.students : [];
+                const currentClass = teacherClasses[0];
                 currentClassId = currentClass.id;
-                currentClassStudents = studentIds;
+                currentClassStudents = Array.isArray(currentClass.students) ? currentClass.students : [];
 
                 let listHtml = '';
-                for (const sid of studentIds) {
+                for (const sid of currentClassStudents) {
                     try {
                         const sd = await getDoc(doc(db, 'users', sid));
                         if (sd.exists()) {
                             const s = sd.data();
                             listHtml += `
                                 <li class="flex justify-between items-center">
-                                    <span>${s.name}</span>
+                                    <span>${s.name || sid}</span>
                                     <div class="space-x-1">
                                         <button data-sid="${sid}" class="class-hw-btn btn bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 text-xs">숙제</button>
                                         <button data-sid="${sid}" class="class-lr-btn btn bg-green-500 hover:bg-green-600 text-white px-2 py-1 text-xs">생활규칙</button>
@@ -4569,58 +4624,42 @@
                     }
                 }
 
-                const prevDisabled = currentClassIndex === 0;
-                const nextDisabled = currentClassIndex === teacherClasses.length - 1;
+                const studentCountLabel = currentClassStudents.length
+                    ? `${currentClassStudents.length}명의 학생`
+                    : '학생이 없습니다.';
 
                 container.innerHTML = `
-                    <div class="flex justify-between items-center mb-2">
-                        <div class="flex items-center space-x-2">
-                            <button id="class-prev-btn" class="btn btn-secondary btn-sm ${prevDisabled ? 'btn-disabled' : ''}" ${prevDisabled ? 'disabled' : ''}>&lt;</button>
-                            <h2 class="text-xl font-bold">🏫 ${currentClass.name || '이름 없는 학급'}</h2>
-                            <span class="text-sm text-gray-500">${currentClassIndex + 1}/${teacherClasses.length}</span>
-                            <button id="class-next-btn" class="btn btn-secondary btn-sm ${nextDisabled ? 'btn-disabled' : ''}" ${nextDisabled ? 'disabled' : ''}>&gt;</button>
+                    <div class="flex flex-col gap-3">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                            <div>
+                                <h2 class="text-xl font-bold">🏫 ${currentClass.name || '내 학급'}</h2>
+                                <p class="text-sm text-gray-500">${studentCountLabel}</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button id="rename-class-btn" class="btn btn-secondary btn-sm">이름 변경</button>
+                                <button id="add-class-student-btn" class="btn btn-primary btn-sm">학생 추가</button>
+                            </div>
                         </div>
-                        <div class="space-x-2">
-                            <button id="add-class-btn" class="btn btn-secondary btn-sm">학급 추가</button>
-                            <button id="add-class-student-btn" class="btn btn-primary btn-sm">학생 추가</button>
-                        </div>
+                        <ul class="list-disc list-inside space-y-1">${listHtml || '<li class="text-sm text-gray-500">학생 없음</li>'}</ul>
                     </div>
-                    <ul class="list-disc list-inside space-y-1">${listHtml || '<li class="text-sm text-gray-500">학생 없음</li>'}</ul>
                 `;
 
-                const prevBtn = container.querySelector('#class-prev-btn');
-                const nextBtn = container.querySelector('#class-next-btn');
-                if (prevBtn) {
-                    prevBtn.addEventListener('click', () => {
-                        if (currentClassIndex > 0) {
-                            currentClassIndex--;
-                            updateCurrentClassState();
-                            loadMyClass({ refresh: false });
+                const renameBtn = container.querySelector('#rename-class-btn');
+                if (renameBtn) {
+                    renameBtn.addEventListener('click', async () => {
+                        const newName = prompt('학급 이름을 입력하세요', currentClass.name || '');
+                        if (!newName) return;
+                        const trimmed = newName.trim();
+                        if (!trimmed) {
+                            showModal('알림', '학급 이름을 입력해주세요.');
+                            return;
                         }
-                    });
-                }
-                if (nextBtn) {
-                    nextBtn.addEventListener('click', () => {
-                        if (currentClassIndex < teacherClasses.length - 1) {
-                            currentClassIndex++;
-                            updateCurrentClassState();
-                            loadMyClass({ refresh: false });
-                        }
-                    });
-                }
-
-                const addClassBtn = container.querySelector('#add-class-btn');
-                if (addClassBtn) {
-                    addClassBtn.addEventListener('click', async () => {
-                        const name = prompt('추가할 학급 이름을 입력하세요');
-                        if (!name) return;
                         try {
-                            const newClassId = await createTeacherClass(db, currentUserData.id, name);
-                            pendingClassFocusId = newClassId;
-                            await refreshTeacherClasses(newClassId);
+                            await updateDoc(doc(db, 'classes', currentClass.id), { name: trimmed });
+                            await refreshTeacherClasses();
                             loadMyClass({ refresh: false });
                         } catch (err) {
-                            showModal('오류', `학급을 추가하는 중 문제가 발생했습니다: ${err.message}`);
+                            showModal('오류', `학급 이름을 변경하는 중 문제가 발생했습니다: ${err.message}`);
                         }
                     });
                 }
