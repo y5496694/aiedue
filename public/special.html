@@ -43,6 +43,27 @@
             box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
             outline: none;
         }
+        .btn {
+            transition: background-color 0.3s, color 0.3s, opacity 0.3s;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-primary {
+            background-color: #0ea5e9;
+            color: #ffffff;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: #0284c7;
+        }
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: #1e293b;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background-color: #cbd5f5;
+        }
         .content-section {
             border: 1px solid #e2e8f0;
             border-radius: 0.75rem;
@@ -221,7 +242,7 @@
                             <input type="text" id="student-code" class="w-full border border-gray-300 rounded-md p-2 form-input" placeholder="발급받은 코드를 입력하세요">
                         </div>
                         <p id="student-login-error" class="text-red-500 text-sm mb-4 hidden"></p>
-                        <button id="student-login-btn" class="w-full py-2 rounded-md bg-sky-600 hover:bg-sky-700 text-white font-semibold transition-colors">학생 로그인</button>
+                        <button id="student-login-btn" class="w-full py-2 rounded-md btn btn-primary font-semibold">학생 로그인</button>
                     </div>
                     <div id="teacher-login-content" class="tab-content pt-6">
                         <div class="mb-4">
@@ -233,8 +254,8 @@
                             <input type="password" id="teacher-password" class="w-full border border-gray-300 rounded-md p-2 form-input" placeholder="••••••••">
                         </div>
                         <p id="teacher-login-error" class="text-red-500 text-sm mb-4 hidden"></p>
-                        <button id="teacher-login-btn" class="w-full py-2 rounded-md bg-sky-600 hover:bg-sky-700 text-white font-semibold transition-colors">교사 로그인</button>
-                        <button id="teacher-google-login-btn" class="w-full py-2 mt-2 rounded-md border border-gray-300 bg-white text-gray-700 font-semibold flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
+                        <button id="teacher-login-btn" class="w-full py-2 rounded-md btn btn-primary font-semibold">교사 로그인</button>
+                        <button id="teacher-google-login-btn" class="w-full py-2 mt-2 rounded-md btn border border-gray-300 bg-white text-gray-700 font-semibold flex items-center justify-center gap-2 hover:bg-gray-50">
                             <svg class="w-5 h-5" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></svg>
                             Google 계정으로 로그인
                         </button>
@@ -251,7 +272,7 @@
                         <input type="text" id="student-name" class="w-full border border-gray-300 rounded-md p-2 form-input" placeholder="이름을 입력하세요">
                     </div>
                     <p id="student-register-error" class="text-red-500 text-sm mb-4 hidden"></p>
-                    <button id="student-register-btn" class="w-full py-2 rounded-md bg-sky-600 hover:bg-sky-700 text-white font-semibold transition-colors mb-4">등록하고 코드 받기</button>
+                    <button id="student-register-btn" class="w-full py-2 rounded-md btn btn-primary font-semibold mb-4">등록하고 코드 받기</button>
                     <button id="back-to-login-btn" class="w-full text-sm text-gray-600 hover:underline">로그인 화면으로 돌아가기</button>
                 </div>
                 <div id="teacher-register-view" class="view">
@@ -269,7 +290,7 @@
                         <input type="password" id="teacher-register-password" class="w-full border border-gray-300 rounded-md p-2 form-input" placeholder="6자리 이상 비밀번호를 입력하세요">
                     </div>
                     <p id="teacher-register-error" class="text-red-500 text-sm mb-4 hidden"></p>
-                    <button id="teacher-register-btn" class="w-full py-2 rounded-md bg-sky-600 hover:bg-sky-700 text-white font-semibold transition-colors mb-4">회원가입</button>
+                    <button id="teacher-register-btn" class="w-full py-2 rounded-md btn btn-primary font-semibold mb-4">회원가입</button>
                     <button id="teacher-back-to-login-btn" class="w-full text-sm text-gray-600 hover:underline">로그인 화면으로 돌아가기</button>
                 </div>
             </div>
@@ -329,7 +350,28 @@
                         </div>
                     </div>
                 </div>
-                
+
+                <!-- Create Class Modal -->
+                <div id="create-class-modal" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 px-4">
+                    <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold text-sky-700">내 학급 만들기</h3>
+                            <button type="button" id="create-class-close-btn" class="text-2xl leading-none text-sky-500 hover:text-sky-700">&times;</button>
+                        </div>
+                        <p class="text-sm text-gray-600 mb-4">학생들과 함께 사용할 학급 이름을 입력해주세요. 학급은 한 번만 생성할 수 있습니다.</p>
+                        <form id="create-class-form" class="space-y-4">
+                            <div>
+                                <label for="create-class-name" class="block text-sm font-medium text-gray-700 mb-1">학급 이름</label>
+                                <input type="text" id="create-class-name" class="w-full border border-gray-300 rounded-md p-2 form-input" placeholder="예: 함께반" autocomplete="off">
+                            </div>
+                            <div class="flex justify-end gap-2">
+                                <button type="button" id="create-class-cancel-btn" class="px-4 py-2 rounded-md btn btn-secondary">취소</button>
+                                <button type="submit" id="create-class-confirm-btn" class="px-4 py-2 rounded-md btn btn-primary font-semibold">만들기</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
                 <!-- IEP View -->
                 <div id="iep-view" class="hidden">
                      <h2 class="text-3xl font-bold mb-6">개별화교육계획(IEP) 수립</h2>
@@ -1100,34 +1142,119 @@
         const addClassBtn = document.getElementById('add-class-btn');
         const classListContainer = document.getElementById('class-list');
         const classTitle = document.getElementById('class-title');
+        const createClassModal = document.getElementById('create-class-modal');
+        const createClassForm = document.getElementById('create-class-form');
+        const createClassNameInput = document.getElementById('create-class-name');
+        const createClassCancelBtn = document.getElementById('create-class-cancel-btn');
+        const createClassCloseBtn = document.getElementById('create-class-close-btn');
+        const createClassConfirmBtn = document.getElementById('create-class-confirm-btn');
         let isLoadingClasses = false;
+        let isCreatingClass = false;
+
+        function setClassCreateButtonState(canCreate) {
+            if (!addClassBtn) return;
+            addClassBtn.disabled = !canCreate;
+            addClassBtn.classList.toggle('opacity-50', !canCreate);
+            addClassBtn.classList.toggle('cursor-not-allowed', !canCreate);
+        }
+
+        function openCreateClassModal() {
+            if (!auth.currentUser || !createClassModal || addClassBtn?.disabled) return;
+            if (createClassNameInput) {
+                createClassNameInput.value = '';
+            }
+            createClassModal.classList.remove('hidden');
+            createClassModal.classList.add('flex');
+            setTimeout(() => createClassNameInput?.focus(), 50);
+        }
+
+        function closeCreateClassModal() {
+            if (!createClassModal) return;
+            createClassModal.classList.add('hidden');
+            createClassModal.classList.remove('flex');
+            if (createClassNameInput) {
+                createClassNameInput.value = '';
+            }
+        }
+
+        async function handleCreateClassSubmit(event) {
+            event.preventDefault();
+            if (isCreatingClass) return;
+            const user = auth.currentUser;
+            if (!user) return;
+            const className = (createClassNameInput?.value || '').trim();
+            if (!className) {
+                showToast('학급 이름을 입력해주세요.');
+                createClassNameInput?.focus();
+                return;
+            }
+
+            isCreatingClass = true;
+            const originalText = createClassConfirmBtn?.textContent || '';
+            if (createClassConfirmBtn) {
+                createClassConfirmBtn.disabled = true;
+                createClassConfirmBtn.textContent = '만드는 중...';
+            }
+
+            try {
+                const classRef = doc(db, 'classes', user.uid);
+                const classSnap = await getDoc(classRef);
+                if (classSnap.exists()) {
+                    showToast('이미 학급이 존재합니다.');
+                    closeCreateClassModal();
+                    return;
+                }
+                await setDoc(classRef, { name: className, students: [] });
+                showToast('새 학급이 만들어졌습니다.');
+                closeCreateClassModal();
+                await loadClasses();
+                await loadHomeData();
+            } catch (error) {
+                console.error('Failed to create class:', error);
+                showToast('학급 생성에 실패했습니다. 잠시 후 다시 시도해주세요.');
+            } finally {
+                isCreatingClass = false;
+                if (createClassConfirmBtn) {
+                    createClassConfirmBtn.disabled = false;
+                    createClassConfirmBtn.textContent = originalText || '만들기';
+                }
+            }
+        }
 
         async function loadClasses() {
             const user = auth.currentUser;
             if (!user || isLoadingClasses) return;
             isLoadingClasses = true;
-            classListContainer.innerHTML = '<p class="text-gray-500">로딩 중...</p>';
+            if (classListContainer) {
+                classListContainer.innerHTML = '<p class="text-gray-500">로딩 중...</p>';
+            }
             const classRef = doc(db, 'classes', user.uid);
             try {
                 const classSnap = await getDoc(classRef);
-                classListContainer.innerHTML = '';
+                if (classListContainer) {
+                    classListContainer.innerHTML = '';
+                }
                 if (!classSnap.exists()) {
-                    addClassBtn.classList.remove('hidden');
                     classTitle.textContent = '내 학급';
-                    classListContainer.innerHTML = `<p class="text-gray-500">생성된 학급이 없습니다.</p>`;
+                    if (classListContainer) {
+                        classListContainer.innerHTML = `<p class="text-gray-500">생성된 학급이 없습니다.</p>`;
+                    }
+                    setClassCreateButtonState(true);
                     return;
                 }
                 const data = classSnap.data();
                 classTitle.textContent = data.name || '내 학급';
-                addClassBtn.classList.add('hidden');
+                setClassCreateButtonState(false);
                 const studentIds = data.students || [];
-                if (studentIds.length === 0) {
-                    classListContainer.innerHTML = '<p class="text-gray-500">학생이 없습니다.</p>';
+                if (!studentIds.length) {
+                    if (classListContainer) {
+                        classListContainer.innerHTML = '<p class="text-gray-500">학생이 없습니다.</p>';
+                    }
                 } else {
                     for (const sid of studentIds) {
                         try {
                             const sd = await getDoc(doc(db, 'users', sid));
-                            if (sd.exists()) {
+                            if (sd.exists() && classListContainer) {
                                 const s = sd.data();
                                 const studentEl = document.createElement('div');
                                 studentEl.className = 'p-3 border rounded-md flex justify-between items-center';
@@ -1143,28 +1270,26 @@
                     }
                 }
             } catch (error) {
-                classListContainer.innerHTML = '<p class="text-red-500">학급 정보를 불러오지 못했습니다.</p>';
+                if (classListContainer) {
+                    classListContainer.innerHTML = '<p class="text-red-500">학급 정보를 불러오지 못했습니다.</p>';
+                }
+                setClassCreateButtonState(true);
             } finally {
                 isLoadingClasses = false;
             }
         }
-        
-        addClassBtn.addEventListener('click', async () => {
-            const user = auth.currentUser;
-            if (!user) return;
-            const classRef = doc(db, 'classes', user.uid);
-            const classSnap = await getDoc(classRef);
-             if (classSnap.exists()) {
-                 alert('이미 학급이 존재합니다.');
-                 return;
-             }
-             const className = prompt('학급 이름을 입력하세요:');
-             if (className) {
-                 await setDoc(classRef, { name: className, students: [] });
-                 loadClasses();
-                loadHomeData();
+
+        if (addClassBtn) {
+            addClassBtn.addEventListener('click', openCreateClassModal);
+        }
+        createClassCancelBtn?.addEventListener('click', closeCreateClassModal);
+        createClassCloseBtn?.addEventListener('click', closeCreateClassModal);
+        createClassModal?.addEventListener('click', (event) => {
+            if (event.target === createClassModal) {
+                closeCreateClassModal();
             }
         });
+        createClassForm?.addEventListener('submit', handleCreateClassSubmit);
 
         // --- Template Generator Logic ---
         function activateTemplateCategory(category) {
