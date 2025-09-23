@@ -568,6 +568,7 @@
             <h3 id="shop-item-modal-title" class="text-xl font-bold mb-4">상점 물품 관리</h3>
             <form id="shop-item-form" class="text-left space-y-3">
                 <input type="hidden" id="shop-item-id">
+                <input type="hidden" id="shop-item-teacher-id">
                 <div>
                     <label for="shop-item-name" class="block text-sm font-medium">물품 이름</label>
                     <input type="text" id="shop-item-name" required class="w-full p-2 border rounded-md form-input">
@@ -1236,7 +1237,7 @@
         import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, runTransaction, updateDoc, increment, deleteField, serverTimestamp, Timestamp, orderBy, addDoc, deleteDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
         import { getStorage, ref as storageRef, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
-        import { createTeacherClass } from "./js/classManager.js";
+        import { createTeacherClass, fetchTeacherClasses, fetchClassesForStudent } from "./js/classManager.js";
 
         // IMPORTANT: Replace with your actual Firebase config
         const firebaseConfig = {
@@ -1276,6 +1277,13 @@
         let currentWordChainProblem = null; // 현재 끝말잇기 문제 템플릿
         let isLibraryLoading = false;
         let libraryBooksCache = [];
+        const DEFAULT_SHOP_TEACHER_ID = 'anHUfyR5RdVamxf13tn3lhWT3vo2';
+        let teacherClasses = [];
+        let currentClassIndex = 0;
+        let currentClassId = null;
+        let currentClassStudents = [];
+        let pendingClassFocusId = null;
+        let studentClassTeacherIdsCache = null;
 
         // --- DOM Elements ---
         const views = {
@@ -1310,6 +1318,97 @@
         const choicePromiseQuestionsContainer = document.getElementById('choice-promise-questions');
         const choicePromisePracticeModal = document.getElementById('choice-promise-practice-modal');
         const choicePromisePracticeList = document.getElementById('choice-promise-practice-list');
+
+        function resetUserSessionState() {
+            teacherClasses = [];
+            currentClassIndex = 0;
+            currentClassId = null;
+            currentClassStudents = [];
+            pendingClassFocusId = null;
+            studentClassTeacherIdsCache = null;
+            myClassStudentIds = [];
+        }
+
+        function updateCurrentClassState() {
+            if (!teacherClasses.length) {
+                currentClassIndex = 0;
+                currentClassId = null;
+                currentClassStudents = [];
+                return;
+            }
+            if (currentClassIndex >= teacherClasses.length) {
+                currentClassIndex = teacherClasses.length - 1;
+            }
+            if (currentClassIndex < 0) {
+                currentClassIndex = 0;
+            }
+            const selectedClass = teacherClasses[currentClassIndex];
+            currentClassId = selectedClass?.id || null;
+            currentClassStudents = Array.isArray(selectedClass?.students) ? selectedClass.students : [];
+        }
+
+        function updateMyClassStudentIds() {
+            const allIds = new Set();
+            teacherClasses.forEach(cls => {
+                (cls.students || []).forEach(id => allIds.add(id));
+            });
+            myClassStudentIds = Array.from(allIds);
+        }
+
+        async function refreshTeacherClasses(focusClassId = null) {
+            if (!currentUserData || currentUserData.role !== 'teacher') {
+                teacherClasses = [];
+                updateCurrentClassState();
+                updateMyClassStudentIds();
+                return teacherClasses;
+            }
+            teacherClasses = await fetchTeacherClasses(db, currentUserData.id);
+            const focusId = focusClassId || pendingClassFocusId;
+            if (focusId) {
+                const idx = teacherClasses.findIndex(cls => cls.id === focusId);
+                if (idx >= 0) {
+                    currentClassIndex = idx;
+                }
+                pendingClassFocusId = null;
+            }
+            updateCurrentClassState();
+            updateMyClassStudentIds();
+            return teacherClasses;
+        }
+
+        async function ensureTeacherClassesLoaded() {
+            if (!currentUserData || currentUserData.role !== 'teacher') {
+                return [];
+            }
+            if (!teacherClasses.length) {
+                await refreshTeacherClasses();
+            }
+            return teacherClasses;
+        }
+
+        async function getStudentAssignedTeacherIds(studentId) {
+            if (!studentId) return [];
+            if (studentClassTeacherIdsCache && studentClassTeacherIdsCache.id === studentId) {
+                return studentClassTeacherIdsCache.ids;
+            }
+            let classDocs = [];
+            try {
+                classDocs = await fetchClassesForStudent(db, studentId);
+            } catch (error) {
+                console.warn('학생 학급 정보를 불러오지 못했습니다:', error);
+                classDocs = [];
+            }
+            const teacherIdSet = new Set();
+            classDocs.forEach(cls => {
+                const teacherId = cls.teacherId || cls.id || '';
+                if (teacherId) {
+                    teacherIdSet.add(teacherId);
+                }
+            });
+            const ids = Array.from(teacherIdSet);
+            studentClassTeacherIdsCache = { id: studentId, ids };
+            return ids;
+        }
         const choicePromisePracticeTitle = document.getElementById('choice-promise-practice-title');
         const choicePromisePracticeSubtitle = document.getElementById('choice-promise-practice-subtitle');
         const choicePromisePracticeFeedback = document.getElementById('choice-promise-practice-feedback');
@@ -1770,6 +1869,7 @@
             isAdminViewing = false; // Reset admin view on auth change
             document.getElementById('back-to-admin-btn').classList.add('hidden');
             document.getElementById('back-to-home-btn').classList.add('hidden');
+            resetUserSessionState();
 
             if (user && !user.isAnonymous) {
                 try {
@@ -2663,14 +2763,55 @@
             const container = document.getElementById('shop-item-list');
             container.innerHTML = `<p class="col-span-full text-center text-gray-500">상점 물품을 불러오는 중입니다...</p>`;
             try {
-                const querySnapshot = await getDocs(query(collection(db, "shopItems"), orderBy("name")));
-                container.innerHTML = '';
-                if(querySnapshot.empty) {
-                    container.innerHTML = `<p class="col-span-full text-center text-gray-500">판매중인 물품이 없습니다.</p>`;
+                const snapshot = await getDocs(collection(db, 'shopItems'));
+                if (snapshot.empty) {
+                    const emptyMsg = currentUserData?.role === 'teacher'
+                        ? '등록된 상점 물품이 없습니다. 새 물품을 추가해보세요.'
+                        : '판매중인 물품이 없습니다.';
+                    container.innerHTML = `<p class="col-span-full text-center text-gray-500">${emptyMsg}</p>`;
                     return;
                 }
-                querySnapshot.forEach(docSnap => {
-                    const item = { id: docSnap.id, ...docSnap.data() };
+
+                const items = [];
+                const missingTeacherUpdates = [];
+                snapshot.forEach(docSnap => {
+                    const raw = docSnap.data() || {};
+                    const teacherId = raw.teacherId || DEFAULT_SHOP_TEACHER_ID;
+                    if (!raw.teacherId) {
+                        missingTeacherUpdates.push(updateDoc(doc(db, 'shopItems', docSnap.id), { teacherId }).catch(err => {
+                            console.warn('상점 물품 teacherId 업데이트 실패:', err);
+                        }));
+                    }
+                    items.push({ id: docSnap.id, ...raw, teacherId });
+                });
+                if (missingTeacherUpdates.length) {
+                    await Promise.allSettled(missingTeacherUpdates);
+                }
+
+                let filteredItems = items;
+                if (currentUserData?.role === 'teacher') {
+                    filteredItems = items.filter(item => item.teacherId === currentUserData.id);
+                } else if (currentUserData?.role === 'student') {
+                    const allowedTeacherIds = await getStudentAssignedTeacherIds(currentUserData.id);
+                    if (!allowedTeacherIds.length) {
+                        container.innerHTML = `<p class="col-span-full text-center text-gray-500">담당 교사가 등록한 상점 물품이 없습니다.</p>`;
+                        return;
+                    }
+                    filteredItems = items.filter(item => allowedTeacherIds.includes(item.teacherId));
+                }
+
+                filteredItems.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko'));
+
+                if (!filteredItems.length) {
+                    const roleMsg = currentUserData?.role === 'teacher'
+                        ? '내가 등록한 상점 물품이 없습니다.'
+                        : '담당 교사가 등록한 상점 물품이 없습니다.';
+                    container.innerHTML = `<p class="col-span-full text-center text-gray-500">${roleMsg}</p>`;
+                    return;
+                }
+
+                container.innerHTML = '';
+                filteredItems.forEach(item => {
                     const card = document.createElement('div');
                     card.className = "bg-white p-4 rounded-lg shadow flex flex-col";
 
@@ -2698,7 +2839,7 @@
                                 </div>
                                 <button data-itemid="${item.id}" data-itemname="${item.name}" data-itemprice="${pricing.basePrice}" class="buy-item-btn btn btn-primary px-3 py-1 text-sm" ${isAdminViewing ? 'disabled' : ''}>구매</button>
                             </div>
-                            ${currentUserData.role === 'teacher' ? `
+                            ${currentUserData?.role === 'teacher' ? `
                             <div class="mt-2 flex justify-end space-x-2">
                                 <button data-itemid="${item.id}" class="edit-item-btn btn bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1">수정</button>
                                 <button data-itemid="${item.id}" class="delete-item-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>
@@ -2708,10 +2849,11 @@
                     `;
                     container.appendChild(card);
                 });
-                document.querySelectorAll('.buy-item-btn').forEach(btn => {
+
+                container.querySelectorAll('.buy-item-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => handleBuyItem(e.target.dataset.itemid, e.target.dataset.itemname, e.target.dataset.itemprice));
                 });
-                if (currentUserData.role === 'teacher') {
+                if (currentUserData?.role === 'teacher') {
                     container.querySelectorAll('.edit-item-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => openShopItemModal(e.target.dataset.itemid));
                     });
@@ -2789,6 +2931,8 @@
             const form = document.getElementById('shop-item-form');
             form.reset();
             document.getElementById('shop-item-id').value = '';
+            const teacherIdField = document.getElementById('shop-item-teacher-id');
+            teacherIdField.value = currentUserData?.id || DEFAULT_SHOP_TEACHER_ID;
             if (itemId) {
                 const itemDoc = await getDoc(doc(db, "shopItems", itemId));
                 if (itemDoc.exists()) {
@@ -2798,6 +2942,7 @@
                     document.getElementById('shop-item-price').value = item.price;
                     document.getElementById('shop-item-desc').value = item.description;
                     document.getElementById('shop-item-image-url').value = item.imageUrl || '';
+                    teacherIdField.value = item.teacherId || teacherIdField.value || DEFAULT_SHOP_TEACHER_ID;
                 }
             }
             shopItemModal.style.display = 'flex';
@@ -2806,11 +2951,13 @@
         document.getElementById('shop-item-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const itemId = document.getElementById('shop-item-id').value;
+            const teacherId = document.getElementById('shop-item-teacher-id').value || currentUserData?.id || DEFAULT_SHOP_TEACHER_ID;
             const data = {
                 name: document.getElementById('shop-item-name').value,
                 price: Number(document.getElementById('shop-item-price').value),
                 description: document.getElementById('shop-item-desc').value,
-                imageUrl: document.getElementById('shop-item-image-url').value
+                imageUrl: document.getElementById('shop-item-image-url').value,
+                teacherId
             };
             if (itemId) {
                 await updateDoc(doc(db, "shopItems", itemId), data);
@@ -4359,31 +4506,47 @@
         }
 
         // --- My Class Management ---
-        async function loadMyClass() {
+        async function loadMyClass(options = { refresh: true }) {
+            const { refresh = true } = options || {};
             const container = document.getElementById('my-class-section');
             if (!container) return;
             container.innerHTML = '<p class="text-center text-gray-500">로딩 중...</p>';
-            const docRef = doc(db, 'classes', currentUserData.id);
+            if (!currentUserData || currentUserData.role !== 'teacher') {
+                container.innerHTML = '<p class="text-center text-gray-500">교사만 사용할 수 있는 기능입니다.</p>';
+                return;
+            }
             try {
-                const docSnap = await getDoc(docRef);
-                if (!docSnap.exists()) {
+                if (refresh) {
+                    await refreshTeacherClasses();
+                } else {
+                    await ensureTeacherClassesLoaded();
+                    updateCurrentClassState();
+                }
+                updateMyClassStudentIds();
+
+                if (!teacherClasses.length) {
                     container.innerHTML = '<h2 class="text-xl font-bold mb-4">🏫 내 학급</h2><button id="create-class-btn" class="btn btn-primary w-full">내 학급 만들기</button>';
                     document.getElementById('create-class-btn').onclick = async () => {
                         const name = prompt('학급 이름을 입력하세요');
-                        if (name) {
-                            try {
-                                await createTeacherClass(db, currentUserData.id, name);
-                                loadMyClass();
-                            } catch (err) {
-                                container.innerHTML = '<p class="text-red-500 text-center">학급 생성 실패</p>';
-                                showModal('오류', `학급 생성 중 오류가 발생했습니다: ${err.message}`);
-                            }
+                        if (!name) return;
+                        try {
+                            const newClassId = await createTeacherClass(db, currentUserData.id, name);
+                            pendingClassFocusId = newClassId;
+                            await refreshTeacherClasses(newClassId);
+                            loadMyClass({ refresh: false });
+                        } catch (err) {
+                            container.innerHTML = '<p class="text-red-500 text-center">학급 생성 실패</p>';
+                            showModal('오류', `학급 생성 중 오류가 발생했습니다: ${err.message}`);
                         }
                     };
                     return;
                 }
-                const data = docSnap.data();
-                const studentIds = data.students || [];
+
+                const currentClass = teacherClasses[currentClassIndex];
+                const studentIds = Array.isArray(currentClass.students) ? currentClass.students : [];
+                currentClassId = currentClass.id;
+                currentClassStudents = studentIds;
+
                 let listHtml = '';
                 for (const sid of studentIds) {
                     try {
@@ -4405,14 +4568,68 @@
                         listHtml += `<li class="text-red-500">오류: ${err.message}</li>`;
                     }
                 }
+
+                const prevDisabled = currentClassIndex === 0;
+                const nextDisabled = currentClassIndex === teacherClasses.length - 1;
+
                 container.innerHTML = `
                     <div class="flex justify-between items-center mb-2">
-                        <h2 class="text-xl font-bold">🏫 ${data.name}</h2>
-                        <button id="add-class-student-btn" class="btn btn-primary btn-sm">학생 추가</button>
+                        <div class="flex items-center space-x-2">
+                            <button id="class-prev-btn" class="btn btn-secondary btn-sm ${prevDisabled ? 'btn-disabled' : ''}" ${prevDisabled ? 'disabled' : ''}>&lt;</button>
+                            <h2 class="text-xl font-bold">🏫 ${currentClass.name || '이름 없는 학급'}</h2>
+                            <span class="text-sm text-gray-500">${currentClassIndex + 1}/${teacherClasses.length}</span>
+                            <button id="class-next-btn" class="btn btn-secondary btn-sm ${nextDisabled ? 'btn-disabled' : ''}" ${nextDisabled ? 'disabled' : ''}>&gt;</button>
+                        </div>
+                        <div class="space-x-2">
+                            <button id="add-class-btn" class="btn btn-secondary btn-sm">학급 추가</button>
+                            <button id="add-class-student-btn" class="btn btn-primary btn-sm">학생 추가</button>
+                        </div>
                     </div>
                     <ul class="list-disc list-inside space-y-1">${listHtml || '<li class="text-sm text-gray-500">학생 없음</li>'}</ul>
                 `;
-                document.getElementById('add-class-student-btn').onclick = () => openAddStudentsModal();
+
+                const prevBtn = container.querySelector('#class-prev-btn');
+                const nextBtn = container.querySelector('#class-next-btn');
+                if (prevBtn) {
+                    prevBtn.addEventListener('click', () => {
+                        if (currentClassIndex > 0) {
+                            currentClassIndex--;
+                            updateCurrentClassState();
+                            loadMyClass({ refresh: false });
+                        }
+                    });
+                }
+                if (nextBtn) {
+                    nextBtn.addEventListener('click', () => {
+                        if (currentClassIndex < teacherClasses.length - 1) {
+                            currentClassIndex++;
+                            updateCurrentClassState();
+                            loadMyClass({ refresh: false });
+                        }
+                    });
+                }
+
+                const addClassBtn = container.querySelector('#add-class-btn');
+                if (addClassBtn) {
+                    addClassBtn.addEventListener('click', async () => {
+                        const name = prompt('추가할 학급 이름을 입력하세요');
+                        if (!name) return;
+                        try {
+                            const newClassId = await createTeacherClass(db, currentUserData.id, name);
+                            pendingClassFocusId = newClassId;
+                            await refreshTeacherClasses(newClassId);
+                            loadMyClass({ refresh: false });
+                        } catch (err) {
+                            showModal('오류', `학급을 추가하는 중 문제가 발생했습니다: ${err.message}`);
+                        }
+                    });
+                }
+
+                const addStudentBtn = container.querySelector('#add-class-student-btn');
+                if (addStudentBtn) {
+                    addStudentBtn.addEventListener('click', () => openAddStudentsModal());
+                }
+
                 container.querySelectorAll('.class-hw-btn').forEach(btn => btn.addEventListener('click', e => openBulkAssignment('homework', null, e.target.dataset.sid)));
                 container.querySelectorAll('.class-lr-btn').forEach(btn => btn.addEventListener('click', e => openBulkAssignment('lifeRule', null, e.target.dataset.sid)));
                 container.querySelectorAll('.class-view-btn').forEach(btn => btn.addEventListener('click', e => viewStudentDashboard(e.target.dataset.sid)));
@@ -4422,12 +4639,14 @@
                 showModal('오류', `학급 정보를 불러오는 중 오류가 발생했습니다: ${error.message}`);
             }
         }
-
-        let currentClassStudents = [];
         async function openAddStudentsModal() {
+            if (!currentClassId) {
+                showModal('오류', '선택된 학급을 찾을 수 없습니다.');
+                return;
+            }
             try {
-                const classDoc = await getDoc(doc(db, 'classes', currentUserData.id));
-                currentClassStudents = classDoc.data().students || [];
+                const classDoc = await getDoc(doc(db, 'classes', currentClassId));
+                currentClassStudents = classDoc.exists() ? (classDoc.data().students || []) : [];
             } catch (err) {
                 showModal('오류', `학급 정보를 불러오지 못했습니다: ${err.message}`);
                 return;
@@ -4461,7 +4680,7 @@
             const selected = Array.from(document.querySelectorAll('#class-student-list input:checked:not(:disabled)')).map(i => i.dataset.studentid);
             if (selected.length > 0) {
                 try {
-                    await updateDoc(doc(db, 'classes', currentUserData.id), { students: arrayUnion(...selected) });
+                    await updateDoc(doc(db, 'classes', currentClassId), { students: arrayUnion(...selected) });
                 } catch (err) {
                     showModal('오류', `학생을 추가하는 중 오류가 발생했습니다: ${err.message}`);
                 }
@@ -6363,42 +6582,75 @@
             step2.classList.add('hidden');
             titleEl.textContent = type === 'homework' ? '숙제 배부하기 - 학생 선택' : '생활 규칙 배부하기 - 학생 선택';
             list.innerHTML = '학생 목록 로딩 중...';
-            const [usersSnapshot, classSnap] = await Promise.all([
-                getDocs(query(collection(db, 'users'), where('role', '==', 'student'))),
-                getDoc(doc(db, 'classes', currentUserData.id))
-            ]);
+            const usersSnapshot = await getDocs(query(collection(db, 'users'), where('role', '==', 'student')));
             if (usersSnapshot.empty) { list.innerHTML = '배부할 학생이 없습니다.'; return; }
+
+            await ensureTeacherClassesLoaded();
+            const classes = teacherClasses;
+            const classStudentsMap = new Map();
+            classes.forEach(cls => {
+                classStudentsMap.set(cls.id, Array.isArray(cls.students) ? cls.students : []);
+            });
+
             const studentsHtml = usersSnapshot.docs.map(docSnap => {
-                const s = {id: docSnap.id, ...docSnap.data()};
+                const s = { id: docSnap.id, ...docSnap.data() };
                 return `<label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100"><input type="checkbox" data-studentid="${s.id}" class="bulk-student-checkbox h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"><span>${s.name} (코드: ${s.userCode})</span></label>`;
             }).join('');
-            let classHtml = '';
-            let classStudents = [];
-            if (classSnap.exists()) {
-                classStudents = classSnap.data().students || [];
-                classHtml = `<label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100 font-semibold"><input type="checkbox" id="bulk-select-class" class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"><span>${classSnap.data().name} 학급 전체 배부</span></label>`;
-            }
-            list.innerHTML = classHtml + studentsHtml;
-            const classCheckbox = document.getElementById('bulk-select-class');
-            if (classCheckbox) {
-                const studentCbs = list.querySelectorAll('input.bulk-student-checkbox');
-                classCheckbox.onchange = e => {
-                    studentCbs.forEach(cb => {
-                        if (classStudents.includes(cb.dataset.studentid)) {
+
+            const classCheckboxHtml = classes.length ? classes.map(cls => `
+                <label class="flex items-center space-x-3 p-2 rounded hover:bg-gray-100 font-semibold">
+                    <input type="checkbox" data-classid="${cls.id}" class="bulk-class-checkbox h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                    <span>${cls.name || '이름 없는 학급'} 학급 전체 배부</span>
+                </label>
+            `).join('') : '';
+
+            list.innerHTML = classCheckboxHtml + studentsHtml;
+
+            const studentCheckboxes = Array.from(list.querySelectorAll('input.bulk-student-checkbox'));
+            const classCheckboxes = Array.from(list.querySelectorAll('input.bulk-class-checkbox'));
+
+            const updateClassCheckboxState = (classCheckbox) => {
+                const members = classStudentsMap.get(classCheckbox.dataset.classid) || [];
+                if (!members.length) {
+                    classCheckbox.checked = false;
+                    classCheckbox.indeterminate = false;
+                    return;
+                }
+                let checkedCount = 0;
+                members.forEach(studentId => {
+                    const target = studentCheckboxes.find(cb => cb.dataset.studentid === studentId);
+                    if (target && target.checked) checkedCount += 1;
+                });
+                if (checkedCount === 0) {
+                    classCheckbox.checked = false;
+                    classCheckbox.indeterminate = false;
+                } else if (checkedCount === members.length) {
+                    classCheckbox.checked = true;
+                    classCheckbox.indeterminate = false;
+                } else {
+                    classCheckbox.checked = false;
+                    classCheckbox.indeterminate = true;
+                }
+            };
+
+            classCheckboxes.forEach(classCheckbox => {
+                classCheckbox.addEventListener('change', (e) => {
+                    const members = classStudentsMap.get(classCheckbox.dataset.classid) || [];
+                    studentCheckboxes.forEach(cb => {
+                        if (members.includes(cb.dataset.studentid)) {
                             cb.checked = e.target.checked;
                         }
                     });
-                };
-                studentCbs.forEach(cb => {
-                    if (classStudents.includes(cb.dataset.studentid)) {
-                        cb.addEventListener('change', () => {
-                            classCheckbox.checked = Array.from(studentCbs)
-                                .filter(c => classStudents.includes(c.dataset.studentid))
-                                .every(c => c.checked);
-                        });
-                    }
+                    updateClassCheckboxState(classCheckbox);
                 });
-            }
+                updateClassCheckboxState(classCheckbox);
+            });
+
+            studentCheckboxes.forEach(cb => {
+                cb.addEventListener('change', () => {
+                    classCheckboxes.forEach(updateClassCheckboxState);
+                });
+            });
             const search = document.getElementById('bulk-student-search');
             search.value = '';
             search.oninput = (e) => {
@@ -6921,9 +7173,9 @@
                 let entries = qSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
 
                 if (showOnlyMyClassReadingLogs && currentUserData?.role === 'teacher') {
+                    await ensureTeacherClassesLoaded();
                     if (!myClassStudentIds.length) {
-                        const classSnap = await getDoc(doc(db, 'classes', currentUserData.id));
-                        myClassStudentIds = classSnap.exists() ? classSnap.data().students || [] : [];
+                        updateMyClassStudentIds();
                     }
                     entries = entries.filter(e => myClassStudentIds.includes(e.userId));
                 }
