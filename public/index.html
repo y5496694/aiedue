@@ -1300,7 +1300,6 @@
             return `${datePart} ${timePart}`.trim();
         };
         const LEVEL_UP_EXP = 100;
-        const HOMEWORK_EXP_PER_PROBLEM = 5;
         const formatCoinsPlain = (amount) => formatCurrency(amount).replace(/\s?원$/, '원');
 
         function getHomeworkProblemCount(assignmentData = {}, problemData = {}) {
@@ -1340,8 +1339,7 @@
         }
 
         function calculateHomeworkRewards(assignmentData = {}, problemData = {}) {
-            const problemCount = getHomeworkProblemCount(assignmentData, problemData);
-            const expReward = problemCount * HOMEWORK_EXP_PER_PROBLEM;
+            const expReward = 0; // 학습 문제 숙제는 레벨/경험치 없이 금전 보상만 지급
             const rawCoins = assignmentData.reward ?? problemData.reward ?? 0;
             const coinsNumber = Number(rawCoins);
             const coinReward = Number.isFinite(coinsNumber) ? Math.max(0, Math.floor(coinsNumber)) : 0;
