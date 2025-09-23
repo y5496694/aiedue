@@ -7,16 +7,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap');
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f7fafc; }
-        .view { display: none; }
-        .view.active { display: block; }
+        body { font-family: 'Gowun Dodum', sans-serif; }
         .loader { border: 8px solid #f3f3f3; border-radius: 50%; width: 60px; height: 60px; animation: spin 2s linear infinite; border-top: 8px solid #10b981; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
+        
         .book-viewer { aspect-ratio: 2 / 1.414; width: 100%; display: flex; }
         .book-page { position: relative; width: 50%; height: 100%; background-size: cover; background-position: center; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 2rem; box-sizing: border-box; }
         .book-spread { display: none; }
@@ -44,92 +41,76 @@
         .form-input { transition: all 0.3s; }
         .form-input:focus { border-color: #F59E0B; box-shadow: 0 0 0 2px rgba(245,158,11,0.2); }
         .btn { transition: background-color 0.3s; }
-        .btn-primary { background-color: #10B981; color: white; }
-        .btn-primary:hover { background-color: #059669; }
+        .btn-primary { background-color: #F59E0B; color: white; }
+        .btn-primary:hover { background-color: #D97706; }
         .btn-secondary { background-color: #6B7280; color: white; }
         .btn-secondary:hover { background-color: #4B5563; }
         .btn-disabled { background-color: #D1D5DB; cursor: not-allowed; }
-        .book-view { display: none; }
-        .book-view.active { display: block; }
-        .book-page, .manual-text-area, .text-box { font-family: 'Gowun Dodum', sans-serif; }
-</style>
+    </style>
 </head>
-<body class="text-gray-800 min-h-screen">
+<body class="p-2 md:p-8 bg-gray-100">
 
-    <div id="book-auth-container" class="max-w-7xl mx-auto p-4 md:p-8 w-full">
-        <div id="book-login-view" class="book-view view active">
-            <div class="text-center mb-12">
-                <h1 class="text-4xl font-bold text-amber-600">에이두 북메이커</h1>
-                <p class="text-gray-600 mt-2">나만의 이야기 책을 만들어 보세요</p>
-            </div>
-            <div class="bg-white p-8 rounded-lg shadow-md max-w-md mx-auto">
-                <div class="border-b border-gray-200">
-                    <nav class="-mb-px flex space-x-6" aria-label="Tabs">
-                        <button id="book-student-login-tab" class="login-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">🧑‍🎓 학생</button>
-                        <button id="book-teacher-login-tab" class="login-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">🧑‍🏫 교사</button>
-                    </nav>
-                </div>
-                <div id="book-student-login-content" class="tab-content pt-6">
-                    <div class="mb-4">
-                        <label for="book-student-code" class="block text-sm font-medium text-gray-700 mb-1">고유 숫자 코드</label>
-                        <input type="text" id="book-student-code" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="발급받은 코드를 입력하세요">
-                    </div>
-                    <button id="book-student-login-btn" class="w-full py-2 rounded-md btn btn-primary">학생 로그인</button>
-                </div>
-                <div id="book-teacher-login-content" class="tab-content pt-6">
-                    <div class="mb-4">
-                        <label for="book-teacher-email" class="block text-sm font-medium text-gray-700 mb-1">이메일</label>
-                        <input type="email" id="book-teacher-email" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="example@email.com">
-                    </div>
-                    <div class="mb-6">
-                        <label for="book-teacher-password" class="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
-                        <input type="password" id="book-teacher-password" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="••••••••">
-                    </div>
-                    <button id="book-teacher-login-btn" class="w-full py-2 rounded-md btn btn-primary">교사 로그인</button>
-                    <button id="book-teacher-google-login-btn" class="w-full py-2 mt-2 rounded-md btn btn-secondary"><i class="fab fa-google mr-2"></i>Google로 로그인</button>
-                </div>
-                <div class="mt-6 text-center space-y-2">
-                    <button id="book-show-student-register-btn" class="w-full text-center text-sm text-amber-600 hover:underline">처음이신가요? 학생 등록하기</button>
-                    <button id="book-show-teacher-register-btn" class="w-full text-center text-sm text-amber-600 hover:underline">교사이신가요? 회원가입하기</button>
-                </div>
-            </div>
+    <div id="book-login-view" class="max-w-md mx-auto mb-8 bg-white p-6 rounded-lg shadow-lg">
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                <button id="book-student-login-tab" class="login-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">🧑‍🎓 학생</button>
+                <button id="book-teacher-login-tab" class="login-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">🧑‍🏫 교사</button>
+            </nav>
         </div>
-
-        <div id="book-student-register-view" class="book-view view">
-            <div class="bg-white p-8 rounded-lg shadow-md max-w-md mx-auto">
-                <h2 class="text-2xl font-bold mb-6 text-center">🧑‍🎓 학생 등록</h2>
-                <div class="mb-4">
-                    <label for="book-student-name" class="block text-sm font-medium text-gray-700 mb-1">이름</label>
-                    <input type="text" id="book-student-name" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="이름을 입력하세요">
-                </div>
-                <button id="book-student-register-btn" class="w-full py-2 rounded-md btn btn-primary mb-4">등록하고 코드 받기</button>
-                <button id="book-back-to-login-btn" class="w-full text-center text-sm text-gray-600 hover:underline">로그인 화면으로 돌아가기</button>
+        <div id="book-student-login-content" class="tab-content pt-6">
+            <div class="mb-4">
+                <label for="book-student-code" class="block text-sm font-medium text-gray-700 mb-1">고유 숫자 코드</label>
+                <input type="text" id="book-student-code" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="발급받은 코드를 입력하세요">
             </div>
+            <button id="book-student-login-btn" class="w-full py-2 rounded-md btn btn-primary">학생 로그인</button>
         </div>
-
-        <div id="book-teacher-register-view" class="book-view view">
-            <div class="bg-white p-8 rounded-lg shadow-md max-w-md mx-auto">
-                <h2 class="text-2xl font-bold mb-6 text-center">🧑‍🏫 교사 회원가입</h2>
-                <div class="mb-4">
-                    <label for="book-teacher-register-name" class="block text-sm font-medium text-gray-700 mb-1">이름</label>
-                    <input type="text" id="book-teacher-register-name" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="이름을 입력하세요">
-                </div>
-                <div class="mb-4">
-                    <label for="book-teacher-register-email" class="block text-sm font-medium text-gray-700 mb-1">이메일</label>
-                    <input type="email" id="book-teacher-register-email" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="example@email.com">
-                </div>
-                <div class="mb-6">
-                    <label for="book-teacher-register-password" class="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
-                    <input type="password" id="book-teacher-register-password" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="6자리 이상 비밀번호를 입력하세요">
-                </div>
-                <button id="book-teacher-register-btn" class="w-full py-2 rounded-md btn btn-primary mb-4">회원가입</button>
-                <button id="book-teacher-back-to-login-btn" class="w-full text-center text-sm text-gray-600 hover:underline">로그인 화면으로 돌아가기</button>
+        <div id="book-teacher-login-content" class="tab-content pt-6">
+            <div class="mb-4">
+                <label for="book-teacher-email" class="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+                <input type="email" id="book-teacher-email" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="example@email.com">
             </div>
+            <div class="mb-6">
+                <label for="book-teacher-password" class="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+                <input type="password" id="book-teacher-password" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="••••••••">
+            </div>
+            <button id="book-teacher-login-btn" class="w-full py-2 rounded-md btn btn-primary">교사 로그인</button>
+            <button id="book-teacher-google-login-btn" class="w-full py-2 mt-2 rounded-md btn btn-secondary"><i class="fab fa-google mr-2"></i>Google로 로그인</button>
         </div>
-
+        <div class="mt-6 text-center space-y-2">
+            <button id="book-show-student-register-btn" class="w-full text-center text-sm text-amber-600 hover:underline">처음이신가요? 학생 등록하기</button>
+            <button id="book-show-teacher-register-btn" class="w-full text-center text-sm text-amber-600 hover:underline">교사이신가요? 회원가입하기</button>
+        </div>
     </div>
 
-    <div id="book-content" class="hidden px-2 md:px-8 py-6">
+    <div id="book-student-register-view" class="max-w-md mx-auto mb-8 bg-white p-6 rounded-lg shadow-lg hidden">
+        <h2 class="text-2xl font-bold mb-6 text-center">🧑‍🎓 학생 등록</h2>
+        <div class="mb-4">
+            <label for="book-student-name" class="block text-sm font-medium text-gray-700 mb-1">이름</label>
+            <input type="text" id="book-student-name" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="이름을 입력하세요">
+        </div>
+        <button id="book-student-register-btn" class="w-full py-2 rounded-md btn btn-primary mb-4">등록하고 코드 받기</button>
+        <button id="book-back-to-login-btn" class="w-full text-center text-sm text-gray-600 hover:underline">로그인 화면으로 돌아가기</button>
+    </div>
+
+    <div id="book-teacher-register-view" class="max-w-md mx-auto mb-8 bg-white p-6 rounded-lg shadow-lg hidden">
+        <h2 class="text-2xl font-bold mb-6 text-center">🧑‍🏫 교사 회원가입</h2>
+        <div class="mb-4">
+            <label for="book-teacher-register-name" class="block text-sm font-medium text-gray-700 mb-1">이름</label>
+            <input type="text" id="book-teacher-register-name" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="이름을 입력하세요">
+        </div>
+        <div class="mb-4">
+            <label for="book-teacher-register-email" class="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+            <input type="email" id="book-teacher-register-email" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="example@email.com">
+        </div>
+        <div class="mb-6">
+            <label for="book-teacher-register-password" class="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+            <input type="password" id="book-teacher-register-password" class="w-full p-2 border border-gray-300 rounded-md form-input" placeholder="6자리 이상 비밀번호를 입력하세요">
+        </div>
+        <button id="book-teacher-register-btn" class="w-full py-2 rounded-md btn btn-primary mb-4">회원가입</button>
+        <button id="book-teacher-back-to-login-btn" class="w-full text-center text-sm text-gray-600 hover:underline">로그인 화면으로 돌아가기</button>
+    </div>
+
+    <div id="book-content" class="hidden">
     <div class="max-w-7xl mx-auto mb-4 flex justify-between items-center">
         <h1 class="flex items-center gap-2 text-3xl font-extrabold text-amber-600">📚 <span>에이두 북메이커</span></h1>
         <div class="flex items-center gap-3 bg-white border rounded-full px-4 py-2">
@@ -305,12 +286,6 @@
         import { getFirestore, doc, getDoc, setDoc, serverTimestamp, updateDoc, increment, collection, addDoc, getDocs, query, where, runTransaction, arrayUnion, deleteDoc, getCountFromServer } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, getBlob } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         import { fetchTeacherClass, createTeacherClass, addStudentsToTeacherClass } from "./js/classManager.js";
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const initialBookId = urlParams.get('bookId');
-        const viewerParam = urlParams.get('viewer');
-        const forceViewerMode = viewerParam === '1' || viewerParam === 'true';
-        let hasAttemptedInitialBookLoad = false;
 
         // 전역 변수
         let bookCurrentPage = 0;
@@ -2603,8 +2578,6 @@
         auth = getAuth(app);
         db = getFirestore(app);
         storage = getStorage(app);
-        const authContainer = document.getElementById('book-auth-container');
-        const bookLoginView = document.getElementById('book-login-view');
         const studentLoginTab = document.getElementById('book-student-login-tab');
         const teacherLoginTab = document.getElementById('book-teacher-login-tab');
         const studentLoginContent = document.getElementById('book-student-login-content');
@@ -2635,44 +2608,30 @@
         const backToLoginBtn = document.getElementById('book-back-to-login-btn');
         const teacherBackToLoginBtn = document.getElementById('book-teacher-back-to-login-btn');
 
-        const bookViews = {
-            login: bookLoginView,
-            studentRegister: studentRegisterView,
-            teacherRegister: teacherRegisterView
-        };
-
-        function switchBookView(target) {
-            Object.values(bookViews).forEach(view => view.classList.remove('active'));
-            if (bookViews[target]) {
-                bookViews[target].classList.add('active');
-            }
+        function showLoginView() {
+            document.getElementById('book-login-view').classList.remove('hidden');
+            studentRegisterView.classList.add('hidden');
+            teacherRegisterView.classList.add('hidden');
         }
 
-        switchBookView('login');
-
         showStudentRegisterBtn.addEventListener('click', () => {
-            switchBookView('studentRegister');
-            switchLoginTab('student');
+            document.getElementById('book-login-view').classList.add('hidden');
+            teacherRegisterView.classList.add('hidden');
+            studentRegisterView.classList.remove('hidden');
         });
 
         showTeacherRegisterBtn.addEventListener('click', () => {
-            switchBookView('teacherRegister');
-            switchLoginTab('teacher');
+            document.getElementById('book-login-view').classList.add('hidden');
+            studentRegisterView.classList.add('hidden');
+            teacherRegisterView.classList.remove('hidden');
         });
 
-        backToLoginBtn.addEventListener('click', () => {
-            switchBookView('login');
-            switchLoginTab('student');
-        });
-
-        teacherBackToLoginBtn.addEventListener('click', () => {
-            switchBookView('login');
-            switchLoginTab('teacher');
-        });
+        backToLoginBtn.addEventListener('click', showLoginView);
+        teacherBackToLoginBtn.addEventListener('click', showLoginView);
 
         document.getElementById('book-student-register-btn').addEventListener('click', async () => {
             const name = document.getElementById('book-student-name').value.trim();
-            if (!name) { showNotification('이름을 입력해주세요.'); return; }
+            if (!name) { alert('이름을 입력해주세요.'); return; }
 
             try {
                 const counterRef = doc(db, 'metadata', 'counters');
@@ -2709,13 +2668,13 @@
                     signedUpAt: serverTimestamp()
                 });
 
-                document.getElementById('book-student-name').value = '';
-                showNotification(`환영합니다, ${name} 학생! 고유 코드는 ${newCode} 입니다.`, 6000);
-                switchBookView('login');
+                alert(`환영합니다, ${name} 학생! 고유 코드는 ${newCode} 입니다.`);
+                studentRegisterView.classList.add('hidden');
+                document.getElementById('book-login-view').classList.remove('hidden');
                 switchLoginTab('student');
             } catch (e) {
                 console.error('Error adding document: ', e);
-                showNotification('학생 등록 중 문제가 발생했습니다.');
+                alert('학생 등록 중 문제가 발생했습니다.');
             }
         });
 
@@ -2725,7 +2684,7 @@
             const password = document.getElementById('book-teacher-register-password').value;
 
             if (!name || !email || !password) {
-                showNotification('이름, 이메일, 비밀번호를 모두 입력해주세요.');
+                alert('이름, 이메일, 비밀번호를 모두 입력해주세요.');
                 return;
             }
 
@@ -2754,11 +2713,12 @@
                     signedUpAt: serverTimestamp()
                 });
 
-                showNotification(`환영합니다, ${name} 선생님! 이제 로그인해보세요.`, 6000);
+                alert(`환영합니다, ${name} 선생님! 이제 로그인해보세요.`);
                 document.getElementById('book-teacher-register-name').value = '';
                 document.getElementById('book-teacher-register-email').value = '';
                 document.getElementById('book-teacher-register-password').value = '';
-                switchBookView('login');
+                teacherRegisterView.classList.add('hidden');
+                document.getElementById('book-login-view').classList.remove('hidden');
                 switchLoginTab('teacher');
             } catch (error) {
                 console.error('Teacher registration error:', error);
@@ -2770,7 +2730,7 @@
                 } else if (error.code === 'auth/weak-password') {
                     message = '비밀번호는 6자 이상이어야 합니다.';
                 }
-                showNotification(message, 5000);
+                alert(message);
             }
         });
 
@@ -3211,44 +3171,23 @@
         document.getElementById('book-student-login-btn').addEventListener('click', async () => {
             const codeInput = document.getElementById('book-student-code').value.trim();
             const normalizedCode = codeInput.replace(/[\uFF10-\uFF19]/g, m => String.fromCharCode(m.charCodeAt(0) - 0xFEE0));
-            if (!normalizedCode || !/^\d+$/.test(normalizedCode)) { showNotification('유효한 숫자 코드를 입력해주세요.'); return; }
+            if (!normalizedCode || !/^\d+$/.test(normalizedCode)) { alert('유효한 숫자 코드를 입력해주세요.'); return; }
             const codeAsInt = parseInt(normalizedCode, 10);
             const email = `${codeAsInt}@abc.com`;
             const password = `${codeAsInt}qwerty`;
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-            } catch (error) {
-                console.error('Student login error:', error);
-                if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-                    showNotification('고유 코드가 올바르지 않거나 해당 학생을 찾을 수 없습니다.');
-                } else if (error.code === 'permission-denied') {
-                    showNotification('데이터베이스 접근 권한이 없습니다. Firestore 보안 규칙을 확인해주세요.');
-                } else {
-                    showNotification(`로그인 오류: ${error.message}`);
-                }
-            }
+            try { await signInWithEmailAndPassword(auth, email, password); } catch (_) { alert('로그인 실패'); }
         });
 
         document.getElementById('book-teacher-login-btn').addEventListener('click', async () => {
             const email = document.getElementById('book-teacher-email').value;
             const password = document.getElementById('book-teacher-password').value;
-            if (!email || !password) { showNotification('이메일과 비밀번호를 모두 입력해주세요.'); return; }
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-            } catch (error) {
-                console.error('Teacher login error:', error);
-                showNotification('이메일 또는 비밀번호가 올바르지 않습니다.');
-            }
+            if (!email || !password) { alert('이메일과 비밀번호를 모두 입력해주세요.'); return; }
+            try { await signInWithEmailAndPassword(auth, email, password); } catch (_) { alert('로그인 실패'); }
         });
 
         document.getElementById('book-teacher-google-login-btn').addEventListener('click', async () => {
             const provider = new GoogleAuthProvider();
-            try {
-                await signInWithPopup(auth, provider);
-            } catch (error) {
-                console.error('Google login error:', error);
-                showNotification('Google 로그인 중 오류가 발생했습니다.');
-            }
+            try { await signInWithPopup(auth, provider); } catch (_) { alert('로그인 실패'); }
         });
 
         onAuthStateChanged(auth, async (user) => {
@@ -3257,10 +3196,9 @@
             const viewerPage = document.getElementById('book-viewer-page');
             const listSection = document.getElementById('book-list-section');
             if (user) {
-                if (authContainer) {
-                    authContainer.classList.add('hidden');
-                }
-                Object.values(bookViews).forEach(view => view.classList.remove('active'));
+                loginView.classList.add('hidden');
+                studentRegisterView.classList.add('hidden');
+                teacherRegisterView.classList.add('hidden');
                 contentView.classList.remove('hidden');
                 viewerPage.classList.add('hidden');
                 listSection.classList.remove('hidden');
@@ -3271,24 +3209,10 @@
                 await updateUserInfo(ensuredData);
                 await loadUserBooks();
                 await loadLibraryBooks();
-                if (initialBookId && !hasAttemptedInitialBookLoad) {
-                    hasAttemptedInitialBookLoad = true;
-                    try {
-                        await loadBook(initialBookId);
-                        if (forceViewerMode) {
-                            setViewMode(true);
-                        }
-                    } catch (error) {
-                        console.error('Failed to open initial book:', error);
-                        showNotification('책을 불러오지 못했습니다.');
-                    }
-                }
             } else {
-                if (authContainer) {
-                    authContainer.classList.remove('hidden');
-                }
-                switchBookView('login');
-                switchLoginTab('student');
+                loginView.classList.remove('hidden');
+                studentRegisterView.classList.add('hidden');
+                teacherRegisterView.classList.add('hidden');
                 contentView.classList.add('hidden');
                 window.currentUserRole = 'student';
                 bookAuthorUid = null;
@@ -3317,4 +3241,3 @@
     </script>
 </body>
 </html>
-
