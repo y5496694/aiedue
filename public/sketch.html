@@ -80,6 +80,7 @@
                 const searchParams = React.useMemo(() => new URLSearchParams(window.location.search), []);
                 const [currentSketchId, setCurrentSketchId] = React.useState(searchParams.get('sketchId'));
                 const [currentSketchCode, setCurrentSketchCode] = React.useState(searchParams.get('code'));
+                const wrapperRef = React.useRef(null);
 
                 const addFilesToScene = React.useCallback((filesData) => {
                     if (!excalidrawAPI || !filesData) return;
@@ -187,6 +188,36 @@
                         })();
                     }
                 }, [user, excalidrawAPI, currentSketchId, addFilesToScene]);
+
+                React.useEffect(() => {
+                    const exitFullscreen = () => {
+                        if (document.exitFullscreen) {
+                            const exitPromise = document.exitFullscreen();
+                            exitPromise?.catch?.(() => {});
+                        } else if (document.webkitExitFullscreen) {
+                            document.webkitExitFullscreen();
+                        }
+                    };
+
+                    const handleFullscreenChange = () => {
+                        const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+                        if (!fullscreenElement || !wrapperRef.current) {
+                            return;
+                        }
+
+                        if (fullscreenElement === wrapperRef.current) {
+                            exitFullscreen();
+                        }
+                    };
+
+                    document.addEventListener('fullscreenchange', handleFullscreenChange);
+                    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+                    return () => {
+                        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+                        document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+                    };
+                }, []);
 
                 const handleSave = async () => {
                     if (!excalidrawAPI || !user || !currentSketchId) return;
@@ -331,10 +362,17 @@
                                 <button onClick={handleLoadFromFile} className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all">파일 불러오기</button>
                             </div>
                         </header>
-                        <div className="excalidraw-wrapper">
+                        <div className="excalidraw-wrapper" ref={wrapperRef}>
                             <Excalidraw
                                 excalidrawAPI={(api) => setExcalidrawAPI(api)}
                                 langCode="ko-KR"
+                                UIOptions={{
+                                    canvasActions: {
+                                        toggleZenMode: false,
+                                        toggleFullscreen: false,
+                                        toggleFullScreen: false,
+                                    },
+                                }}
                             />
                         </div>
                     </>
