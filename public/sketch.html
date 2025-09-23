@@ -16,7 +16,7 @@
     <script src="https://unpkg.com/@excalidraw/excalidraw@0.17.5/dist/excalidraw.production.min.js" crossorigin></script>
     
     <!-- JSX를 브라우저에서 직접 변환하기 위한 Babel 로드 -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com//@babel/standalone/babel.min.js"></script>
     
     <style>
         /* Excalidraw가 전체 화면을 차지하도록 스타일 설정 */
@@ -54,7 +54,7 @@
             projectId: "mansungcoin-c6e06",
             storageBucket: "mansungcoin-c6e06.firebasestorage.app",
             messagingSenderId: "704809284946",
-            appId: "1:704809284946:web:3e71d98f38810577e1768b"
+            appId: "1:704809284946:web:3e71d8f38810577e1768b"
         };
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -82,6 +82,15 @@
                 const [currentSketchId, setCurrentSketchId] = React.useState(searchParams.get('sketchId'));
                 const [currentSketchCode, setCurrentSketchCode] = React.useState(searchParams.get('code'));
                 const wrapperRef = React.useRef(null);
+                
+                // --- 추가된 부분 ---
+                // Excalidraw가 시작될 때 젠 모드를 비활성화 상태로 강제합니다.
+                const [initialData] = React.useState({
+                    appState: {
+                        zenMode: false
+                    }
+                });
+                // --- 추가 끝 ---
 
                 const addFilesToScene = React.useCallback((filesData) => {
                     if (!excalidrawAPI || !filesData) return;
@@ -167,7 +176,6 @@
                     if (user && excalidrawAPI && currentSketchId) {
                         (async () => {
                             try {
-                                // 사용자별 경로를 포함하여 파일을 로드합니다
                                 const fileRef = storageRef(storage, `sketch/${user.uid}/${currentSketchId}.excalidraw`);
                                 const blob = await getBlob(fileRef);
                                 const text = await blob.text();
@@ -189,36 +197,10 @@
                         })();
                     }
                 }, [user, excalidrawAPI, currentSketchId, addFilesToScene]);
-
-                React.useEffect(() => {
-                    const exitFullscreen = () => {
-                        if (document.exitFullscreen) {
-                            const exitPromise = document.exitFullscreen();
-                            exitPromise?.catch?.(() => {});
-                        } else if (document.webkitExitFullscreen) {
-                            document.webkitExitFullscreen();
-                        }
-                    };
-
-                    const handleFullscreenChange = () => {
-                        const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
-                        if (!fullscreenElement || !wrapperRef.current) {
-                            return;
-                        }
-
-                        if (fullscreenElement === wrapperRef.current) {
-                            exitFullscreen();
-                        }
-                    };
-
-                    document.addEventListener('fullscreenchange', handleFullscreenChange);
-                    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-
-                    return () => {
-                        document.removeEventListener('fullscreenchange', handleFullscreenChange);
-                        document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-                    };
-                }, []);
+                
+                // --- 삭제된 부분 ---
+                // 불필요하고 충돌을 일으키던 전체화면 관련 useEffect 코드를 완전히 제거했습니다.
+                // --- 삭제 끝 ---
 
                 const handleSave = async () => {
                     if (!excalidrawAPI || !user || !currentSketchId) return;
@@ -239,7 +221,6 @@
                         type: 'excalidraw', version: 2, source: 'https://gemini.google.com',
                         elements, appState: appStateToSave, files,
                     }, null, 2);
-                    // 사용자별 경로를 포함하여 파일을 저장합니다
                     const fileRef = storageRef(storage, `sketch/${user.uid}/${currentSketchId}.excalidraw`);
                     await uploadBytes(fileRef, new Blob([data], { type: 'application/json' }));
                     try {
@@ -323,7 +304,6 @@
                     if (!confirm('정말 삭제하시겠습니까?')) return;
                     await deleteDoc(doc(db, 'users', user.uid, 'sketches', currentSketchId));
                     try {
-                        // 사용자별 경로를 포함하여 파일을 삭제합니다
                         await deleteObject(storageRef(storage, `sketch/${user.uid}/${currentSketchId}.excalidraw`));
                     } catch (e) {
                         console.error(e);
@@ -368,6 +348,7 @@
                                 excalidrawAPI={(api) => setExcalidrawAPI(api)}
                                 langCode="ko-KR"
                                 // --- 수정된 부분 ---
+                                initialData={initialData}
                                 zenModeEnabled={false}
                                 viewModeEnabled={false}
                                 // --- 수정 끝 ---
@@ -375,7 +356,6 @@
                                     canvasActions: {
                                         toggleZenMode: false,
                                         toggleFullscreen: false,
-                                        toggleFullScreen: false,
                                     },
                                 }}
                             />
