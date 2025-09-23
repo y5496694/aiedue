@@ -36,47 +36,6 @@
             flex-grow: 1; /* 남은 공간을 모두 차지하도록 설정 */
             position: relative; /* Excalidraw가 이 컨테이너를 기준으로 렌더링되도록 함 */
         }
-        /* 알림 메시지 스타일 */
-        .notification {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: #333;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 8px;
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.5s, transform 0.5s;
-            pointer-events: none;
-        }
-        .notification.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-            pointer-events: auto;
-        }
-        /* 확인 모달 스타일 */
-        .confirm-modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-        .confirm-modal {
-            background: white;
-            padding: 24px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            width: 90%;
-            max-width: 400px;
-        }
     </style>
 </head>
 <body>
@@ -88,12 +47,12 @@
         import { getFirestore, collection, addDoc, getDocs, serverTimestamp, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref as storageRef, uploadBytes, getBlob, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-        // 중요: 프로덕션 환경에서는 이 설정 정보를 안전하게 관리해야 합니다.
+        // 원래 설정으로 되돌렸습니다.
         const firebaseConfig = {
             apiKey: "AIzaSyDCeJPDQUNi-KmJ9DhkTRIu-9t2PGZCpt0",
             authDomain: "mansungcoin-c6e06.firebaseapp.com",
             projectId: "mansungcoin-c6e06",
-            storageBucket: "mansungcoin-c6e06.appspot.com",
+            storageBucket: "mansungcoin-c6e06.firebasestorage.app",
             messagingSenderId: "704809284946",
             appId: "1:704809284946:web:3e71d98f38810577e1768b"
         };
@@ -112,31 +71,6 @@
             return code;
         }
 
-        // 알림 컴포넌트
-        function Notification({ message, show }) {
-            return (
-                <div className={`notification ${show ? 'show' : ''}`}>
-                    {message}
-                </div>
-            );
-        }
-
-        // 확인 모달 컴포넌트
-        function ConfirmModal({ message, onConfirm, onCancel }) {
-            if (!message) return null;
-            return (
-                <div className="confirm-modal-overlay">
-                    <div className="confirm-modal">
-                        <p className="text-lg mb-4">{message}</p>
-                        <div className="flex justify-end space-x-2">
-                            <button onClick={onCancel} className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">취소</button>
-                            <button onClick={onConfirm} className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">확인</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
         window.addEventListener('load', () => {
             const Excalidraw = window.ExcalidrawLib.Excalidraw;
 
@@ -149,18 +83,6 @@
                 const [currentSketchCode, setCurrentSketchCode] = React.useState(searchParams.get('code'));
                 const wrapperRef = React.useRef(null);
 
-                // 알림 및 모달 상태
-                const [notification, setNotification] = React.useState({ show: false, message: '' });
-                const [confirmAction, setConfirmAction] = React.useState(null);
-
-
-                const showNotification = (message) => {
-                    setNotification({ show: true, message });
-                    setTimeout(() => {
-                        setNotification({ show: false, message: '' });
-                    }, 3000);
-                };
-                
                 const addFilesToScene = React.useCallback((filesData) => {
                     if (!excalidrawAPI || !filesData) return;
 
@@ -169,7 +91,7 @@
                         filesArray = Array.from(filesData.values());
                     } else if (Array.isArray(filesData)) {
                         filesArray = filesData;
-                    } else if (typeof filesData === 'object' && filesData !== null) {
+                    } else if (typeof filesData === 'object') {
                         filesArray = Object.values(filesData);
                     }
 
@@ -177,7 +99,6 @@
                         excalidrawAPI.addFiles(filesArray);
                     }
                 }, [excalidrawAPI]);
-
 
                 React.useEffect(() => {
                     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -246,14 +167,12 @@
                     if (user && excalidrawAPI && currentSketchId) {
                         (async () => {
                             try {
+                                // 사용자별 경로를 포함하여 파일을 로드합니다
                                 const fileRef = storageRef(storage, `sketch/${user.uid}/${currentSketchId}.excalidraw`);
                                 const blob = await getBlob(fileRef);
                                 const text = await blob.text();
                                 const data = JSON.parse(text);
-                                
-                                const files = data.files || {};
-                                addFilesToScene(files);
-                                
+                                addFilesToScene(data.files);
                                 const appState = {
                                     ...data.appState,
                                     collaborators: new Map(Object.entries(data.appState?.collaborators || {}))
@@ -262,16 +181,45 @@
                             } catch (error) {
                                 if (error?.code === 'storage/object-not-found') {
                                     console.info('저장된 스케치가 없어 새 스케치북으로 시작합니다.');
-                                    excalidrawAPI.resetScene();
                                     return;
                                 }
                                 console.error('스케치북 데이터를 불러오는 중 오류가 발생했습니다.', error);
-                                showNotification('스케치북을 불러오는 중 문제가 발생했습니다.');
+                                alert('스케치북을 불러오는 중 문제가 발생했습니다. 다시 시도해주세요.');
                             }
                         })();
                     }
                 }, [user, excalidrawAPI, currentSketchId, addFilesToScene]);
-                
+
+                React.useEffect(() => {
+                    const exitFullscreen = () => {
+                        if (document.exitFullscreen) {
+                            const exitPromise = document.exitFullscreen();
+                            exitPromise?.catch?.(() => {});
+                        } else if (document.webkitExitFullscreen) {
+                            document.webkitExitFullscreen();
+                        }
+                    };
+
+                    const handleFullscreenChange = () => {
+                        const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+                        if (!fullscreenElement || !wrapperRef.current) {
+                            return;
+                        }
+
+                        if (fullscreenElement === wrapperRef.current) {
+                            exitFullscreen();
+                        }
+                    };
+
+                    document.addEventListener('fullscreenchange', handleFullscreenChange);
+                    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+                    return () => {
+                        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+                        document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+                    };
+                }, []);
+
                 const handleSave = async () => {
                     if (!excalidrawAPI || !user || !currentSketchId) return;
                     const elements = excalidrawAPI.getSceneElements();
@@ -291,7 +239,7 @@
                         type: 'excalidraw', version: 2, source: 'https://gemini.google.com',
                         elements, appState: appStateToSave, files,
                     }, null, 2);
-                    
+                    // 사용자별 경로를 포함하여 파일을 저장합니다
                     const fileRef = storageRef(storage, `sketch/${user.uid}/${currentSketchId}.excalidraw`);
                     await uploadBytes(fileRef, new Blob([data], { type: 'application/json' }));
                     try {
@@ -301,7 +249,7 @@
                     } catch (error) {
                         console.error('스케치 정보를 업데이트하는 데 실패했습니다.', error);
                     }
-                    showNotification('저장되었습니다.');
+                    alert('저장되었습니다.');
                 };
 
                 const handleLoadFromFile = () => {
@@ -329,11 +277,11 @@
                                         commitToHistory: true,
                                     });
                                 } else {
-                                    showNotification("유효하지 않은 Excalidraw 파일입니다.");
+                                    alert("유효하지 않은 Excalidraw 파일입니다.");
                                 }
                             } catch (error) {
                                 console.error("파일을 읽는 중 오류가 발생했습니다.", error);
-                                showNotification("파일을 불러오는 데 실패했습니다.");
+                                alert("파일을 불러오는 데 실패했습니다.");
                             }
                         };
                         reader.readAsText(file, 'utf-8');
@@ -370,41 +318,26 @@
                     }
                 };
 
-                const handleDeleteSketch = () => {
+                const handleDeleteSketch = async () => {
                     if (!user || !currentSketchId) return;
-                    setConfirmAction({
-                        message: '정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
-                        action: async () => {
-                            await deleteDoc(doc(db, 'users', user.uid, 'sketches', currentSketchId));
-                            try {
-                                await deleteObject(storageRef(storage, `sketch/${user.uid}/${currentSketchId}.excalidraw`));
-                            } catch (e) {
-                                if (e.code !== 'storage/object-not-found') {
-                                    console.error(e);
-                                }
-                            }
-                            const remaining = sketches.filter(s => s.id !== currentSketchId);
-                            if (remaining.length > 0) {
-                                window.location.href = `?sketchId=${encodeURIComponent(remaining[0].id)}&code=${encodeURIComponent(remaining[0].code || '')}`;
-                            } else {
-                                handleCreateSketch(); // 스케치가 없으면 새로 만듭니다.
-                            }
-                        }
-                    });
+                    if (!confirm('정말 삭제하시겠습니까?')) return;
+                    await deleteDoc(doc(db, 'users', user.uid, 'sketches', currentSketchId));
+                    try {
+                        // 사용자별 경로를 포함하여 파일을 삭제합니다
+                        await deleteObject(storageRef(storage, `sketch/${user.uid}/${currentSketchId}.excalidraw`));
+                    } catch (e) {
+                        console.error(e);
+                    }
+                    const remaining = sketches.filter(s => s.id !== currentSketchId);
+                    if (remaining.length > 0) {
+                        window.location.href = `?sketchId=${encodeURIComponent(remaining[0].id)}&code=${encodeURIComponent(remaining[0].code || '')}`;
+                    } else {
+                        window.location.href = 'index.html';
+                    }
                 };
-                
+
                 return (
                     <>
-                        <ConfirmModal
-                            message={confirmAction?.message}
-                            onConfirm={() => {
-                                confirmAction?.action();
-                                setConfirmAction(null);
-                            }}
-                            onCancel={() => setConfirmAction(null)}
-                        />
-                        <Notification message={notification.message} show={notification.show} />
-
                         <header className="flex flex-wrap items-center justify-between gap-2 p-2 shadow-md bg-white z-10">
                             <div className="flex items-center space-x-4">
                                 <div className="flex items-center space-x-2">
@@ -435,15 +368,14 @@
                                 excalidrawAPI={(api) => setExcalidrawAPI(api)}
                                 langCode="ko-KR"
                                 // --- 수정된 부분 ---
-                                // 젠 모드와 보기 모드 기능을 비활성화하여 메뉴가 사라지지 않도록 합니다.
                                 zenModeEnabled={false}
                                 viewModeEnabled={false}
                                 // --- 수정 끝 ---
                                 UIOptions={{
                                     canvasActions: {
                                         toggleZenMode: false,
-                                        // 전체화면 버튼도 숨겨서 Excalidraw의 자체 전체화면 기능과의 충돌을 방지합니다.
-                                        toggleFullscreen: false, 
+                                        toggleFullscreen: false,
+                                        toggleFullScreen: false,
                                     },
                                 }}
                             />
@@ -458,3 +390,4 @@
     </script>
 </body>
 </html>
+
