@@ -374,11 +374,21 @@
                 </div>
             </div>
             <div id="library-tab-content" class="tab-content">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold">📚 에이두 도서관</h2>
-                    <a href="book.html" id="create-ai-book-btn" class="btn btn-primary flex items-center gap-2">📚 <span>에이두 북메이커</span></a>
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <h2 class="text-2xl font-bold">📚 에이두 도서관</h2>
+                        <a href="book.html" id="create-ai-book-btn" class="btn btn-primary flex items-center gap-2">📚 <span>에이두북메이커</span></a>
+                    </div>
+                    <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="relative w-full sm:w-72">
+                            <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input id="library-search-input" type="text" class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md form-input" placeholder="책 제목 또는 글쓴이를 검색하세요">
+                        </div>
+                    </div>
+                    <div id="library-book-list" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"></div>
                 </div>
-                <div id="library-book-list" class="flex items-center gap-2 overflow-x-auto"></div>
             </div>
             <div id="sketchbook-tab-content" class="tab-content">
                 <div class="p-4 h-[80vh] flex flex-col">
@@ -1265,6 +1275,7 @@
         let currentMathTemplate = null;    // For student-generated math homework
         let currentWordChainProblem = null; // 현재 끝말잇기 문제 템플릿
         let isLibraryLoading = false;
+        let libraryBooksCache = [];
 
         // --- DOM Elements ---
         const views = {
@@ -1330,6 +1341,7 @@
         const libraryBookModal = document.getElementById('library-book-modal');
         const libraryBookIframe = document.getElementById('library-book-iframe');
         const closeLibraryBookModalBtn = document.getElementById('close-library-book-modal');
+        const librarySearchInput = document.getElementById('library-search-input');
         const readingLogEntryModal = document.getElementById('reading-log-entry-modal');
         const editInfoModal = document.getElementById('edit-info-modal');
         let studentToAdjustId = null;
@@ -6982,6 +6994,10 @@
             });
         }
 
+        if (librarySearchInput) {
+            librarySearchInput.addEventListener('input', () => renderLibraryBooks());
+        }
+
         function openReadingLogEntry(entry) {
             document.getElementById('reading-log-entry-title').textContent = entry.bookTitle;
             const dateEl = document.getElementById('reading-log-entry-date');
@@ -7000,49 +7016,135 @@
             readingLogEntryModal.style.display = 'flex';
         }
 
+        function renderLibraryBooks() {
+            const listEl = document.getElementById('library-book-list');
+            if (!listEl) return;
+            if (listEl.dataset.loading === 'true') return;
+
+            listEl.innerHTML = '';
+
+            if (!Array.isArray(libraryBooksCache) || libraryBooksCache.length === 0) {
+                const emptyEl = document.createElement('div');
+                emptyEl.className = 'col-span-full text-sm text-gray-500 bg-gray-50 border border-dashed border-gray-300 rounded-lg p-6 text-center';
+                emptyEl.textContent = '도서관에 등록된 책이 없습니다.';
+                listEl.appendChild(emptyEl);
+                return;
+            }
+
+            const searchTerm = (librarySearchInput?.value || '').trim().toLowerCase();
+            const filtered = libraryBooksCache.filter(({ data }) => {
+                const title = String(data?.title || '').toLowerCase();
+                const author = String(data?.author || '').toLowerCase();
+                if (!searchTerm) return true;
+                return title.includes(searchTerm) || author.includes(searchTerm);
+            });
+
+            if (filtered.length === 0) {
+                const emptyEl = document.createElement('div');
+                emptyEl.className = 'col-span-full text-sm text-gray-500 bg-gray-50 border border-dashed border-gray-300 rounded-lg p-6 text-center';
+                emptyEl.textContent = '조건에 맞는 책이 없습니다.';
+                listEl.appendChild(emptyEl);
+                return;
+            }
+
+            filtered.forEach(({ id, data, coverUrl }) => {
+                const card = document.createElement('div');
+                card.className = 'relative bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition cursor-pointer flex flex-col gap-2';
+                card.addEventListener('click', () => openLibraryBook(id));
+
+                const coverEl = document.createElement('div');
+                coverEl.className = 'w-full h-40 bg-gray-200 rounded-lg bg-cover bg-center';
+                if (coverUrl) {
+                    coverEl.style.backgroundImage = `url('${coverUrl}')`;
+                }
+                card.appendChild(coverEl);
+
+                const titleEl = document.createElement('div');
+                titleEl.className = 'font-semibold text-lg truncate';
+                titleEl.textContent = data?.title || '제목없음';
+                card.appendChild(titleEl);
+
+                const authorEl = document.createElement('div');
+                authorEl.className = 'text-sm text-gray-600 truncate';
+                authorEl.textContent = `글쓴이: ${data?.author || '알 수 없음'}`;
+                card.appendChild(authorEl);
+
+                const metaEl = document.createElement('div');
+                metaEl.className = 'text-xs text-gray-500';
+                const likesCount = Number.isFinite(Number(data?.likesCount)) ? Number(data.likesCount) : 0;
+                const commentsCount = Number.isFinite(Number(data?.commentsCount)) ? Number(data.commentsCount) : 0;
+                metaEl.textContent = `좋아요 ${likesCount} · 댓글 ${commentsCount}`;
+                card.appendChild(metaEl);
+
+                const codeEl = document.createElement('div');
+                codeEl.className = 'text-xs text-gray-400';
+                codeEl.textContent = `코드: ${id}`;
+                card.appendChild(codeEl);
+
+                listEl.appendChild(card);
+            });
+        }
+
         async function loadLibraryBooks() {
             if (isLibraryLoading) return;
+            const listEl = document.getElementById('library-book-list');
+            if (!listEl) return;
+
             isLibraryLoading = true;
+            listEl.dataset.loading = 'true';
+            listEl.innerHTML = '<div class="col-span-full text-sm text-gray-500 bg-gray-50 border border-dashed border-gray-300 rounded-lg p-6 text-center">도서관을 불러오는 중...</div>';
+
             try {
-                const listEl = document.getElementById('library-book-list');
-                if (!listEl) return;
-                listEl.innerHTML = '';
                 const q = query(collection(db, 'Book'), where('isPublic', '==', true));
                 const snap = await getDocs(q);
+                const books = [];
                 for (const docSnap of snap.docs) {
-                    const data = docSnap.data();
-                    const item = document.createElement('button');
+                    const data = docSnap.data() || {};
                     let coverUrl = '';
                     if (data.coverImage) {
                         try {
                             coverUrl = await getDownloadURL(storageRef(storage, `Book/${docSnap.id}/${data.coverImage}`));
                         } catch (e) {
-                            console.error(e);
+                            console.error('Failed to load cover image:', e);
                         }
                     }
-                    item.innerHTML = `<div class="w-32 h-40 bg-gray-200 bg-cover bg-center mb-2"${coverUrl ? ` style="background-image:url('${coverUrl}')"` : ''}></div>` +
-                                     `<div class="font-semibold">${data.title || '제목없음'}</div>` +
-                                     `<div class="text-xs text-gray-600">좋아요 ${data.likesCount || 0} · 댓글 ${data.commentsCount || 0}</div>` +
-                                     `<div class="text-xs text-gray-600">글쓴이: ${data.author || ''}</div>` +
-                                     `<div class="text-xs text-gray-600">코드: ${docSnap.id}</div>`;
-                    item.className = 'text-left p-2 bg-gray-100 rounded-lg hover:bg-gray-200 flex-shrink-0';
-                    item.addEventListener('click', () => openLibraryBook(docSnap.id));
-                    listEl.appendChild(item);
+                    books.push({ id: docSnap.id, data, coverUrl });
                 }
+                libraryBooksCache = books;
+                listEl.dataset.loading = 'false';
+                renderLibraryBooks();
+            } catch (error) {
+                console.error('Failed to load library books:', error);
+                listEl.dataset.loading = 'false';
+                listEl.innerHTML = `<div class="col-span-full text-sm text-red-500 bg-red-50 border border-dashed border-red-200 rounded-lg p-6 text-center">도서관을 불러오지 못했습니다.<br>${error.message}</div>`;
+                libraryBooksCache = [];
             } finally {
                 isLibraryLoading = false;
             }
         }
 
         function openLibraryBook(bookId) {
-            libraryBookIframe.src = `book.html?bookId=${bookId}`;
+            if (!bookId) return;
+            libraryBookIframe.src = `book.html?bookId=${encodeURIComponent(bookId)}&viewer=1`;
+            libraryBookModal.classList.remove('hidden');
             libraryBookModal.style.display = 'flex';
         }
 
         closeLibraryBookModalBtn.addEventListener('click', () => {
             libraryBookModal.style.display = 'none';
+            libraryBookModal.classList.add('hidden');
             libraryBookIframe.src = '';
         });
+
+        if (libraryBookModal) {
+            libraryBookModal.addEventListener('click', (event) => {
+                if (event.target === libraryBookModal) {
+                    libraryBookModal.style.display = 'none';
+                    libraryBookModal.classList.add('hidden');
+                    libraryBookIframe.src = '';
+                }
+            });
+        }
 
         document.querySelectorAll('.edit-info-btn').forEach(btn => {
             btn.addEventListener('click', () => {
