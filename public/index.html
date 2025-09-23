@@ -3267,7 +3267,8 @@
                                     text: rule.text,
                                     rewardExp,
                                     sentences: Array.isArray(rule.sentences) ? rule.sentences : [],
-                                    repeatType: rule.repeatType
+                                    repeatType: rule.repeatType,
+                                    type: 'copyPromise'
                                 });
                             });
                         } else {
@@ -3286,7 +3287,8 @@
                                     text: rule.text,
                                     rewardExp,
                                     questions: Array.isArray(rule.questions) ? rule.questions : [],
-                                    repeatType: rule.repeatType
+                                    repeatType: rule.repeatType,
+                                    type: 'choicePromise'
                                 });
                             });
                         } else if (isAdminViewing) {
@@ -3405,6 +3407,9 @@
                     typed: typeof detail?.typed === 'string' ? detail.typed : String(detail?.typed ?? '')
                 }))
                 : [];
+            const sentences = Array.isArray(entry.sentences)
+                ? entry.sentences.map(sentence => typeof sentence === 'string' ? sentence : String(sentence ?? ''))
+                : [];
             const questions = Array.isArray(entry.questions)
                 ? entry.questions.map(detail => ({
                     question: typeof detail?.question === 'string' ? detail.question : String(detail?.question ?? ''),
@@ -3420,16 +3425,21 @@
                     isCorrect: Boolean(detail?.isCorrect)
                 }))
                 : [];
-            const type = entry.type || 'copyPromise';
+            const explicitType = typeof entry.type === 'string' ? entry.type : null;
+            const hasChoiceDetails = questions.length > 0 || responses.length > 0;
+            let type = 'copyPromise';
+            if (explicitType === 'choicePromise' || explicitType === 'copyPromise') {
+                type = explicitType;
+            } else if (hasChoiceDetails && sentences.length === 0) {
+                type = 'choicePromise';
+            }
             return {
                 id: entry.id || null,
                 title: entry.title || (type === 'choicePromise' ? '선택형 약속' : '따라쓰기 약속'),
                 type,
                 rewardExp: Number(entry.rewardExp ?? 0) || 0,
                 repeatType: entry.repeatType || null,
-                sentences: Array.isArray(entry.sentences)
-                    ? entry.sentences.map(sentence => typeof sentence === 'string' ? sentence : String(sentence ?? ''))
-                    : [],
+                sentences,
                 typedSentences,
                 questions,
                 responses,
@@ -3448,7 +3458,6 @@
                 original: typeof detail?.original === 'string' ? detail.original : String(detail?.original ?? ''),
                 typed: typeof detail?.typed === 'string' ? detail.typed : String(detail?.typed ?? '')
             }));
-            const type = assignment.type || 'copyPromise';
             const sanitizedQuestions = Array.isArray(assignment.questions)
                 ? assignment.questions.map(question => ({
                     question: typeof question?.question === 'string' ? question.question : String(question?.question ?? ''),
@@ -3463,6 +3472,14 @@
                 correctAnswer: typeof detail?.correctAnswer === 'string' ? detail.correctAnswer : String(detail?.correctAnswer ?? ''),
                 isCorrect: Boolean(detail?.isCorrect)
             }));
+            const explicitType = typeof assignment.type === 'string' ? assignment.type : null;
+            const hasChoiceDetails = sanitizedQuestions.length > 0 || sanitizedResponses.length > 0;
+            let type = 'copyPromise';
+            if (explicitType === 'choicePromise' || explicitType === 'copyPromise') {
+                type = explicitType;
+            } else if (hasChoiceDetails && sanitizedSentences.length === 0) {
+                type = 'choicePromise';
+            }
             const now = new Date();
             const completedAtIso = now.toISOString();
             const localEntry = {
@@ -3572,7 +3589,6 @@
                             typed: typeof detail?.typed === 'string' ? detail.typed : String(detail?.typed ?? '')
                         }))
                         : [];
-                    const type = data.type || 'copyPromise';
                     const questions = Array.isArray(data.questions)
                         ? data.questions.map(detail => ({
                             question: typeof detail?.question === 'string' ? detail.question : String(detail?.question ?? ''),
@@ -3588,6 +3604,14 @@
                             isCorrect: Boolean(detail?.isCorrect)
                         }))
                         : [];
+                    const explicitType = typeof data.type === 'string' ? data.type : null;
+                    const hasChoiceDetails = questions.length > 0 || responses.length > 0;
+                    let type = 'copyPromise';
+                    if (explicitType === 'choicePromise' || explicitType === 'copyPromise') {
+                        type = explicitType;
+                    } else if (hasChoiceDetails && sentences.length === 0) {
+                        type = 'choicePromise';
+                    }
                     const entry = {
                         id: docSnap.id,
                         title: data.title || (type === 'choicePromise' ? '선택형 약속' : '따라쓰기 약속'),
@@ -3634,22 +3658,19 @@
 
         function openCopyPromiseHistoryModal(entry) {
             if (!copyPromiseHistoryModal || !copyPromiseHistoryModalTitle || !copyPromiseHistoryModalDate || !copyPromiseHistoryModalContent) return;
-            const type = entry?.type || 'copyPromise';
-            const typeLabelMap = {
-                copyPromise: '따라쓰기 약속',
-                choicePromise: '선택형 약속'
-            };
-            const typeLabel = typeLabelMap[type] || '약속';
-            copyPromiseHistoryModalTitle.textContent = entry?.title || (type === 'choicePromise' ? '선택형 약속' : '따라쓰기 약속');
-            if (entry?.completedAt instanceof Date) {
-                copyPromiseHistoryModalDate.textContent = `${formatDateTime(entry.completedAt)} 완료`;
-            } else {
-                copyPromiseHistoryModalDate.textContent = '완료 일자 정보가 없어요.';
-            }
-
-            const sentences = Array.isArray(entry?.typedSentences) && entry.typedSentences.length > 0
-                ? entry.typedSentences
-                : (Array.isArray(entry?.sentences) ? entry.sentences.map(sentence => ({ original: sentence, typed: sentence })) : []);
+            const typedEntries = Array.isArray(entry?.typedSentences) && entry.typedSentences.length > 0
+                ? entry.typedSentences.map(detail => ({
+                    original: typeof detail?.original === 'string' ? detail.original : String(detail?.original ?? ''),
+                    typed: typeof detail?.typed === 'string' ? detail.typed : String(detail?.typed ?? '')
+                }))
+                : [];
+            const sentenceFallback = Array.isArray(entry?.sentences)
+                ? entry.sentences.map(sentence => ({
+                    original: typeof sentence === 'string' ? sentence : String(sentence ?? ''),
+                    typed: typeof sentence === 'string' ? sentence : String(sentence ?? '')
+                }))
+                : [];
+            const sentences = typedEntries.length > 0 ? typedEntries : sentenceFallback;
             const normalizedResponses = Array.isArray(entry?.responses)
                 ? entry.responses.map(detail => ({
                     question: typeof detail?.question === 'string' ? detail.question : String(detail?.question ?? ''),
@@ -3667,8 +3688,27 @@
                 }))
                 : [];
             const choiceResponses = normalizedResponses.length > 0 ? normalizedResponses : questionFallback;
+            const explicitType = typeof entry?.type === 'string' ? entry.type : null;
+            const hasChoiceDetails = choiceResponses.length > 0;
             const sentenceCount = sentences.length;
             const questionCount = choiceResponses.length;
+            let type = 'copyPromise';
+            if (explicitType === 'choicePromise' || explicitType === 'copyPromise') {
+                type = explicitType;
+            } else if (hasChoiceDetails && sentenceCount === 0) {
+                type = 'choicePromise';
+            }
+            const typeLabelMap = {
+                copyPromise: '따라쓰기 약속',
+                choicePromise: '선택형 약속'
+            };
+            const typeLabel = typeLabelMap[type] || '약속';
+            copyPromiseHistoryModalTitle.textContent = entry?.title || (type === 'choicePromise' ? '선택형 약속' : '따라쓰기 약속');
+            if (entry?.completedAt instanceof Date) {
+                copyPromiseHistoryModalDate.textContent = `${formatDateTime(entry.completedAt)} 완료`;
+            } else {
+                copyPromiseHistoryModalDate.textContent = '완료 일자 정보가 없어요.';
+            }
 
             if (copyPromiseHistoryModalMeta) {
                 const metaParts = [];
@@ -3819,13 +3859,17 @@
 
         function openCopyPromisePracticeModal(assignment) {
             if (!assignment) return;
-            currentCopyPromiseAssignment = assignment;
+            const assignmentData = {
+                ...assignment,
+                type: assignment.type === 'choicePromise' ? 'choicePromise' : 'copyPromise'
+            };
+            currentCopyPromiseAssignment = assignmentData;
             resetCopyPromisePracticeModal();
-            const sentences = Array.isArray(assignment.sentences) ? assignment.sentences : [];
+            const sentences = Array.isArray(assignmentData.sentences) ? assignmentData.sentences : [];
             const summaryParts = [];
             if (sentences.length > 0) summaryParts.push(`총 문항 ${sentences.length}개`);
-            if (assignment.rewardExp) summaryParts.push(`완료하면 ${assignment.rewardExp} EXP를 받을 수 있어요.`);
-            copyPromisePracticeTitle.textContent = assignment.text || '따라쓰기 약속';
+            if (assignmentData.rewardExp) summaryParts.push(`완료하면 ${assignmentData.rewardExp} EXP를 받을 수 있어요.`);
+            copyPromisePracticeTitle.textContent = assignmentData.text || '따라쓰기 약속';
             copyPromisePracticeSubtitle.textContent = summaryParts.join(' • ') || '문장을 정확히 따라 적어보세요.';
 
             if (sentences.length === 0) {
@@ -4007,14 +4051,18 @@
 
         function openChoicePromisePracticeModal(assignment) {
             if (!assignment || !choicePromisePracticeModal || !choicePromisePracticeList) return;
-            currentChoicePromiseAssignment = assignment;
+            const assignmentData = {
+                ...assignment,
+                type: assignment.type === 'copyPromise' ? 'copyPromise' : 'choicePromise'
+            };
+            currentChoicePromiseAssignment = assignmentData;
             resetChoicePromisePracticeModal();
-            const questions = Array.isArray(assignment.questions) ? assignment.questions : [];
+            const questions = Array.isArray(assignmentData.questions) ? assignmentData.questions : [];
             const summaryParts = [];
             if (questions.length > 0) summaryParts.push(`총 문항 ${questions.length}개`);
-            if (assignment.rewardExp) summaryParts.push(`완료하면 ${assignment.rewardExp} EXP를 받을 수 있어요.`);
+            if (assignmentData.rewardExp) summaryParts.push(`완료하면 ${assignmentData.rewardExp} EXP를 받을 수 있어요.`);
             if (choicePromisePracticeTitle) {
-                choicePromisePracticeTitle.textContent = assignment.text || '선택형 약속';
+                choicePromisePracticeTitle.textContent = assignmentData.text || '선택형 약속';
             }
             if (choicePromisePracticeSubtitle) {
                 choicePromisePracticeSubtitle.textContent = summaryParts.join(' • ') || '문제를 잘 읽고 알맞은 답을 골라보세요.';
