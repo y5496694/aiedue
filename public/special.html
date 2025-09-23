@@ -489,50 +489,65 @@
                 </div>
 
                 <!-- Behavior Intervention View -->
+
                 <div id="behavior-view" class="hidden">
                     <h2 class="text-3xl font-bold mb-6">행동 중재</h2>
-                     <div class="flex flex-col lg:flex-row gap-6">
-                        <aside class="w-full lg:w-1/3 bg-white p-6 rounded-lg shadow-lg h-fit lg:sticky top-24 space-y-6">
-                            <div>
-                                <h3 class="text-lg font-semibold mb-4">학생 및 행동 선택</h3>
-                                <div class="space-y-4">
-                                     <div>
-                                        <label for="behavior-student-name" class="block text-sm font-medium text-gray-700">학생 이름</label>
-                                        <input type="text" id="behavior-student-name" class="mt-1 block w-full border border-gray-300 rounded-md p-2" placeholder="관찰할 학생 이름">
-                                    </div>
-                                    <div>
-                                        <label for="target-behavior" class="block text-sm font-medium text-gray-700">목표 행동</label>
-                                        <input type="text" id="target-behavior" class="mt-1 block w-full border border-gray-300 rounded-md p-2" placeholder="예: 바르게 앉아 있기">
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">행동 유형</label>
-                                        <div id="behavior-type-buttons" class="grid grid-cols-2 gap-2">
-                                            <button type="button" data-value="increase" class="tab-btn py-2 px-2 rounded text-sm active">증가시킬 행동</button>
-                                            <button type="button" data-value="decrease" class="tab-btn py-2 px-2 rounded text-sm">감소시킬 행동</button>
-                                        </div>
-                                    </div>
-                                    <button id="start-observation-btn" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded-lg">관찰 시작</button>
-                                </div>
+                    <div class="flex flex-col lg:flex-row gap-6">
+                        <aside class="w-full lg:w-1/3 bg-white p-6 rounded-lg shadow-lg h-fit lg:sticky top-24 space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-lg font-semibold">내 학생 목록</h3>
+                                <button id="refresh-behavior-students" class="text-xs text-sky-600 hover:underline">새로고침</button>
                             </div>
-                            <div id="behavior-logging-section" class="hidden">
-                                <h3 class="text-lg font-semibold mb-4">행동 기록</h3>
-                                <p class="text-sm text-gray-600 mb-1">학생: <span id="logging-student" class="font-bold"></span></p>
-                                <p class="text-sm text-gray-600 mb-4">목표 행동: <span id="logging-behavior" class="font-bold"></span></p>
-                                <button id="log-behavior-btn" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-4 rounded-lg text-lg">행동 발생 (+1)</button>
+                            <p class="text-sm text-gray-500">학생을 선택하면 오른쪽에서 행동 기록을 확인하고 추가할 수 있습니다.</p>
+                            <div id="behavior-student-list" class="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                                <p class="text-sm text-gray-500">학생 목록을 불러오는 중입니다...</p>
                             </div>
                         </aside>
-                        <section class="w-full lg:w-2/3">
-                            <div class="content-section">
-                                <h3 class="text-xl font-bold mb-4">행동 관찰 그래프</h3>
-                                <div id="behavior-chart-container" class="h-96">
-                                    <canvas id="behaviorChart"></canvas>
+                        <section class="w-full lg:w-2/3 space-y-6">
+                            <div class="bg-white p-6 rounded-lg shadow-lg">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                                    <div>
+                                        <h3 class="text-xl font-bold">행동 기록</h3>
+                                        <p id="behavior-selected-student" class="text-sm text-gray-500">학생을 선택해주세요.</p>
+                                    </div>
+                                    <button id="open-behavior-modal" class="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-600 text-white px-4 py-2 text-sm font-semibold shadow-sm hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50">
+                                        <span>추가</span>
+                                    </button>
+                                </div>
+                                <div id="behavior-record-list" class="space-y-2">
+                                    <p class="text-sm text-gray-500">학생을 선택하면 행동 기록이 표시됩니다.</p>
+                                </div>
+                            </div>
+                            <div id="behavior-detail-panel" class="bg-white p-6 rounded-lg shadow-lg hidden">
+                                <div class="flex flex-col gap-2 mb-6">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h3 id="behavior-detail-title" class="text-2xl font-bold text-slate-800"></h3>
+                                        <span id="behavior-reinforcer-badge" class="hidden rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">강화물</span>
+                                        <span id="behavior-attention-badge" class="hidden rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">주의 토큰</span>
+                                    </div>
+                                    <p id="behavior-operational-definition" class="text-sm text-gray-600 whitespace-pre-line"></p>
+                                </div>
+                                <div class="mb-6">
+                                    <h4 class="text-lg font-semibold mb-2">행동 관찰 그래프</h4>
+                                    <div class="h-72">
+                                        <canvas id="behaviorChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between mb-4">
+                                    <span class="text-sm font-medium text-gray-700">기록 버튼</span>
+                                    <button id="log-behavior-btn" class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed">기록</button>
+                                </div>
+                                <div>
+                                    <h4 class="text-base font-semibold mb-3">타임스탬프 기록</h4>
+                                    <ul id="behavior-log-list" class="space-y-2 max-h-64 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
+                                        <li class="text-gray-500">기록이 없습니다.</li>
+                                    </ul>
                                 </div>
                             </div>
                         </section>
                     </div>
                 </div>
-
-                <!-- Achievement Criteria View -->
+<!-- Achievement Criteria View -->
                 <div id="achievement-view" class="hidden">
                     <h2 class="text-3xl font-bold mb-6">성취기준 기록</h2>
                     <div class="bg-white p-6 rounded-lg shadow-lg">
@@ -567,6 +582,39 @@
             </main>
         </div>
         
+
+        <!-- Behavior Entry Modal -->
+        <div id="behavior-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+            <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+                <h3 class="text-xl font-semibold text-slate-800">행동 기록 추가</h3>
+                <p class="mt-1 text-sm text-gray-500">선택한 학생의 행동 기록을 추가로 관리할 수 있습니다.</p>
+                <div class="mt-5 space-y-4">
+                    <div>
+                        <label for="behavior-modal-title" class="block text-sm font-medium text-gray-700">제목</label>
+                        <input id="behavior-modal-title" type="text" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200" placeholder="예: 수업 중 자리 이탈">
+                    </div>
+                    <div class="flex flex-col gap-2 rounded-lg border border-slate-200 p-3 text-sm text-slate-700">
+                        <label class="inline-flex items-center gap-2">
+                            <input id="behavior-modal-reinforcer" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                            <span>강화물 사용</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2">
+                            <input id="behavior-modal-attention" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-amber-500 focus:ring-amber-400">
+                            <span>주의 토큰 사용</span>
+                        </label>
+                    </div>
+                    <div>
+                        <label for="behavior-modal-definition" class="block text-sm font-medium text-gray-700">조작적 정의</label>
+                        <textarea id="behavior-modal-definition" rows="4" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200" placeholder="행동을 관찰 가능하게 설명해주세요."></textarea>
+                    </div>
+                </div>
+                <div class="mt-6 flex items-center justify-end gap-2">
+                    <button id="behavior-modal-cancel" type="button" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">취소</button>
+                    <button id="behavior-modal-save" type="button" class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-sky-700">추가</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Major Evaluation Modal -->
         <div id="major-eval-modal" class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50 p-4">
             <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
@@ -687,6 +735,7 @@
         
         let statsChartInstance = null;
         let behaviorChartInstance = null;
+        let currentUserProfile = null;
         let isLoadingHomeData = false;
         let majorEvalEntries = [];
         let activeMajorEvalId = '';
@@ -965,6 +1014,8 @@
 
         onAuthStateChanged(auth, user => {
             if (user) {
+                currentUserProfile = null;
+                ensureCurrentUserProfile();
                 authView.classList.add('hidden');
                 mainAppView.classList.remove('hidden');
                 mainAppView.classList.add('flex');
@@ -973,6 +1024,7 @@
                 const currentView = window.location.hash.replace('#', '') || 'home';
                 switchView(currentView);
             } else {
+                currentUserProfile = null;
                 authView.classList.remove('hidden');
                 mainAppView.classList.add('hidden');
                 mainAppView.classList.remove('flex');
@@ -1007,7 +1059,7 @@
                 } else if (view === 'templates') {
                     activateTemplateCategory('major-eval');
                 } else if (view === 'behavior') {
-                    initBehaviorChart();
+                    prepareBehaviorView();
                 }
 
             } else { // Fallback to home
@@ -3450,101 +3502,558 @@ ${JSON.stringify(entry.aiData, null, 2)}
         }
 
         // --- Behavior Intervention Logic ---
-        const startObservationBtn = document.getElementById('start-observation-btn');
-        const behaviorLoggingSection = document.getElementById('behavior-logging-section');
+        const behaviorStudentList = document.getElementById('behavior-student-list');
+        const behaviorSelectedStudentLabel = document.getElementById('behavior-selected-student');
+        const behaviorRecordList = document.getElementById('behavior-record-list');
+        const behaviorDetailPanel = document.getElementById('behavior-detail-panel');
+        const behaviorDetailTitle = document.getElementById('behavior-detail-title');
+        const behaviorOperationalDefinition = document.getElementById('behavior-operational-definition');
+        const behaviorReinforcerBadge = document.getElementById('behavior-reinforcer-badge');
+        const behaviorAttentionBadge = document.getElementById('behavior-attention-badge');
+        const behaviorLogList = document.getElementById('behavior-log-list');
+        const openBehaviorModalBtn = document.getElementById('open-behavior-modal');
+        const refreshBehaviorStudentsBtn = document.getElementById('refresh-behavior-students');
+        const behaviorModal = document.getElementById('behavior-modal');
+        const behaviorModalTitleInput = document.getElementById('behavior-modal-title');
+        const behaviorModalReinforcerInput = document.getElementById('behavior-modal-reinforcer');
+        const behaviorModalAttentionInput = document.getElementById('behavior-modal-attention');
+        const behaviorModalDefinitionInput = document.getElementById('behavior-modal-definition');
+        const behaviorModalCancelBtn = document.getElementById('behavior-modal-cancel');
+        const behaviorModalSaveBtn = document.getElementById('behavior-modal-save');
         const logBehaviorBtn = document.getElementById('log-behavior-btn');
-        let currentObservation = null;
 
-        startObservationBtn.addEventListener('click', async () => {
-            const user = auth.currentUser;
-            if(!user) return;
-            
-            const studentName = document.getElementById('behavior-student-name').value;
-            const behavior = document.getElementById('target-behavior').value;
-            const type = document.querySelector('#behavior-type-buttons .active').dataset.value;
-            
-            if (!studentName || !behavior) {
-                alert('학생 이름과 목표 행동을 모두 입력해주세요.');
-                return;
+        let behaviorStudents = [];
+        let behaviorEntries = [];
+        let currentBehaviorStudentId = '';
+        let currentBehaviorEntry = null;
+        let isLoadingBehaviorStudents = false;
+        let isLoadingBehaviorEntries = false;
+
+        function resetBehaviorDetail() {
+            currentBehaviorEntry = null;
+            if (behaviorDetailPanel) {
+                behaviorDetailPanel.classList.add('hidden');
             }
-            
-            // Check for existing observation
-            const q = query(collection(db, "users", user.uid, "behaviors"), where("studentName", "==", studentName), where("behavior", "==", behavior));
-            const querySnapshot = await getDocs(q);
-
-            if (querySnapshot.empty) {
-                // Create new observation
-                const docRef = await addDoc(collection(db, "users", user.uid, "behaviors"), {
-                    studentName: studentName,
-                    behavior: behavior,
-                    type: type,
-                    createdAt: serverTimestamp()
-                });
-                currentObservation = { id: docRef.id, studentName, behavior };
-            } else {
-                const doc = querySnapshot.docs[0];
-                currentObservation = { id: doc.id, ...doc.data() };
+            if (behaviorDetailTitle) behaviorDetailTitle.textContent = '';
+            if (behaviorOperationalDefinition) behaviorOperationalDefinition.textContent = '';
+            if (behaviorReinforcerBadge) behaviorReinforcerBadge.classList.add('hidden');
+            if (behaviorAttentionBadge) behaviorAttentionBadge.classList.add('hidden');
+            if (behaviorLogList) {
+                behaviorLogList.innerHTML = '<li class="text-gray-500">행동 기록을 선택해주세요.</li>';
             }
-            
-            document.getElementById('logging-student').textContent = studentName;
-            document.getElementById('logging-behavior').textContent = behavior;
-            behaviorLoggingSection.classList.remove('hidden');
-            
-            loadBehaviorLogs();
-        });
+            if (window.behaviorChartInstance) {
+                window.behaviorChartInstance.destroy();
+                window.behaviorChartInstance = null;
+            }
+            if (logBehaviorBtn) {
+                logBehaviorBtn.disabled = true;
+            }
+        }
 
-        logBehaviorBtn.addEventListener('click', async () => {
+        function updateBehaviorActionState() {
+            if (openBehaviorModalBtn) {
+                openBehaviorModalBtn.disabled = !currentBehaviorStudentId;
+            }
+            if (logBehaviorBtn) {
+                logBehaviorBtn.disabled = !currentBehaviorEntry;
+            }
+        }
+
+        async function ensureCurrentUserProfile() {
             const user = auth.currentUser;
-            if (!user || !currentObservation) return;
-            
-            await addDoc(collection(db, "users", user.uid, "behaviors", currentObservation.id, "logs"), {
-                timestamp: serverTimestamp()
-            });
-            showToast(`${currentObservation.behavior} 행동이 기록되었습니다.`);
-            loadBehaviorLogs();
-        });
-        
-        async function loadBehaviorLogs() {
-            if (!currentObservation) return;
-            const user = auth.currentUser;
-            if(!user) return;
-            
-            const logsRef = collection(db, "users", user.uid, "behaviors", currentObservation.id, "logs");
-            const q = query(logsRef, orderBy("timestamp", "asc"));
-            const logSnapshot = await getDocs(q);
-            
-            const dailyCounts = {};
-            logSnapshot.forEach(doc => {
-                const date = doc.data().timestamp.toDate().toLocaleDateString();
-                dailyCounts[date] = (dailyCounts[date] || 0) + 1;
-            });
-            
-            const chartLabels = Object.keys(dailyCounts);
-            const chartData = Object.values(dailyCounts);
-            
-            updateChart('behaviorChart', 'behaviorChartInstance', 'line', {
-                labels: chartLabels,
-                datasets: [{
-                    label: `${currentObservation.behavior} 발생 빈도`,
-                    data: chartData,
-                    borderColor: '#0ea5e9',
-                    backgroundColor: 'rgba(14, 165, 233, 0.1)',
-                    fill: true,
-                    tension: 0.1
-                }]
+            if (!user) return null;
+            if (currentUserProfile) return currentUserProfile;
+            try {
+                const snap = await getDoc(doc(db, 'users', user.uid));
+                if (snap.exists()) {
+                    currentUserProfile = snap.data();
+                }
+            } catch (error) {
+                console.error('Failed to load user profile', error);
+            }
+            return currentUserProfile;
+        }
+
+        function updateBehaviorStudentActiveState() {
+            if (!behaviorStudentList) return;
+            const buttons = behaviorStudentList.querySelectorAll('button[data-student-id]');
+            buttons.forEach(button => {
+                const isActive = currentBehaviorStudentId && button.dataset.studentId === currentBehaviorStudentId;
+                button.classList.toggle('border-sky-500', isActive);
+                button.classList.toggle('bg-sky-50', isActive);
+                button.classList.toggle('text-sky-700', isActive);
             });
         }
-        
-        function initBehaviorChart() {
-             updateChart('behaviorChart', 'behaviorChartInstance', 'line', {
-                labels: [],
-                datasets: [{ label: '행동 발생 빈도', data: [] }]
-            }, {
-                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+
+        function updateBehaviorEntriesActiveState() {
+            if (!behaviorRecordList) return;
+            behaviorRecordList.querySelectorAll('button[data-behavior-id]').forEach(button => {
+                const isActive = currentBehaviorEntry && button.dataset.behaviorId === currentBehaviorEntry.id;
+                button.classList.toggle('border-sky-500', isActive);
+                button.classList.toggle('bg-sky-50', isActive);
+                button.classList.toggle('text-sky-700', isActive);
             });
+        }
+
+        function renderBehaviorStudents() {
+            if (!behaviorStudentList) return;
+            behaviorStudentList.innerHTML = '';
+            if (!behaviorStudents.length) {
+                behaviorStudentList.innerHTML = '<p class="text-sm text-gray-500">학생이 없습니다.</p>';
+                return;
+            }
+            behaviorStudents.forEach(student => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.dataset.studentId = student.id;
+                button.className = 'flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm transition hover:border-sky-400 hover:bg-sky-50';
+                button.innerHTML = `<span class="font-medium text-slate-700">${escapeHtml(student.name || '이름 미확인')}</span>`;
+                behaviorStudentList.appendChild(button);
+            });
+            updateBehaviorStudentActiveState();
+        }
+
+        function renderBehaviorEntries() {
+            if (!behaviorRecordList) return;
+            behaviorRecordList.innerHTML = '';
+            if (!behaviorEntries.length) {
+                behaviorRecordList.innerHTML = '<p class="text-sm text-gray-500">등록된 행동 기록이 없습니다. 상단의 추가 버튼을 눌러 작성해보세요.</p>';
+                return;
+            }
+            behaviorEntries.forEach(entry => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.dataset.behaviorId = entry.id;
+                button.className = 'w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-sky-400 hover:bg-sky-50';
+                const badges = [];
+                if (entry.useReinforcer) {
+                    badges.push('<span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">강화물</span>');
+                }
+                if (entry.useAttentionToken) {
+                    badges.push('<span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">주의 토큰</span>');
+                }
+                const firstLine = (entry.operationalDefinition || '').split('\n')[0].trim();
+                const description = firstLine ? escapeHtml(firstLine) : '조작적 정의가 등록되지 않았습니다.';
+                button.innerHTML = `
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="font-semibold text-slate-800">${escapeHtml(entry.title || '행동 기록')}</p>
+                            <p class="mt-1 text-xs text-slate-500 break-words">${description}</p>
+                        </div>
+                        <div class="flex flex-col items-end gap-1 text-xs font-medium text-slate-500">${badges.join('')}</div>
+                    </div>
+                `;
+                behaviorRecordList.appendChild(button);
+            });
+            updateBehaviorEntriesActiveState();
+        }
+
+        async function loadBehaviorStudents() {
+            const user = auth.currentUser;
+            if (!user || !behaviorStudentList || isLoadingBehaviorStudents) return;
+            isLoadingBehaviorStudents = true;
+            behaviorStudentList.innerHTML = '<p class="text-sm text-gray-500">학생 목록을 불러오는 중입니다...</p>';
+            try {
+                const classSnap = await getDoc(doc(db, 'classes', user.uid));
+                if (!classSnap.exists()) {
+                    behaviorStudents = [];
+                    behaviorStudentList.innerHTML = '<p class="text-sm text-gray-500">학급 정보가 없습니다. 먼저 학급을 생성해주세요.</p>';
+                    currentBehaviorStudentId = '';
+                    if (behaviorRecordList) behaviorRecordList.innerHTML = '<p class="text-sm text-gray-500">학생을 선택하면 행동 기록이 표시됩니다.</p>';
+                    if (behaviorSelectedStudentLabel) behaviorSelectedStudentLabel.textContent = '학생을 선택해주세요.';
+                    resetBehaviorDetail();
+                    updateBehaviorActionState();
+                    return;
+                }
+                const studentIds = classSnap.data().students || [];
+                if (!studentIds.length) {
+                    behaviorStudents = [];
+                    behaviorStudentList.innerHTML = '<p class="text-sm text-gray-500">등록된 학생이 없습니다.</p>';
+                    currentBehaviorStudentId = '';
+                    if (behaviorRecordList) behaviorRecordList.innerHTML = '<p class="text-sm text-gray-500">학생을 선택하면 행동 기록이 표시됩니다.</p>';
+                    if (behaviorSelectedStudentLabel) behaviorSelectedStudentLabel.textContent = '학생을 선택해주세요.';
+                    resetBehaviorDetail();
+                    updateBehaviorActionState();
+                    return;
+                }
+                const studentDocs = await Promise.all(studentIds.map(async (sid) => {
+                    try {
+                        const snap = await getDoc(doc(db, 'users', sid));
+                        if (snap.exists()) {
+                            const data = snap.data();
+                            return { id: sid, name: data.name || data.userCode || sid };
+                        }
+                    } catch (error) {
+                        console.error('Failed to load student info', error);
+                    }
+                    return { id: sid, name: sid };
+                }));
+                behaviorStudents = studentDocs.filter(Boolean);
+                renderBehaviorStudents();
+                const hasSelectedStudent = currentBehaviorStudentId && behaviorStudents.some(student => student.id === currentBehaviorStudentId);
+                if (hasSelectedStudent) {
+                    updateBehaviorStudentActiveState();
+                    const student = behaviorStudents.find(s => s.id === currentBehaviorStudentId);
+                    if (behaviorSelectedStudentLabel) {
+                        behaviorSelectedStudentLabel.textContent = `${student?.name || '학생'} 학생`;
+                    }
+                    await loadBehaviorEntries(currentBehaviorStudentId);
+                } else {
+                    currentBehaviorStudentId = '';
+                    if (behaviorRecordList) behaviorRecordList.innerHTML = '<p class="text-sm text-gray-500">학생을 선택하면 행동 기록이 표시됩니다.</p>';
+                    if (behaviorSelectedStudentLabel) behaviorSelectedStudentLabel.textContent = '학생을 선택해주세요.';
+                    resetBehaviorDetail();
+                    updateBehaviorActionState();
+                }
+            } catch (error) {
+                console.error('Failed to load behavior students', error);
+                behaviorStudents = [];
+                if (behaviorStudentList) {
+                    behaviorStudentList.innerHTML = '<p class="text-sm text-red-500">학생 목록을 불러오지 못했습니다.</p>';
+                }
+                currentBehaviorStudentId = '';
+                if (behaviorRecordList) behaviorRecordList.innerHTML = '<p class="text-sm text-gray-500">학생을 선택하면 행동 기록이 표시됩니다.</p>';
+                if (behaviorSelectedStudentLabel) behaviorSelectedStudentLabel.textContent = '학생을 선택해주세요.';
+                resetBehaviorDetail();
+                updateBehaviorActionState();
+            } finally {
+                isLoadingBehaviorStudents = false;
+            }
+        }
+
+        async function loadBehaviorEntries(studentId, behaviorIdToSelect = '') {
+            const user = auth.currentUser;
+            if (!user || !behaviorRecordList || isLoadingBehaviorEntries) return;
+            isLoadingBehaviorEntries = true;
+            behaviorRecordList.innerHTML = '<p class="text-sm text-gray-500">행동 기록을 불러오는 중입니다...</p>';
+            try {
+                const behaviorsRef = collection(db, 'users', user.uid, 'behaviors');
+                const q = query(behaviorsRef, where('studentId', '==', studentId));
+                const snapshot = await getDocs(q);
+                behaviorEntries = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+                behaviorEntries.sort((a, b) => {
+                    const aTime = a.createdAt?.toMillis?.() || 0;
+                    const bTime = b.createdAt?.toMillis?.() || 0;
+                    return bTime - aTime;
+                });
+                if (!behaviorEntries.length) {
+                    const student = behaviorStudents.find(s => s.id === studentId);
+                    if (student?.name) {
+                        const legacySnapshot = await getDocs(query(behaviorsRef, where('studentName', '==', student.name)));
+                        const legacyUpdates = [];
+                        legacySnapshot.forEach(docSnap => {
+                            const data = docSnap.data();
+                            behaviorEntries.push({ id: docSnap.id, ...data });
+                            if (!data.studentId) {
+                                legacyUpdates.push(updateDoc(doc(db, 'users', user.uid, 'behaviors', docSnap.id), {
+                                    studentId,
+                                    studentName: student.name
+                                }).catch(() => {}));
+                            }
+                        });
+                        if (legacyUpdates.length) {
+                            await Promise.allSettled(legacyUpdates);
+                        }
+                        behaviorEntries.sort((a, b) => {
+                            const aTime = a.createdAt?.toMillis?.() || 0;
+                            const bTime = b.createdAt?.toMillis?.() || 0;
+                            return bTime - aTime;
+                        });
+                    }
+                }
+                renderBehaviorEntries();
+                const targetId = behaviorIdToSelect || (currentBehaviorEntry && behaviorEntries.some(entry => entry.id === currentBehaviorEntry.id) ? currentBehaviorEntry.id : '');
+                if (targetId) {
+                    selectBehaviorEntry(targetId);
+                } else {
+                    currentBehaviorEntry = null;
+                    resetBehaviorDetail();
+                    updateBehaviorActionState();
+                }
+            } catch (error) {
+                console.error('Failed to load behavior entries', error);
+                behaviorRecordList.innerHTML = '<p class="text-sm text-red-500">행동 기록을 불러오지 못했습니다.</p>';
+                behaviorEntries = [];
+                currentBehaviorEntry = null;
+                resetBehaviorDetail();
+            } finally {
+                isLoadingBehaviorEntries = false;
+                updateBehaviorActionState();
+            }
+        }
+
+        function selectBehaviorEntry(behaviorId) {
+            const entry = behaviorEntries.find(item => item.id === behaviorId);
+            if (!entry) return;
+            currentBehaviorEntry = entry;
+            updateBehaviorEntriesActiveState();
+            showBehaviorDetail(entry);
+        }
+
+        function showBehaviorDetail(entry) {
+            if (!behaviorDetailPanel) return;
+            behaviorDetailPanel.classList.remove('hidden');
+            if (behaviorDetailTitle) behaviorDetailTitle.textContent = entry.title || '행동 기록';
+            if (behaviorOperationalDefinition) {
+                const definition = (entry.operationalDefinition || '').trim();
+                behaviorOperationalDefinition.textContent = definition || '조작적 정의가 등록되지 않았습니다.';
+            }
+            if (behaviorReinforcerBadge) {
+                behaviorReinforcerBadge.classList.toggle('hidden', !entry.useReinforcer);
+            }
+            if (behaviorAttentionBadge) {
+                behaviorAttentionBadge.classList.toggle('hidden', !entry.useAttentionToken);
+            }
+            if (behaviorLogList) {
+                behaviorLogList.innerHTML = '<li class="text-gray-500">기록을 불러오는 중입니다...</li>';
+            }
+            requestAnimationFrame(() => {
+                renderBehaviorChart([], [], entry.title || '');
+            });
+            updateBehaviorActionState();
+            loadBehaviorLogs(entry.id);
+        }
+
+        async function loadBehaviorLogs(behaviorId) {
+            if (!currentBehaviorEntry || currentBehaviorEntry.id !== behaviorId) return;
+            const user = auth.currentUser;
+            if (!user) return;
+            try {
+                const logsRef = collection(db, 'users', user.uid, 'behaviors', behaviorId, 'logs');
+                const logSnapshot = await getDocs(query(logsRef, orderBy('timestamp', 'asc')));
+                const dailyCounts = new Map();
+                const logItems = [];
+                logSnapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    const timestamp = data.timestamp?.toDate?.() || null;
+                    if (timestamp) {
+                        const dateLabel = timestamp.toLocaleDateString('ko-KR');
+                        dailyCounts.set(dateLabel, (dailyCounts.get(dateLabel) || 0) + 1);
+                    }
+                    logItems.push({
+                        id: docSnap.id,
+                        timestamp,
+                        recordedByName: data.recordedByName || '',
+                        recordedBy: data.recordedBy || ''
+                    });
+                });
+                renderBehaviorLogList(logItems);
+                const labels = Array.from(dailyCounts.keys());
+                const dataPoints = labels.map(label => dailyCounts.get(label));
+                renderBehaviorChart(labels, dataPoints, currentBehaviorEntry.title);
+            } catch (error) {
+                console.error('Failed to load behavior logs', error);
+                if (behaviorLogList) {
+                    behaviorLogList.innerHTML = '<li class="text-sm text-red-500">기록을 불러오지 못했습니다.</li>';
+                }
+            }
+        }
+
+        function renderBehaviorLogList(logItems) {
+            if (!behaviorLogList) return;
+            behaviorLogList.innerHTML = '';
+            if (!logItems.length) {
+                behaviorLogList.innerHTML = '<li class="text-gray-500">기록 버튼을 눌러 첫 기록을 남겨보세요.</li>';
+                return;
+            }
+            logItems.slice().reverse().forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm';
+                const name = escapeHtml(item.recordedByName || '기록자 미상');
+                const time = item.timestamp ? formatTimestamp(item.timestamp) : '시간 정보 없음';
+                li.innerHTML = `<div class="flex flex-col gap-1"><span class="font-semibold text-slate-700">${name}</span><span class="text-xs text-slate-500">${escapeHtml(time)}</span></div>`;
+                behaviorLogList.appendChild(li);
+            });
+        }
+
+        function renderBehaviorChart(labels, dataPoints, labelText) {
+            const datasetLabel = labelText ? `${labelText} 발생 빈도` : '행동 발생 빈도';
+            const chartData = {
+                labels,
+                datasets: [{
+                    label: datasetLabel,
+                    data: dataPoints,
+                    borderColor: '#0ea5e9',
+                    backgroundColor: 'rgba(14, 165, 233, 0.15)',
+                    fill: true,
+                    tension: 0.15,
+                    pointRadius: 3
+                }]
+            };
+            const options = {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 }
+                    }
+                }
+            };
+            updateChart('behaviorChart', 'behaviorChartInstance', 'line', chartData, options);
+        }
+
+        function openBehaviorModal() {
+            if (!behaviorModal) return;
+            behaviorModal.classList.remove('hidden');
+            behaviorModal.classList.add('flex');
+            if (behaviorModalTitleInput) behaviorModalTitleInput.value = '';
+            if (behaviorModalDefinitionInput) behaviorModalDefinitionInput.value = '';
+            if (behaviorModalReinforcerInput) behaviorModalReinforcerInput.checked = false;
+            if (behaviorModalAttentionInput) behaviorModalAttentionInput.checked = false;
+            setTimeout(() => behaviorModalTitleInput?.focus(), 50);
+        }
+
+        function closeBehaviorModal() {
+            if (!behaviorModal) return;
+            behaviorModal.classList.add('hidden');
+            behaviorModal.classList.remove('flex');
+        }
+
+        async function handleBehaviorModalSave() {
+            if (!currentBehaviorStudentId) {
+                alert('학생을 먼저 선택해주세요.');
+                return;
+            }
+            const title = (behaviorModalTitleInput?.value || '').trim();
+            const operationalDefinition = (behaviorModalDefinitionInput?.value || '').trim();
+            const useReinforcer = !!behaviorModalReinforcerInput?.checked;
+            const useAttentionToken = !!behaviorModalAttentionInput?.checked;
+            if (!title) {
+                alert('제목을 입력해주세요.');
+                behaviorModalTitleInput?.focus();
+                return;
+            }
+            const user = auth.currentUser;
+            if (!user) return;
+            const student = behaviorStudents.find(s => s.id === currentBehaviorStudentId);
+            try {
+                const docRef = await addDoc(collection(db, 'users', user.uid, 'behaviors'), {
+                    title,
+                    studentId: currentBehaviorStudentId,
+                    studentName: student?.name || '',
+                    useReinforcer,
+                    useAttentionToken,
+                    operationalDefinition,
+                    createdAt: serverTimestamp()
+                });
+                showToast('행동 기록이 추가되었습니다.');
+                closeBehaviorModal();
+                await loadBehaviorEntries(currentBehaviorStudentId, docRef.id);
+            } catch (error) {
+                console.error('Failed to add behavior entry', error);
+                alert('행동 기록을 추가하지 못했습니다. 잠시 후 다시 시도해주세요.');
+            }
+        }
+
+        async function getRecorderDisplayName() {
+            const user = auth.currentUser;
+            if (!user) return '기록자';
+            const profile = await ensureCurrentUserProfile();
+            if (profile?.name) return profile.name;
+            if (user.displayName) return user.displayName;
+            if (profile?.email) return profile.email.split('@')[0];
+            if (user.email) return user.email.split('@')[0];
+            return '기록자';
+        }
+
+        if (behaviorStudentList) {
+            behaviorStudentList.addEventListener('click', (event) => {
+                const button = event.target.closest('button[data-student-id]');
+                if (!button) return;
+                const studentId = button.dataset.studentId;
+                currentBehaviorStudentId = studentId;
+                const student = behaviorStudents.find(s => s.id === studentId);
+                if (behaviorSelectedStudentLabel) {
+                    behaviorSelectedStudentLabel.textContent = `${student?.name || '학생'} 학생`;
+                }
+                updateBehaviorStudentActiveState();
+                resetBehaviorDetail();
+                loadBehaviorEntries(studentId);
+                updateBehaviorActionState();
+            });
+        }
+
+        if (behaviorRecordList) {
+            behaviorRecordList.addEventListener('click', (event) => {
+                const button = event.target.closest('button[data-behavior-id]');
+                if (!button) return;
+                selectBehaviorEntry(button.dataset.behaviorId);
+            });
+        }
+
+        refreshBehaviorStudentsBtn?.addEventListener('click', () => loadBehaviorStudents());
+
+        openBehaviorModalBtn?.addEventListener('click', () => {
+            if (!currentBehaviorStudentId) {
+                alert('학생을 먼저 선택해주세요.');
+                return;
+            }
+            openBehaviorModal();
+        });
+
+        behaviorModalCancelBtn?.addEventListener('click', closeBehaviorModal);
+        behaviorModal?.addEventListener('click', (event) => {
+            if (event.target === behaviorModal) {
+                closeBehaviorModal();
+            }
+        });
+        behaviorModalSaveBtn?.addEventListener('click', handleBehaviorModalSave);
+
+        if (logBehaviorBtn) {
+            logBehaviorBtn.addEventListener('click', async () => {
+                if (!currentBehaviorEntry) {
+                    alert('행동 기록을 선택해주세요.');
+                    return;
+                }
+                const user = auth.currentUser;
+                if (!user) return;
+                const recorderName = await getRecorderDisplayName();
+                try {
+                    await addDoc(collection(db, 'users', user.uid, 'behaviors', currentBehaviorEntry.id, 'logs'), {
+                        timestamp: serverTimestamp(),
+                        recordedBy: user.uid,
+                        recordedByName: recorderName
+                    });
+                    const title = currentBehaviorEntry.title || '행동';
+                    showToast(`${title}이 기록되었습니다.`);
+                    loadBehaviorLogs(currentBehaviorEntry.id);
+                } catch (error) {
+                    console.error('Failed to record behavior log', error);
+                    alert('행동을 기록하지 못했습니다. 잠시 후 다시 시도해주세요.');
+                }
+            });
+        }
+
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && behaviorModal && !behaviorModal.classList.contains('hidden')) {
+                closeBehaviorModal();
+            }
+        });
+
+        function prepareBehaviorView() {
+            if (behaviorSelectedStudentLabel && !currentBehaviorStudentId) {
+                behaviorSelectedStudentLabel.textContent = '학생을 선택해주세요.';
+            }
+            resetBehaviorDetail();
+            updateBehaviorActionState();
+            loadBehaviorStudents();
         }
 
         // --- UTILITY FUNCTIONS ---
+        function formatTimestamp(date) {
+            if (!(date instanceof Date)) {
+                return '시간 정보 없음';
+            }
+            return date.toLocaleString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+        }
+
         function escapeHtml(text) {
             return (text || '').replace(/[&<>"']/g, (char) => {
                 switch (char) {
