@@ -96,6 +96,15 @@ service cloud.firestore {
       match /achievements/{achievementId} {
         allow read, write: if request.auth.uid == userId && isTeacher();
       }
+
+      // ✨ [에이두 스페셜] 행동 기록 및 로그
+      match /behaviors/{behaviorId} {
+        allow read, write: if request.auth.uid == userId && isTeacher();
+
+        match /logs/{logId} {
+          allow read, write: if request.auth.uid == userId && isTeacher();
+        }
+      }
     }
 
     // ──────────────────────────────────────────────────────────────
