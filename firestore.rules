@@ -227,11 +227,17 @@ service cloud.firestore {
     match /classes/{teacherId} {
       allow get, update, delete: if request.auth.uid == teacherId && isTeacher();
       allow create: if request.auth.uid == teacherId && isTeacher();
+
       allow list: if isTeacher() ||
-        (isStudent() &&
+        (request.auth != null &&
          request.query != null &&
          request.query.where('students', 'array-contains', request.auth.uid));
-      allow get: if isStudent() && resource.data.students != null && request.auth.uid in resource.data.students;
+
+      allow get: if
+        (request.auth.uid == teacherId && isTeacher()) ||
+        (request.auth != null &&
+         resource.data.students != null &&
+         request.auth.uid in resource.data.students);
     }
 
     // 'IEP 에이두' 앱 규칙
