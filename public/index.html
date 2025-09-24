@@ -7010,12 +7010,11 @@
             }
             teacherPurchaseLogList.innerHTML = '';
             try {
-                const q = query(
+                const purchaseQuery = query(
                     collection(db, 'purchaseLog'),
-                    where('teacherId', '==', currentUserData.id),
-                    orderBy('purchasedAt', 'desc')
+                    where('teacherId', '==', currentUserData.id)
                 );
-                const snapshot = await getDocs(q);
+                const snapshot = await getDocs(purchaseQuery);
                 if (snapshot.empty) {
                     if (teacherPurchaseLogEmpty) {
                         teacherPurchaseLogEmpty.classList.remove('hidden');
@@ -7023,6 +7022,11 @@
                     return;
                 }
                 const logs = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+                logs.sort((a, b) => {
+                    const aTime = (a.purchasedAt && typeof a.purchasedAt.toMillis === 'function') ? a.purchasedAt.toMillis() : (a.purchasedAt instanceof Date ? a.purchasedAt.getTime() : 0);
+                    const bTime = (b.purchasedAt && typeof b.purchasedAt.toMillis === 'function') ? b.purchasedAt.toMillis() : (b.purchasedAt instanceof Date ? b.purchasedAt.getTime() : 0);
+                    return bTime - aTime;
+                });
                 await Promise.all(logs.map(async (log) => {
                     if (!log.teacherName && log.teacherId) {
                         log.teacherName = await getTeacherNameById(log.teacherId);

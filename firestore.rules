@@ -87,6 +87,11 @@ service cloud.firestore {
         allow read, write: if request.auth.uid == userId && isTeacher();
       }
 
+      // ✨ [에이두 스페셜] 상점 물품 배부 내역
+      match /assignedShopItems/{itemId} {
+        allow read, write: if request.auth.uid == userId || isTeacher();
+      }
+
       // ✨ [에이두 스페셜] 개별화교육계획(IEP)
       match /ieps/{iepId} {
         allow read, write: if request.auth.uid == userId && isTeacher();
@@ -220,7 +225,13 @@ service cloud.firestore {
     }
 
     match /classes/{teacherId} {
-      allow read, write: if request.auth.uid == teacherId && isTeacher();
+      allow get, update, delete: if request.auth.uid == teacherId && isTeacher();
+      allow create: if request.auth.uid == teacherId && isTeacher();
+      allow list: if isTeacher() ||
+        (isStudent() &&
+         request.query != null &&
+         request.query.where('students', 'array-contains', request.auth.uid));
+      allow get: if isStudent() && resource.data.students != null && request.auth.uid in resource.data.students;
     }
 
     // 'IEP 에이두' 앱 규칙
