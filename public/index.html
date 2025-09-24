@@ -1270,10 +1270,9 @@
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, runTransaction, updateDoc, increment, deleteField, serverTimestamp, Timestamp, orderBy, addDoc, deleteDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, runTransaction, updateDoc, increment, deleteField, serverTimestamp, Timestamp, orderBy, addDoc, deleteDoc, arrayUnion, collectionGroup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
         import { getStorage, ref as storageRef, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
-        import { fetchClassesForStudent } from "./js/studentClassService.js";
 
         // IMPORTANT: Replace with your actual Firebase config
         const firebaseConfig = {
@@ -1318,7 +1317,6 @@
         let currentClassIndex = 0;
         let currentClassId = null;
         let currentClassStudents = [];
-        let studentClassTeacherIdsCache = null;
         const shopItemsCache = new Map();
         const teacherNameCache = new Map();
         let currentShopItemForDistribution = null;
@@ -1377,7 +1375,6 @@
             currentClassIndex = 0;
             currentClassId = null;
             currentClassStudents = [];
-            studentClassTeacherIdsCache = null;
             myClassStudentIds = [];
         }
 
@@ -1485,29 +1482,6 @@
             return teacherClasses;
         }
 
-        async function getStudentAssignedTeacherIds(studentId) {
-            if (!studentId) return [];
-            if (studentClassTeacherIdsCache && studentClassTeacherIdsCache.id === studentId) {
-                return studentClassTeacherIdsCache.ids;
-            }
-            let classDocs = [];
-            try {
-                classDocs = await fetchClassesForStudent(db, studentId);
-            } catch (error) {
-                console.warn('학생 학급 정보를 불러오지 못했습니다:', error);
-                classDocs = [];
-            }
-            const teacherIdSet = new Set();
-            classDocs.forEach(cls => {
-                const teacherId = cls.teacherId || cls.id || '';
-                if (teacherId) {
-                    teacherIdSet.add(teacherId);
-                }
-            });
-            const ids = Array.from(teacherIdSet);
-            studentClassTeacherIdsCache = { id: studentId, ids };
-            return ids;
-        }
         const choicePromisePracticeTitle = document.getElementById('choice-promise-practice-title');
         const choicePromisePracticeSubtitle = document.getElementById('choice-promise-practice-subtitle');
         const choicePromisePracticeFeedback = document.getElementById('choice-promise-practice-feedback');
@@ -2931,11 +2905,173 @@
         });
         
         // --- Shop Logic ---
+        async function loadStudentAssignedShopItems(container, student) {
+            const studentId = student?.id;
+            if (!studentId) {
+                container.innerHTML = `<p class="col-span-full text-center text-red-500">학생 정보를 찾을 수 없습니다.</p>`;
+                return;
+            }
+            try {
+                const assignmentsQuery = query(
+                    collection(db, `users/${studentId}/assignedShopItems`),
+                    orderBy('assignedAt', 'desc')
+                );
+                const assignmentSnapshot = await getDocs(assignmentsQuery);
+                if (assignmentSnapshot.empty) {
+                    container.innerHTML = `<p class="col-span-full text-center text-gray-500">배부된 상점 물품이 없습니다.</p>`;
+                    return;
+                }
+
+                const assignments = assignmentSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+                const uniqueItemIds = new Set();
+                const orphanedAssignmentIds = new Set();
+                assignments.forEach(assignment => {
+                    if (assignment.itemId) {
+                        uniqueItemIds.add(assignment.itemId);
+                    } else {
+                        orphanedAssignmentIds.add(assignment.id);
+                    }
+                });
+
+                const itemMap = new Map();
+                const missingItemIds = new Set();
+                if (uniqueItemIds.size) {
+                    const fetchResults = await Promise.all([...uniqueItemIds].map(async itemId => {
+                        try {
+                            const itemDoc = await getDoc(doc(db, 'shopItems', itemId));
+                            return { itemId, itemDoc };
+                        } catch (error) {
+                            console.warn('상점 물품 조회 실패:', error);
+                            return { itemId, itemDoc: null, error };
+                        }
+                    }));
+                    fetchResults.forEach(({ itemId, itemDoc }) => {
+                        if (itemDoc && itemDoc.exists()) {
+                            itemMap.set(itemId, { id: itemDoc.id, ...itemDoc.data() });
+                        } else {
+                            missingItemIds.add(itemId);
+                        }
+                    });
+                }
+
+                assignments.forEach(assignment => {
+                    if (!assignment.itemId || missingItemIds.has(assignment.itemId)) {
+                        orphanedAssignmentIds.add(assignment.id);
+                    }
+                });
+
+                const displayItems = assignments.map(assignment => {
+                    const baseItem = assignment.itemId ? itemMap.get(assignment.itemId) : null;
+                    if (!baseItem) {
+                        return null;
+                    }
+                    const item = { id: baseItem.id, ...baseItem };
+                    const teacherId = item.teacherId || assignment.teacherId || DEFAULT_SHOP_TEACHER_ID;
+                    const teacherName = item.teacherName || assignment.teacherName || teacherNameCache.get(teacherId) || '';
+                    if (teacherName) {
+                        item.teacherName = teacherName;
+                        teacherNameCache.set(teacherId, teacherName);
+                    }
+                    const assignedAtMillis = assignment.assignedAt && typeof assignment.assignedAt.toMillis === 'function'
+                        ? assignment.assignedAt.toMillis()
+                        : 0;
+                    return { assignment, item, assignedAtMillis };
+                }).filter(Boolean);
+
+                if (orphanedAssignmentIds.size) {
+                    await Promise.allSettled([...orphanedAssignmentIds].map(assignmentId =>
+                        deleteDoc(doc(db, `users/${studentId}/assignedShopItems`, assignmentId))
+                    ));
+                }
+
+                if (!displayItems.length) {
+                    container.innerHTML = `<p class="col-span-full text-center text-gray-500">배부된 상점 물품이 없습니다.</p>`;
+                    return;
+                }
+
+                await Promise.allSettled(displayItems.map(({ item }) => ensureItemTeacherName(item)));
+                displayItems.forEach(({ item }) => {
+                    if (item.teacherId && item.teacherName) {
+                        teacherNameCache.set(item.teacherId, item.teacherName);
+                    }
+                    shopItemsCache.set(item.id, item);
+                });
+
+                displayItems.sort((a, b) => {
+                    if (b.assignedAtMillis !== a.assignedAtMillis) {
+                        return b.assignedAtMillis - a.assignedAtMillis;
+                    }
+                    return (a.item.name || '').localeCompare(b.item.name || '', 'ko');
+                });
+
+                container.innerHTML = '';
+                displayItems.forEach(({ assignment, item }) => {
+                    const card = document.createElement('div');
+                    card.className = "bg-white p-4 rounded-lg shadow flex flex-col";
+
+                    const imageHtml = item.imageUrl
+                        ? `<img src="${item.imageUrl}" alt="${item.name}" class="w-full h-32 object-cover rounded-md mb-3" onerror="this.onerror=null;this.src='https://placehold.co/400x300/F59E0B/FFFFFF?text=Image';">`
+                        : `<div class="w-full h-32 bg-gray-200 rounded-md mb-3 flex items-center justify-center"><span class="text-gray-500 text-sm">No Image</span></div>`;
+
+                    const pricing = calculatePriceWithWarningTokens(item.price, viewedUserData);
+                    const priceInfoHtml = pricing.warningTokenCount > 0
+                        ? `<div class="flex flex-col text-sm leading-tight">
+                                <span class="text-gray-500 line-through">원래 가격 ${formatCurrency(pricing.basePrice)}</span>
+                                <span class="text-lg font-bold text-red-600">현재 가격 ${formatCurrency(pricing.adjustedPrice)}</span>
+                                <span class="text-xs text-gray-600">주의 토큰 ${pricing.warningTokenCount}개로 ${pricing.multiplier}배</span>
+                           </div>`
+                        : `<span class="font-bold text-amber-600">${formatCurrency(pricing.basePrice)}</span>`;
+                    const teacherLabelHtml = item.teacherName
+                        ? `<p class="text-xs text-gray-400">${item.teacherName} 교사</p>`
+                        : '';
+                    const assignedAtText = assignment.assignedAt && typeof assignment.assignedAt.toDate === 'function'
+                        ? assignment.assignedAt.toDate().toLocaleString('ko-KR')
+                        : '';
+                    const assignmentMetaHtml = assignedAtText
+                        ? `<p class="text-xs text-gray-400">${assignedAtText} 배부</p>`
+                        : '';
+
+                    card.innerHTML = `
+                        ${imageHtml}
+                        <div class="flex flex-col flex-grow">
+                            <h3 class="text-lg font-bold">${item.name}</h3>
+                            ${teacherLabelHtml}
+                            ${assignmentMetaHtml}
+                            <p class="text-sm text-gray-500 flex-grow my-2">${item.description || ''}</p>
+                            <div class="flex justify-between items-center mt-4 gap-2">
+                                <div class="flex-1 text-left">
+                                    ${priceInfoHtml}
+                                </div>
+                                <button data-itemid="${item.id}" class="buy-item-btn btn btn-primary px-3 py-1 text-sm" ${isAdminViewing ? 'disabled' : ''}>구매</button>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+
+                container.querySelectorAll('.buy-item-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => handleBuyItem(e.target.dataset.itemid));
+                });
+            } catch (error) {
+                console.error('학생 상점 물품을 불러오는 중 오류:', error);
+                container.innerHTML = `<p class="col-span-full text-center text-red-500">상점 물품을 불러오는 중 문제가 발생했습니다.</p>`;
+            }
+        }
+
         async function loadAndRenderShopItems() {
             const container = document.getElementById('shop-item-list');
             container.innerHTML = `<p class="col-span-full text-center text-gray-500">상점 물품을 불러오는 중입니다...</p>`;
             shopItemsCache.clear();
             try {
+                const studentContext = (currentUserData?.role === 'student')
+                    ? currentUserData
+                    : (isAdminViewing && viewedUserData?.role === 'student' ? viewedUserData : null);
+
+                if (studentContext) {
+                    await loadStudentAssignedShopItems(container, studentContext);
+                    return;
+                }
+
                 const snapshot = await getDocs(collection(db, 'shopItems'));
                 if (snapshot.empty) {
                     const emptyMsg = currentUserData?.role === 'teacher'
@@ -2972,13 +3108,6 @@
                 let filteredItems = items;
                 if (currentUserData?.role === 'teacher') {
                     filteredItems = items.filter(item => item.teacherId === currentUserData.id);
-                } else if (currentUserData?.role === 'student') {
-                    const allowedTeacherIds = await getStudentAssignedTeacherIds(currentUserData.id);
-                    if (!allowedTeacherIds.length) {
-                        container.innerHTML = `<p class="col-span-full text-center text-gray-500">담당 교사가 등록한 상점 물품이 없습니다.</p>`;
-                        return;
-                    }
-                    filteredItems = items.filter(item => allowedTeacherIds.includes(item.teacherId));
                 }
 
                 filteredItems.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko'));
@@ -2986,7 +3115,7 @@
                 if (!filteredItems.length) {
                     const roleMsg = currentUserData?.role === 'teacher'
                         ? '내가 등록한 상점 물품이 없습니다.'
-                        : '담당 교사가 등록한 상점 물품이 없습니다.';
+                        : '상점 물품이 없습니다.';
                     container.innerHTML = `<p class="col-span-full text-center text-gray-500">${roleMsg}</p>`;
                     return;
                 }
@@ -3138,6 +3267,15 @@
             showModal('삭제 확인', '정말로 이 물품을 삭제하시겠습니까?', async () => {
                 try {
                     await deleteDoc(doc(db, 'shopItems', itemId));
+                    try {
+                        const assignmentQuery = query(collectionGroup(db, 'assignedShopItems'), where('itemId', '==', itemId));
+                        const assignmentsSnap = await getDocs(assignmentQuery);
+                        if (!assignmentsSnap.empty) {
+                            await Promise.allSettled(assignmentsSnap.docs.map(docSnap => deleteDoc(docSnap.ref)));
+                        }
+                    } catch (cleanupError) {
+                        console.warn('배부된 상점 물품 정리 중 오류:', cleanupError);
+                    }
                     modal.style.display = 'none';
                     showModal('성공', '물품이 삭제되었습니다.');
                     loadAndRenderShopItems();
