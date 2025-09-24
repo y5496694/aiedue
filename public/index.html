@@ -282,6 +282,15 @@
                             <p>고유 코드: <strong id="dashboard-code" class="text-lg"></strong></p>
                         </div>
                         <div id="my-class-section" class="hidden bg-white p-6 rounded-lg shadow-md"></div>
+                        <div id="teacher-purchase-log-section" class="hidden bg-white p-6 rounded-lg shadow-md">
+                            <div class="flex items-center justify-between mb-4">
+                                <h2 class="text-xl font-bold">🧾 구매 기록</h2>
+                                <button id="refresh-teacher-purchase-log-btn" class="btn btn-secondary px-3 py-1 text-sm">새로고침</button>
+                            </div>
+                            <div id="teacher-purchase-log-loading" class="text-sm text-gray-500 hidden">기록을 불러오는 중입니다...</div>
+                            <div id="teacher-purchase-log-empty" class="text-sm text-gray-500 text-center hidden">구매 기록이 없습니다.</div>
+                            <ul id="teacher-purchase-log-list" class="space-y-2 max-h-60 overflow-y-auto text-sm"></ul>
+                        </div>
                         <div id="teacher-admin-panel" class="hidden bg-white p-6 rounded-lg shadow-md">
                             <h2 class="text-xl font-bold mb-4 text-red-600">⚙️ 관리자 메뉴</h2>
                             <button id="assign-homework-start-btn" class="w-full py-2 mb-2 rounded-md btn bg-amber-500 hover:bg-amber-600 text-white">숙제 배부하기</button>
@@ -529,6 +538,10 @@
                     <h4 class="font-bold text-lg border-b pb-1 mb-2">📜 배부된 생활 규칙</h4>
                     <div id="adjust-modal-liferules" class="mt-1 space-y-2 text-sm"></div>
                 </div>
+                <div>
+                    <h4 class="font-bold text-lg border-b pb-1 mb-2">🎁 배부된 상점 물품</h4>
+                    <div id="adjust-modal-shop-items" class="mt-1 space-y-2 text-sm"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -589,6 +602,29 @@
                     <button type="submit" class="btn btn-primary">저장</button>
                 </div>
             </form>
+        </div>
+    </div>
+    <div id="shop-distribution-modal" class="modal-overlay hidden">
+        <div class="modal-content modal-content-lg text-left">
+            <span class="close-button" id="close-shop-distribution-modal-btn">&times;</span>
+            <h3 id="shop-distribution-title" class="text-xl font-bold mb-4">상점 물품 배부</h3>
+            <div class="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
+                <p id="shop-distribution-item-name" class="font-medium text-gray-700"></p>
+                <label class="inline-flex items-center space-x-2 text-sm text-gray-700">
+                    <input type="checkbox" id="shop-distribution-select-all" class="form-checkbox h-4 w-4 text-amber-600 focus:ring-amber-500" disabled>
+                    <span>내 학급 전체 선택</span>
+                </label>
+            </div>
+            <div class="mb-3 relative">
+                <input type="text" id="shop-distribution-search" class="w-full p-2 pl-10 border border-gray-300 rounded-md form-input" placeholder="학생 이름 또는 코드를 검색하세요">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-gray-400"></i>
+                </div>
+            </div>
+            <div id="shop-distribution-student-list" class="space-y-2 max-h-60 overflow-y-auto text-sm border border-gray-200 rounded-md p-3 bg-gray-50"></div>
+            <div class="mt-6 text-right">
+                <button id="shop-distribution-confirm-btn" class="btn btn-primary" disabled>배부하기</button>
+            </div>
         </div>
     </div>
     <div id="life-rule-modal" class="modal-overlay hidden">
@@ -1283,6 +1319,11 @@
         let currentClassId = null;
         let currentClassStudents = [];
         let studentClassTeacherIdsCache = null;
+        const shopItemsCache = new Map();
+        const teacherNameCache = new Map();
+        let currentShopItemForDistribution = null;
+        let shopDistributionStudents = [];
+        const shopDistributionSelectedIds = new Set();
 
         // --- DOM Elements ---
         const views = {
@@ -1317,6 +1358,19 @@
         const choicePromiseQuestionsContainer = document.getElementById('choice-promise-questions');
         const choicePromisePracticeModal = document.getElementById('choice-promise-practice-modal');
         const choicePromisePracticeList = document.getElementById('choice-promise-practice-list');
+        const shopDistributionModal = document.getElementById('shop-distribution-modal');
+        const shopDistributionTitle = document.getElementById('shop-distribution-title');
+        const shopDistributionItemName = document.getElementById('shop-distribution-item-name');
+        const shopDistributionStudentList = document.getElementById('shop-distribution-student-list');
+        const shopDistributionSelectAll = document.getElementById('shop-distribution-select-all');
+        const shopDistributionSearch = document.getElementById('shop-distribution-search');
+        const shopDistributionConfirmBtn = document.getElementById('shop-distribution-confirm-btn');
+        const closeShopDistributionModalBtn = document.getElementById('close-shop-distribution-modal-btn');
+        const teacherPurchaseLogSection = document.getElementById('teacher-purchase-log-section');
+        const teacherPurchaseLogList = document.getElementById('teacher-purchase-log-list');
+        const teacherPurchaseLogLoading = document.getElementById('teacher-purchase-log-loading');
+        const teacherPurchaseLogEmpty = document.getElementById('teacher-purchase-log-empty');
+        const refreshTeacherPurchaseLogBtn = document.getElementById('refresh-teacher-purchase-log-btn');
 
         function resetUserSessionState() {
             teacherClasses = [];
@@ -1687,10 +1741,76 @@
             return { basePrice: normalizedBasePrice, warningTokenCount, multiplier, adjustedPrice };
         };
 
+        async function getTeacherNameById(teacherId) {
+            if (!teacherId) return '';
+            if (teacherNameCache.has(teacherId)) {
+                return teacherNameCache.get(teacherId);
+            }
+            try {
+                const teacherSnap = await getDoc(doc(db, 'users', teacherId));
+                const teacherName = teacherSnap.exists() ? (teacherSnap.data().name || '') : '';
+                teacherNameCache.set(teacherId, teacherName);
+                return teacherName;
+            } catch (error) {
+                console.warn('교사 이름 조회 실패:', error);
+                teacherNameCache.set(teacherId, '');
+                return '';
+            }
+        }
+
+        async function ensureItemTeacherName(item) {
+            if (!item || !item.teacherId) return '';
+            if (item.teacherName) {
+                teacherNameCache.set(item.teacherId, item.teacherName);
+                return item.teacherName;
+            }
+            const teacherName = await getTeacherNameById(item.teacherId);
+            if (teacherName) {
+                item.teacherName = teacherName;
+                try {
+                    await updateDoc(doc(db, 'shopItems', item.id), { teacherName });
+                } catch (error) {
+                    console.warn('상점 물품 teacherName 업데이트 실패:', error);
+                }
+            }
+            return item.teacherName || '';
+        }
+
+        function buildPurchaseLogMessage(log) {
+            const studentName = log.studentName || '알 수 없는 학생';
+            if (log.teacherId && log.teacherName) {
+                teacherNameCache.set(log.teacherId, log.teacherName);
+            }
+            const cachedTeacherName = log.teacherName || (log.teacherId ? teacherNameCache.get(log.teacherId) : '') || '';
+            const teacherDisplay = cachedTeacherName ? `${cachedTeacherName} 교사` : '알 수 없는 교사';
+            const itemName = log.itemName || '상점 물품';
+            return `<span class="font-semibold">${studentName}</span>이 <span class="font-semibold">${teacherDisplay}</span>의 <span class="font-semibold">${itemName}</span>을 구매하였습니다.`;
+        }
+
+        function buildPurchaseLogPriceDetails(log) {
+            const finalPrice = Number(log.price);
+            const basePrice = Number(log.basePrice);
+            const warningCount = Number(log.warningTokenCount);
+            const multiplier = Number(log.priceMultiplier);
+            if (!Number.isFinite(finalPrice)) {
+                return '';
+            }
+            let detailText = `결제 금액: ${formatCurrency(finalPrice)}`;
+            const hasBase = Number.isFinite(basePrice);
+            const hasWarningPenalty = Number.isFinite(warningCount) && warningCount > 0;
+            const hasMultiplier = Number.isFinite(multiplier) && multiplier > 0;
+            if (hasWarningPenalty && hasBase && hasMultiplier) {
+                detailText += ` (원래 ${formatCurrency(basePrice)}, ${multiplier}배)`;
+            } else if (hasBase && basePrice !== finalPrice) {
+                detailText += ` (원래 ${formatCurrency(basePrice)})`;
+            }
+            return `<p class="text-xs text-gray-600">${detailText}</p>`;
+        }
+
         function showModal(title, message, onConfirm = null) {
             modalTitle.textContent = title;
             modalMessage.innerHTML = message;
-            
+
             // Clone and replace the button to remove old event listeners
             const newConfirmBtn = modalConfirmBtn.cloneNode(true);
             modalConfirmBtn.parentNode.replaceChild(newConfirmBtn, modalConfirmBtn);
@@ -2039,6 +2159,10 @@
                 calendarEl.classList.remove('hidden');
                 loadMyClass();
                 renderCalendar();
+                if (teacherPurchaseLogSection) {
+                    teacherPurchaseLogSection.classList.remove('hidden');
+                    loadTeacherPurchaseLog();
+                }
             } else {
                 walletSection.classList.remove('hidden');
                 marketSection.classList.remove('hidden');
@@ -2049,6 +2173,9 @@
                 classSection.classList.add('hidden');
                 calendarEl.classList.add('hidden');
                 renderTodayHomework();
+                if (teacherPurchaseLogSection) {
+                    teacherPurchaseLogSection.classList.add('hidden');
+                }
             }
 
             if (editStudentInfoBtn) {
@@ -2807,6 +2934,7 @@
         async function loadAndRenderShopItems() {
             const container = document.getElementById('shop-item-list');
             container.innerHTML = `<p class="col-span-full text-center text-gray-500">상점 물품을 불러오는 중입니다...</p>`;
+            shopItemsCache.clear();
             try {
                 const snapshot = await getDocs(collection(db, 'shopItems'));
                 if (snapshot.empty) {
@@ -2827,10 +2955,18 @@
                             console.warn('상점 물품 teacherId 업데이트 실패:', err);
                         }));
                     }
-                    items.push({ id: docSnap.id, ...raw, teacherId });
+                    const item = { id: docSnap.id, ...raw, teacherId };
+                    items.push(item);
+                    shopItemsCache.set(item.id, item);
+                    if (item.teacherName) {
+                        teacherNameCache.set(teacherId, item.teacherName);
+                    }
                 });
                 if (missingTeacherUpdates.length) {
                     await Promise.allSettled(missingTeacherUpdates);
+                }
+                if (items.length) {
+                    await Promise.allSettled(items.map(item => ensureItemTeacherName(item)));
                 }
 
                 let filteredItems = items;
@@ -2872,20 +3008,25 @@
                                 <span class="text-xs text-gray-600">주의 토큰 ${pricing.warningTokenCount}개로 ${pricing.multiplier}배</span>
                            </div>`
                         : `<span class="font-bold text-amber-600">${formatCurrency(pricing.basePrice)}</span>`;
+                    const teacherLabelHtml = item.teacherName
+                        ? `<p class="text-xs text-gray-400">${item.teacherName} 교사</p>`
+                        : '';
 
                     card.innerHTML = `
                         ${imageHtml}
                         <div class="flex flex-col flex-grow">
                             <h3 class="text-lg font-bold">${item.name}</h3>
+                            ${teacherLabelHtml}
                             <p class="text-sm text-gray-500 flex-grow my-2">${item.description || ''}</p>
                             <div class="flex justify-between items-center mt-4 gap-2">
                                 <div class="flex-1 text-left">
                                     ${priceInfoHtml}
                                 </div>
-                                <button data-itemid="${item.id}" data-itemname="${item.name}" data-itemprice="${pricing.basePrice}" class="buy-item-btn btn btn-primary px-3 py-1 text-sm" ${isAdminViewing ? 'disabled' : ''}>구매</button>
+                                <button data-itemid="${item.id}" class="buy-item-btn btn btn-primary px-3 py-1 text-sm" ${isAdminViewing ? 'disabled' : ''}>구매</button>
                             </div>
                             ${currentUserData?.role === 'teacher' ? `
-                            <div class="mt-2 flex justify-end space-x-2">
+                            <div class="mt-2 flex flex-wrap justify-end gap-2">
+                                <button data-itemid="${item.id}" class="distribute-item-btn btn bg-emerald-500 hover:bg-emerald-600 text-white text-xs px-2 py-1">배부</button>
                                 <button data-itemid="${item.id}" class="edit-item-btn btn bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-2 py-1">수정</button>
                                 <button data-itemid="${item.id}" class="delete-item-btn btn bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1">삭제</button>
                             </div>
@@ -2896,7 +3037,7 @@
                 });
 
                 container.querySelectorAll('.buy-item-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => handleBuyItem(e.target.dataset.itemid, e.target.dataset.itemname, e.target.dataset.itemprice));
+                    btn.addEventListener('click', (e) => handleBuyItem(e.target.dataset.itemid));
                 });
                 if (currentUserData?.role === 'teacher') {
                     container.querySelectorAll('.edit-item-btn').forEach(btn => {
@@ -2905,6 +3046,16 @@
                     container.querySelectorAll('.delete-item-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => deleteShopItem(e.target.dataset.itemid));
                     });
+                    container.querySelectorAll('.distribute-item-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            const item = shopItemsCache.get(e.target.dataset.itemid);
+                            if (!item) {
+                                showModal('오류', '상점 물품 정보를 찾을 수 없습니다.');
+                                return;
+                            }
+                            openShopDistributionModal(item);
+                        });
+                    });
                 }
             } catch (error) {
                 console.error("Error loading shop items: ", error);
@@ -2912,10 +3063,30 @@
             }
         }
 
-        async function handleBuyItem(itemId, itemName, itemPrice) {
+        async function handleBuyItem(itemId) {
             if (isAdminViewing) return;
             if (!currentUserData) return;
-            const pricing = calculatePriceWithWarningTokens(itemPrice, currentUserData);
+            let item = shopItemsCache.get(itemId);
+            if (!item) {
+                try {
+                    const itemSnap = await getDoc(doc(db, 'shopItems', itemId));
+                    if (itemSnap.exists()) {
+                        item = { id: itemSnap.id, ...itemSnap.data() };
+                        shopItemsCache.set(item.id, item);
+                    }
+                } catch (error) {
+                    console.error('상점 물품 조회 실패:', error);
+                }
+            }
+            if (!item) {
+                showModal('오류', '상점 물품 정보를 찾을 수 없습니다.');
+                return;
+            }
+            await ensureItemTeacherName(item);
+            const basePrice = Number(item.price);
+            const pricing = calculatePriceWithWarningTokens(basePrice, currentUserData);
+            const itemName = item.name || '상점 물품';
+            const teacherId = item.teacherId || DEFAULT_SHOP_TEACHER_ID;
             const confirmationMessage = pricing.warningTokenCount > 0
                 ? `"${itemName}"을(를) ${formatCurrency(pricing.adjustedPrice)}에 구매하시겠습니까?<br><span class="text-sm text-gray-600">원래 가격 ${formatCurrency(pricing.basePrice)} · 주의 토큰 ${pricing.warningTokenCount}개 → ${pricing.multiplier}배</span>`
                 : `"${itemName}"을(를) ${formatCurrency(pricing.adjustedPrice)}에 구매하시겠습니까?`;
@@ -2933,6 +3104,11 @@
                         transaction.update(userRef, { balance: increment(-pricing.adjustedPrice) });
                     });
 
+                    const teacherName = item.teacherName || await getTeacherNameById(teacherId);
+                    if (teacherName) {
+                        teacherNameCache.set(teacherId, teacherName);
+                        item.teacherName = teacherName;
+                    }
                     await addDoc(collection(db, 'purchaseLog'), {
                         studentId: currentUserData.id,
                         studentName: currentUserData.name,
@@ -2942,6 +3118,8 @@
                         basePrice: pricing.basePrice,
                         warningTokenCount: pricing.warningTokenCount,
                         priceMultiplier: pricing.multiplier,
+                        teacherId,
+                        teacherName: item.teacherName || '',
                         purchasedAt: serverTimestamp()
                     });
 
@@ -2967,6 +3145,285 @@
                     showModal('삭제 실패', `오류: ${error.message}`);
                 }
             });
+        }
+
+        function updateShopDistributionSelectAllState() {
+            if (!shopDistributionSelectAll) return;
+            if (!shopDistributionStudents.length) {
+                shopDistributionSelectAll.checked = false;
+                shopDistributionSelectAll.indeterminate = false;
+                shopDistributionSelectAll.disabled = true;
+                return;
+            }
+            const total = shopDistributionStudents.length;
+            const selectedCount = shopDistributionSelectedIds.size;
+            shopDistributionSelectAll.disabled = false;
+            if (selectedCount === 0) {
+                shopDistributionSelectAll.checked = false;
+                shopDistributionSelectAll.indeterminate = false;
+            } else if (selectedCount === total) {
+                shopDistributionSelectAll.checked = true;
+                shopDistributionSelectAll.indeterminate = false;
+            } else {
+                shopDistributionSelectAll.checked = false;
+                shopDistributionSelectAll.indeterminate = true;
+            }
+        }
+
+        function updateShopDistributionConfirmState() {
+            if (!shopDistributionConfirmBtn) return;
+            shopDistributionConfirmBtn.disabled = shopDistributionSelectedIds.size === 0;
+        }
+
+        function renderShopDistributionStudentList(filterTerm = '') {
+            if (!shopDistributionStudentList) return;
+            const term = (filterTerm || '').toLowerCase().trim();
+            shopDistributionStudentList.innerHTML = '';
+            const filtered = shopDistributionStudents.filter(student => {
+                if (!term) return true;
+                const name = (student.name || '').toLowerCase();
+                const code = String(student.userCode || '').toLowerCase();
+                return name.includes(term) || code.includes(term);
+            });
+            if (!filtered.length) {
+                shopDistributionStudentList.innerHTML = '<p class="text-sm text-gray-500 text-center">검색 결과가 없습니다.</p>';
+                updateShopDistributionSelectAllState();
+                updateShopDistributionConfirmState();
+                return;
+            }
+            filtered.forEach(student => {
+                const label = document.createElement('label');
+                label.className = 'flex items-center space-x-3 p-2 rounded hover:bg-gray-100';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'form-checkbox h-4 w-4 text-amber-600 focus:ring-amber-500';
+                checkbox.dataset.studentId = student.id;
+                checkbox.checked = shopDistributionSelectedIds.has(student.id);
+                checkbox.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        shopDistributionSelectedIds.add(student.id);
+                    } else {
+                        shopDistributionSelectedIds.delete(student.id);
+                    }
+                    updateShopDistributionSelectAllState();
+                    updateShopDistributionConfirmState();
+                });
+                const info = document.createElement('div');
+                info.className = 'flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between text-sm';
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = student.name;
+                const codeSpan = document.createElement('span');
+                codeSpan.className = 'text-xs text-gray-500 sm:ml-2';
+                codeSpan.textContent = student.userCode ? `코드: ${student.userCode}` : '';
+                info.appendChild(nameSpan);
+                info.appendChild(codeSpan);
+                label.appendChild(checkbox);
+                label.appendChild(info);
+                shopDistributionStudentList.appendChild(label);
+            });
+            updateShopDistributionSelectAllState();
+            updateShopDistributionConfirmState();
+        }
+
+        function closeShopDistributionModal() {
+            if (shopDistributionModal) {
+                shopDistributionModal.style.display = 'none';
+            }
+            currentShopItemForDistribution = null;
+            shopDistributionStudents = [];
+            shopDistributionSelectedIds.clear();
+            if (shopDistributionStudentList) {
+                shopDistributionStudentList.innerHTML = '';
+            }
+            if (shopDistributionSearch) {
+                shopDistributionSearch.value = '';
+            }
+            if (shopDistributionSelectAll) {
+                shopDistributionSelectAll.checked = false;
+                shopDistributionSelectAll.indeterminate = false;
+                shopDistributionSelectAll.disabled = true;
+            }
+            if (shopDistributionConfirmBtn) {
+                shopDistributionConfirmBtn.disabled = true;
+            }
+        }
+
+        async function openShopDistributionModal(item) {
+            if (!currentUserData || currentUserData.role !== 'teacher') {
+                showModal('오류', '교사만 상점 물품을 배부할 수 있습니다.');
+                return;
+            }
+            if (!item) {
+                showModal('오류', '상점 물품 정보를 찾을 수 없습니다.');
+                return;
+            }
+            currentShopItemForDistribution = item;
+            shopDistributionSelectedIds.clear();
+            if (shopDistributionTitle) {
+                shopDistributionTitle.textContent = '상점 물품 배부';
+            }
+            if (shopDistributionItemName) {
+                const priceLabel = Number.isFinite(Number(item.price)) ? ` (${formatCurrency(Number(item.price))})` : '';
+                shopDistributionItemName.textContent = `${item.name || '상점 물품'}${priceLabel}`;
+            }
+            if (shopDistributionSearch) {
+                shopDistributionSearch.value = '';
+            }
+            if (shopDistributionStudentList) {
+                shopDistributionStudentList.innerHTML = '<p class="text-sm text-gray-500 text-center">학생 목록을 불러오는 중입니다...</p>';
+            }
+            if (shopDistributionSelectAll) {
+                shopDistributionSelectAll.checked = false;
+                shopDistributionSelectAll.indeterminate = false;
+                shopDistributionSelectAll.disabled = true;
+            }
+            if (shopDistributionConfirmBtn) {
+                shopDistributionConfirmBtn.disabled = true;
+            }
+            if (shopDistributionModal) {
+                shopDistributionModal.style.display = 'flex';
+            }
+            try {
+                await ensureTeacherClassesLoaded();
+                updateMyClassStudentIds();
+                const studentIds = myClassStudentIds.slice();
+                if (!studentIds.length) {
+                    if (shopDistributionStudentList) {
+                        shopDistributionStudentList.innerHTML = '<p class="text-sm text-gray-500 text-center">내 학급 학생이 없습니다. 학급에 학생을 추가해주세요.</p>';
+                    }
+                    return;
+                }
+                const studentDocs = await Promise.all(studentIds.map(async (sid) => {
+                    try {
+                        const snap = await getDoc(doc(db, 'users', sid));
+                        if (!snap.exists()) return null;
+                        const data = snap.data() || {};
+                        return { id: sid, name: data.name || '이름 없음', userCode: data.userCode || '' };
+                    } catch (error) {
+                        console.error('학생 정보 로드 실패:', error);
+                        return null;
+                    }
+                }));
+                shopDistributionStudents = studentDocs.filter(Boolean).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko'));
+                if (!shopDistributionStudents.length) {
+                    if (shopDistributionStudentList) {
+                        shopDistributionStudentList.innerHTML = '<p class="text-sm text-gray-500 text-center">표시할 학생이 없습니다.</p>';
+                    }
+                    return;
+                }
+                renderShopDistributionStudentList();
+            } catch (error) {
+                console.error('학생 목록 로드 실패:', error);
+                if (shopDistributionStudentList) {
+                    shopDistributionStudentList.innerHTML = '<p class="text-red-500 text-sm text-center">학생 목록을 불러오는 중 문제가 발생했습니다.</p>';
+                }
+            }
+        }
+
+        async function distributeShopItemToStudents(studentIds) {
+            if (!Array.isArray(studentIds) || !studentIds.length) {
+                return { assignedCount: 0, skippedCount: 0, errors: [] };
+            }
+            if (!currentUserData || currentUserData.role !== 'teacher' || !currentShopItemForDistribution) {
+                throw new Error('배부할 물품 정보를 찾을 수 없습니다.');
+            }
+            const item = currentShopItemForDistribution;
+            const teacherId = currentUserData.id;
+            const teacherName = currentUserData.name || await getTeacherNameById(teacherId) || '';
+            teacherNameCache.set(teacherId, teacherName);
+            let assignedCount = 0;
+            let skippedCount = 0;
+            const errors = [];
+            for (const studentId of studentIds) {
+                try {
+                    const assignmentsRef = collection(db, `users/${studentId}/assignedShopItems`);
+                    const existingSnap = await getDocs(query(assignmentsRef, where('itemId', '==', item.id)));
+                    if (!existingSnap.empty) {
+                        skippedCount += 1;
+                        continue;
+                    }
+                    await addDoc(assignmentsRef, {
+                        itemId: item.id,
+                        itemName: item.name || '',
+                        itemPrice: Number(item.price) || 0,
+                        description: item.description || '',
+                        imageUrl: item.imageUrl || '',
+                        teacherId,
+                        teacherName,
+                        assignedAt: serverTimestamp()
+                    });
+                    assignedCount += 1;
+                } catch (error) {
+                    errors.push({ studentId, error });
+                    console.error('상점 물품 배부 실패:', error);
+                }
+            }
+            return { assignedCount, skippedCount, errors };
+        }
+
+        if (shopDistributionSelectAll) {
+            shopDistributionSelectAll.addEventListener('change', (e) => {
+                if (!shopDistributionStudents.length) {
+                    shopDistributionSelectAll.checked = false;
+                    shopDistributionSelectAll.indeterminate = false;
+                    return;
+                }
+                if (e.target.checked) {
+                    shopDistributionStudents.forEach(student => shopDistributionSelectedIds.add(student.id));
+                } else {
+                    shopDistributionStudents.forEach(student => shopDistributionSelectedIds.delete(student.id));
+                }
+                const searchTerm = shopDistributionSearch ? shopDistributionSearch.value : '';
+                renderShopDistributionStudentList(searchTerm);
+            });
+        }
+
+        if (shopDistributionSearch) {
+            shopDistributionSearch.addEventListener('input', (e) => {
+                renderShopDistributionStudentList(e.target.value);
+            });
+        }
+
+        if (shopDistributionConfirmBtn) {
+            shopDistributionConfirmBtn.addEventListener('click', async () => {
+                if (!currentShopItemForDistribution) return;
+                const studentIds = Array.from(shopDistributionSelectedIds);
+                if (!studentIds.length) {
+                    showModal('오류', '배부할 학생을 선택하세요.');
+                    return;
+                }
+                shopDistributionConfirmBtn.disabled = true;
+                try {
+                    const { assignedCount, skippedCount, errors } = await distributeShopItemToStudents(studentIds);
+                    closeShopDistributionModal();
+                    let message = `${assignedCount}명의 학생에게 배부했습니다.`;
+                    if (skippedCount > 0) {
+                        message += `<br>${skippedCount}명의 학생은 이미 동일한 물품이 배부되어 건너뛰었습니다.`;
+                    }
+                    if (errors.length) {
+                        message += `<br><span class="text-red-500">${errors.length}명의 학생에게 배부하지 못했습니다.</span>`;
+                    }
+                    showModal(errors.length ? '배부 완료 (일부 실패)' : '배부 완료', message);
+                } catch (error) {
+                    showModal('배부 실패', `오류: ${error.message}`);
+                } finally {
+                    if (shopDistributionConfirmBtn) {
+                        shopDistributionConfirmBtn.disabled = false;
+                    }
+                }
+            });
+        }
+
+        if (shopDistributionModal) {
+            shopDistributionModal.addEventListener('click', (e) => {
+                if (e.target === shopDistributionModal) {
+                    closeShopDistributionModal();
+                }
+            });
+        }
+
+        if (closeShopDistributionModalBtn) {
+            closeShopDistributionModalBtn.addEventListener('click', () => closeShopDistributionModal());
         }
 
         // --- Admin Shop Management ---
@@ -2997,12 +3454,14 @@
             e.preventDefault();
             const itemId = document.getElementById('shop-item-id').value;
             const teacherId = document.getElementById('shop-item-teacher-id').value || currentUserData?.id || DEFAULT_SHOP_TEACHER_ID;
+            const teacherName = currentUserData?.name || '';
             const data = {
                 name: document.getElementById('shop-item-name').value,
                 price: Number(document.getElementById('shop-item-price').value),
                 description: document.getElementById('shop-item-desc').value,
                 imageUrl: document.getElementById('shop-item-image-url').value,
-                teacherId
+                teacherId,
+                teacherName
             };
             if (itemId) {
                 await updateDoc(doc(db, "shopItems", itemId), data);
@@ -3098,6 +3557,48 @@
                 });
             } else {
                  lifeRuleList.innerHTML = '<p class="text-xs text-gray-500">배부된 생활 규칙이 없습니다.</p>';
+            }
+
+            const shopItemList = document.getElementById('adjust-modal-shop-items');
+            if (shopItemList) {
+                shopItemList.innerHTML = '';
+                try {
+                    const assignedShopSnapshot = await getDocs(query(collection(db, `users/${studentId}/assignedShopItems`), orderBy('assignedAt', 'desc')));
+                    if (assignedShopSnapshot.empty) {
+                        shopItemList.innerHTML = '<p class="text-xs text-gray-500">배부된 상점 물품이 없습니다.</p>';
+                    } else {
+                        assignedShopSnapshot.forEach(itemDoc => {
+                            const item = { id: itemDoc.id, ...itemDoc.data() };
+                            const details = [];
+                            if (item.teacherName) {
+                                details.push(`${item.teacherName} 교사`);
+                            }
+                            if (Number.isFinite(Number(item.itemPrice))) {
+                                details.push(formatCurrency(Number(item.itemPrice)));
+                            }
+                            if (item.assignedAt && typeof item.assignedAt.toDate === 'function') {
+                                details.push(item.assignedAt.toDate().toLocaleString('ko-KR'));
+                            }
+                            const metaHtml = details.length ? `<p class="text-xs text-gray-500">${details.join(' · ')}</p>` : '';
+                            const actionHtml = currentUserData?.role === 'teacher'
+                                ? `<button data-shopassignmentid="${item.id}" class="delete-shop-assignment-btn text-xs bg-red-500 text-white px-2 py-1 rounded">삭제</button>`
+                                : '';
+                            const wrapper = document.createElement('div');
+                            wrapper.className = 'flex justify-between items-center bg-gray-100 p-2 rounded';
+                            wrapper.innerHTML = `
+                                <div>
+                                    <p>${item.itemName || '상점 물품'}</p>
+                                    ${metaHtml}
+                                </div>
+                                ${actionHtml}
+                            `;
+                            shopItemList.appendChild(wrapper);
+                        });
+                    }
+                } catch (error) {
+                    console.error('Assigned shop items load error:', error);
+                    shopItemList.innerHTML = '<p class="text-xs text-red-500">상점 물품을 불러오는 중 오류가 발생했습니다.</p>';
+                }
             }
 
             adjustStudentModal.style.display = 'flex';
@@ -3210,10 +3711,21 @@
                 openAdjustModal(studentToAdjustId); // Refresh modal
             }));
 
-             document.querySelectorAll('.delete-lr-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+            document.querySelectorAll('.delete-lr-btn').forEach(btn => btn.addEventListener('click', async (e) => {
                 const lrId = e.target.dataset.lrid;
                 await deleteDoc(doc(db, `users/${studentToAdjustId}/assignedLifeRules`, lrId));
                 openAdjustModal(studentToAdjustId); // Refresh modal
+            }));
+
+            document.querySelectorAll('.delete-shop-assignment-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                const assignmentId = e.target.dataset.shopassignmentid;
+                if (!assignmentId) return;
+                try {
+                    await deleteDoc(doc(db, `users/${studentToAdjustId}/assignedShopItems`, assignmentId));
+                    openAdjustModal(studentToAdjustId);
+                } catch (error) {
+                    showModal('오류', `상점 물품을 삭제하는 중 문제가 발생했습니다: ${error.message}`);
+                }
             }));
         }
 
@@ -6449,32 +6961,24 @@
                     return;
                 }
                 logEl.innerHTML = '';
-                logSnapshot.forEach(logDoc => {
-                    const log = logDoc.data();
+                const logs = logSnapshot.docs.map(logDoc => ({ id: logDoc.id, ...logDoc.data() }));
+                await Promise.all(logs.map(async (log) => {
+                    if (!log.teacherName && log.teacherId) {
+                        log.teacherName = await getTeacherNameById(log.teacherId);
+                    } else if (log.teacherId && log.teacherName) {
+                        teacherNameCache.set(log.teacherId, log.teacherName);
+                    }
+                }));
+                logs.forEach(log => {
                     const li = document.createElement('li');
                     li.className = "border-b pb-2 mb-2";
-                    const finalPrice = Number(log.price);
-                    const hasFinalPrice = Number.isFinite(finalPrice);
-                    const basePrice = Number(log.basePrice);
-                    const hasBasePrice = Number.isFinite(basePrice);
-                    const warningCount = Number(log.warningTokenCount);
-                    const hasWarningPenalty = Number.isFinite(warningCount) && warningCount > 0;
-                    const multiplier = Number(log.priceMultiplier);
-                    const hasMultiplier = Number.isFinite(multiplier) && multiplier > 0;
-                    let priceDetails = '';
-                    if (hasFinalPrice) {
-                        let detailText = `결제 금액: ${formatCurrency(finalPrice)}`;
-                        if (hasWarningPenalty && hasBasePrice && hasMultiplier) {
-                            detailText += ` (원래 ${formatCurrency(basePrice)}, ${multiplier}배)`;
-                        } else if (hasBasePrice && basePrice !== finalPrice) {
-                            detailText += ` (원래 ${formatCurrency(basePrice)})`;
-                        }
-                        priceDetails = `<p class="text-xs text-gray-600">${detailText}</p>`;
-                    }
+                    const timestampHtml = log.purchasedAt && typeof log.purchasedAt.toDate === 'function'
+                        ? `<p class="text-xs text-gray-500">${log.purchasedAt.toDate().toLocaleString('ko-KR')}</p>`
+                        : '';
                     li.innerHTML = `
-                        <p><span class="font-semibold">${log.studentName}</span> 학생이 <span class="font-semibold">${log.itemName}</span> 구매</p>
-                        ${priceDetails}
-                        <p class="text-xs text-gray-500">${log.purchasedAt.toDate().toLocaleString('ko-KR')}</p>
+                        <p>${buildPurchaseLogMessage(log)}</p>
+                        ${buildPurchaseLogPriceDetails(log)}
+                        ${timestampHtml}
                     `;
                     logEl.appendChild(li);
                 });
@@ -6493,6 +6997,66 @@
                     </li>
                 `;
             }
+        }
+
+        async function loadTeacherPurchaseLog() {
+            if (!currentUserData || currentUserData.role !== 'teacher') return;
+            if (!teacherPurchaseLogSection || !teacherPurchaseLogList) return;
+            if (teacherPurchaseLogLoading) {
+                teacherPurchaseLogLoading.classList.remove('hidden');
+            }
+            if (teacherPurchaseLogEmpty) {
+                teacherPurchaseLogEmpty.classList.add('hidden');
+            }
+            teacherPurchaseLogList.innerHTML = '';
+            try {
+                const q = query(
+                    collection(db, 'purchaseLog'),
+                    where('teacherId', '==', currentUserData.id),
+                    orderBy('purchasedAt', 'desc')
+                );
+                const snapshot = await getDocs(q);
+                if (snapshot.empty) {
+                    if (teacherPurchaseLogEmpty) {
+                        teacherPurchaseLogEmpty.classList.remove('hidden');
+                    }
+                    return;
+                }
+                const logs = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+                await Promise.all(logs.map(async (log) => {
+                    if (!log.teacherName && log.teacherId) {
+                        log.teacherName = await getTeacherNameById(log.teacherId);
+                    } else if (log.teacherId && log.teacherName) {
+                        teacherNameCache.set(log.teacherId, log.teacherName);
+                    }
+                }));
+                logs.forEach(log => {
+                    const li = document.createElement('li');
+                    li.className = 'border-b pb-2';
+                    const timestampHtml = log.purchasedAt && typeof log.purchasedAt.toDate === 'function'
+                        ? `<p class="text-xs text-gray-500">${log.purchasedAt.toDate().toLocaleString('ko-KR')}</p>`
+                        : '';
+                    li.innerHTML = `
+                        <p>${buildPurchaseLogMessage(log)}</p>
+                        ${buildPurchaseLogPriceDetails(log)}
+                        ${timestampHtml}
+                    `;
+                    teacherPurchaseLogList.appendChild(li);
+                });
+            } catch (error) {
+                console.error('Error loading teacher purchase log:', error);
+                teacherPurchaseLogList.innerHTML = '<li class="text-red-500 text-sm text-center">구매 기록을 불러오지 못했습니다.</li>';
+            } finally {
+                if (teacherPurchaseLogLoading) {
+                    teacherPurchaseLogLoading.classList.add('hidden');
+                }
+            }
+        }
+
+        if (refreshTeacherPurchaseLogBtn) {
+            refreshTeacherPurchaseLogBtn.addEventListener('click', () => {
+                loadTeacherPurchaseLog();
+            });
         }
 
         async function loadSignupLog() {
