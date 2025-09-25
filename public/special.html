@@ -4631,30 +4631,65 @@ ${JSON.stringify(entry.aiData, null, 2)}
             isLoadingSharedBehaviors = true;
             behaviorSharedList.innerHTML = '<p class="text-sm text-gray-500">공유 받은 행동 기록을 불러오는 중입니다...</p>';
             try {
-                const sharedQuery = query(collectionGroup(db, 'behaviors'), where('sharedWith', 'array-contains', user.uid));
-                const snapshot = await getDocs(sharedQuery);
-                sharedBehaviorEntries = snapshot.docs.map(docSnap => {
-                    const data = docSnap.data();
-                    const ownerRef = docSnap.ref.parent?.parent;
-                    const ownerId = ownerRef?.id || data.ownerId || '';
-                    return {
-                        id: docSnap.id,
-                        ownerId,
-                        studentId: data.studentId || '',
-                        studentName: data.studentName || data.studentId || '',
-                        title: data.title || '',
-                        operationalDefinition: data.operationalDefinition || '',
-                        useReinforcer: !!data.useReinforcer,
-                        useAttentionToken: !!data.useAttentionToken,
-                        sharedWith: Array.isArray(data.sharedWith) ? data.sharedWith : [],
-                        createdAt: data.createdAt,
-                    };
-                });
-                sharedBehaviorEntries.sort((a, b) => {
-                    const aTime = a.createdAt?.toMillis?.() || 0;
-                    const bTime = b.createdAt?.toMillis?.() || 0;
-                    return bTime - aTime;
-                });
+                const sharedInboxRef = collection(db, 'users', user.uid, 'sharedBehaviors');
+                const sharedInboxSnapshot = await getDocs(query(sharedInboxRef, orderBy('sharedAt', 'desc')));
+                const inboxEntries = sharedInboxSnapshot.docs
+                    .map(docSnap => {
+                        const data = docSnap.data();
+                        const ownerId = data.ownerId || '';
+                        const behaviorId = data.behaviorId || '';
+                        return {
+                            id: behaviorId || docSnap.id,
+                            ownerId,
+                            studentId: data.studentId || '',
+                            studentName: data.studentName || data.studentId || '',
+                            title: data.title || '',
+                            operationalDefinition: data.operationalDefinition || '',
+                            useReinforcer: !!data.useReinforcer,
+                            useAttentionToken: !!data.useAttentionToken,
+                            sharedWith: Array.isArray(data.sharedWith) ? data.sharedWith : [],
+                            createdAt: data.createdAt,
+                            sharedAt: data.sharedAt || data.updatedAt || data.createdAt,
+                        };
+                    })
+                    .filter(entry => entry.id && entry.ownerId);
+                sharedBehaviorEntries = inboxEntries;
+
+                if (!sharedBehaviorEntries.length) {
+                    const legacyQuery = query(collectionGroup(db, 'behaviors'), where('sharedWith', 'array-contains', user.uid));
+                    const snapshot = await getDocs(legacyQuery);
+                    sharedBehaviorEntries = snapshot.docs.map(docSnap => {
+                        const data = docSnap.data();
+                        const ownerRef = docSnap.ref.parent?.parent;
+                        const ownerId = ownerRef?.id || data.ownerId || '';
+                        return {
+                            id: docSnap.id,
+                            ownerId,
+                            studentId: data.studentId || '',
+                            studentName: data.studentName || data.studentId || '',
+                            title: data.title || '',
+                            operationalDefinition: data.operationalDefinition || '',
+                            useReinforcer: !!data.useReinforcer,
+                            useAttentionToken: !!data.useAttentionToken,
+                            sharedWith: Array.isArray(data.sharedWith) ? data.sharedWith : [],
+                            createdAt: data.createdAt,
+                        };
+                    });
+                    sharedBehaviorEntries.sort((a, b) => {
+                        const aTime = a.createdAt?.toMillis?.() || 0;
+                        const bTime = b.createdAt?.toMillis?.() || 0;
+                        return bTime - aTime;
+                    });
+                    if (sharedBehaviorEntries.length) {
+                        await Promise.allSettled(sharedBehaviorEntries.map(entry => cacheSharedBehaviorEntry(user.uid, entry)));
+                    }
+                } else {
+                    sharedBehaviorEntries.sort((a, b) => {
+                        const aTime = a.sharedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
+                        const bTime = b.sharedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+                        return bTime - aTime;
+                    });
+                }
                 if (currentBehaviorSource === 'shared') {
                     const stillExists = sharedBehaviorEntries.some(entry => entry.id === currentBehaviorEntry?.id && entry.ownerId === currentBehaviorOwnerId);
                     if (!stillExists) {
@@ -4673,6 +4708,33 @@ ${JSON.stringify(entry.aiData, null, 2)}
                 }
             } finally {
                 isLoadingSharedBehaviors = false;
+            }
+        }
+
+        function getSharedBehaviorDocId(ownerId, behaviorId) {
+            return `${ownerId}_${behaviorId}`;
+        }
+
+        async function cacheSharedBehaviorEntry(recipientId, entry) {
+            try {
+                const docId = getSharedBehaviorDocId(entry.ownerId, entry.id);
+                const sharedRef = doc(db, 'users', recipientId, 'sharedBehaviors', docId);
+                await setDoc(sharedRef, {
+                    ownerId: entry.ownerId,
+                    behaviorId: entry.id,
+                    studentId: entry.studentId || '',
+                    studentName: entry.studentName || '',
+                    title: entry.title || '',
+                    operationalDefinition: entry.operationalDefinition || '',
+                    useReinforcer: !!entry.useReinforcer,
+                    useAttentionToken: !!entry.useAttentionToken,
+                    sharedWith: Array.isArray(entry.sharedWith) ? entry.sharedWith : [],
+                    createdAt: entry.createdAt || serverTimestamp(),
+                    sharedAt: entry.sharedAt || entry.createdAt || serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                }, { merge: true });
+            } catch (error) {
+                console.warn('Failed to cache shared behavior entry', error);
             }
         }
 
@@ -4757,6 +4819,7 @@ ${JSON.stringify(entry.aiData, null, 2)}
             if (!user || !currentBehaviorEntry || currentBehaviorOwnerId !== user.uid || !behaviorShareUserList) return;
             if (isUpdatingBehaviorShare) return;
             const selectedIds = Array.from(behaviorShareUserList.querySelectorAll('input[type="checkbox"]:checked')).map(input => input.value);
+            const previousSharedWith = Array.isArray(currentBehaviorEntry.sharedWith) ? [...currentBehaviorEntry.sharedWith] : [];
             isUpdatingBehaviorShare = true;
             if (behaviorShareConfirmBtn) behaviorShareConfirmBtn.disabled = true;
             try {
@@ -4770,6 +4833,7 @@ ${JSON.stringify(entry.aiData, null, 2)}
                 if (entryIndex !== -1) {
                     behaviorEntries[entryIndex].sharedWith = selectedIds;
                 }
+                await syncSharedBehaviorInbox(user.uid, selectedIds, previousSharedWith);
                 showToast('공유 설정이 저장되었습니다.');
                 closeBehaviorShareModal();
                 loadSharedBehaviors();
@@ -4779,6 +4843,46 @@ ${JSON.stringify(entry.aiData, null, 2)}
             } finally {
                 isUpdatingBehaviorShare = false;
                 if (behaviorShareConfirmBtn) behaviorShareConfirmBtn.disabled = false;
+            }
+        }
+
+        async function syncSharedBehaviorInbox(ownerId, selectedIds, previousSharedWith) {
+            if (!currentBehaviorEntry || !Array.isArray(selectedIds)) return;
+            const tasks = [];
+            const uniqueSelected = selectedIds.filter((teacherId, index, arr) => teacherId && arr.indexOf(teacherId) === index && teacherId !== ownerId);
+            const removed = Array.isArray(previousSharedWith)
+                ? previousSharedWith.filter(id => id && id !== ownerId && !uniqueSelected.includes(id))
+                : [];
+
+            const payload = {
+                ownerId,
+                behaviorId: currentBehaviorEntry.id,
+                studentId: currentBehaviorEntry.studentId || '',
+                studentName: currentBehaviorEntry.studentName || '',
+                title: currentBehaviorEntry.title || '',
+                operationalDefinition: currentBehaviorEntry.operationalDefinition || '',
+                useReinforcer: !!currentBehaviorEntry.useReinforcer,
+                useAttentionToken: !!currentBehaviorEntry.useAttentionToken,
+                sharedWith: uniqueSelected,
+                createdAt: currentBehaviorEntry.createdAt || serverTimestamp(),
+                sharedAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            };
+
+            uniqueSelected.forEach(teacherId => {
+                const docId = getSharedBehaviorDocId(ownerId, currentBehaviorEntry.id);
+                const sharedRef = doc(db, 'users', teacherId, 'sharedBehaviors', docId);
+                tasks.push(setDoc(sharedRef, payload, { merge: true }));
+            });
+
+            removed.forEach(teacherId => {
+                const docId = getSharedBehaviorDocId(ownerId, currentBehaviorEntry.id);
+                const sharedRef = doc(db, 'users', teacherId, 'sharedBehaviors', docId);
+                tasks.push(deleteDoc(sharedRef).catch(() => {}));
+            });
+
+            if (tasks.length) {
+                await Promise.allSettled(tasks);
             }
         }
 
