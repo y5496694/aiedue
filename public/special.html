@@ -196,6 +196,24 @@
             text-align: center;
             position: relative;
         }
+        .markdown-table-remove-column {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: 9999px;
+            border: none;
+            background: transparent;
+            color: #ef4444;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .markdown-table-remove-column:hover {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+        }
         .iep-cover-footer {
             margin-top: auto;
             font-weight: 500;
@@ -2663,13 +2681,14 @@ ${JSON.stringify(entry.aiData, null, 2)}
             const rows = lines.slice(2).map(line => line.split('|').slice(1, -1).map(s => s.trim()));
             const firstColWidth = 20;
             const otherColWidth = headers.length > 1 ? (80 / (headers.length - 1)) : 80;
-            const firstWidthStyle = `style="width: ${firstColWidth}%"`;
+            const firstWidthStyle = `style="width: ${headers.length === 1 ? 100 : firstColWidth}%"`;
             const otherWidthStyle = headers.length > 1 ? `style="width: ${otherColWidth.toFixed(2)}%"` : '';
-            let html = '<table class="min-w-full border border-gray-300 text-sm"><thead><tr>';
+            let html = '<table data-markdown-table="true" class="min-w-full border border-gray-300 text-sm"><thead><tr>';
             headers.forEach((h, idx) => {
                 const widthStyle = idx === 0 ? firstWidthStyle : otherWidthStyle;
                 const widthAttr = widthStyle ? `${widthStyle} ` : '';
-                html += `<th ${widthAttr}class="border px-2 py-1 bg-gray-100">${h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</th>`;
+                const headerContent = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+                html += `<th ${widthAttr}class="border px-2 py-1 bg-gray-100"><div class="flex items-center gap-1"><button type="button" class="markdown-table-remove-column" title="열 삭제" aria-label="열 삭제">×</button><span class="flex-1">${headerContent}</span></div></th>`;
             });
             html += '</tr></thead><tbody>';
             rows.forEach(row => {
@@ -2684,6 +2703,46 @@ ${JSON.stringify(entry.aiData, null, 2)}
             html += '</tbody></table>';
             return html;
         }
+
+        function adjustMarkdownTableColumnWidths(table) {
+            const rows = table ? Array.from(table.querySelectorAll('tr')) : [];
+            if (!rows.length) return;
+            const headerRow = table.querySelector('thead tr') || rows[0];
+            const colCount = headerRow ? headerRow.children.length : 0;
+            if (!colCount) return;
+            const firstColWidth = colCount === 1 ? 100 : 20;
+            const otherColWidth = colCount > 1 ? 80 / (colCount - 1) : 0;
+            rows.forEach(row => {
+                Array.from(row.children).forEach((cell, idx) => {
+                    if (colCount === 1) {
+                        cell.style.width = '100%';
+                    } else if (idx === 0) {
+                        cell.style.width = `${firstColWidth}%`;
+                    } else {
+                        cell.style.width = `${otherColWidth.toFixed(2)}%`;
+                    }
+                });
+            });
+        }
+
+        document.addEventListener('click', (event) => {
+            const button = event.target.closest('.markdown-table-remove-column');
+            if (!button) return;
+            const th = button.closest('th');
+            if (!th) return;
+            const table = th.closest('table');
+            if (!table || table.dataset.markdownTable !== 'true') return;
+            const row = th.parentElement;
+            const colIndex = Array.from(row.children).indexOf(th);
+            if (colIndex < 0) return;
+            table.querySelectorAll('tr').forEach(rowElement => {
+                const cell = rowElement.children[colIndex];
+                if (cell) {
+                    cell.remove();
+                }
+            });
+            adjustMarkdownTableColumnWidths(table);
+        });
 
         function setButtonState(btn, state) {
             btn.dataset.state = state;
