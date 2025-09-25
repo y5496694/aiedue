@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -220,6 +221,43 @@
         }
         .iep-page + .iep-page {
             margin-top: 1.5rem;
+        }
+        .major-eval-page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            padding: 20mm;
+            background-color: #ffffff;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.1);
+            box-sizing: border-box;
+            position: relative;
+        }
+        .major-eval-page + .major-eval-page {
+            margin-top: 1.5rem;
+        }
+        .major-eval-copy-btn {
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1px solid #bae6fd;
+            color: #0284c7;
+            background-color: #f8fafc;
+            border-radius: 0.375rem;
+            padding: 0.35rem 0.75rem;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+        }
+        .major-eval-copy-btn:hover {
+            background-color: #e0f2fe;
+            border-color: #7dd3fc;
+        }
+        @media print {
+            .major-eval-page {
+                box-shadow: none;
+                page-break-after: always;
+            }
+            .major-eval-page:last-child {
+                page-break-after: auto;
+            }
         }
     </style>
 </head>
@@ -472,7 +510,12 @@
                                     </div>
                                     <button type="button" id="major-eval-generate-btn" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2 rounded">생성</button>
                                 </div>
-                                <div id="major-eval-modify-section" class="hidden space-y-3">
+                                <div id="major-eval-upload-section" class="hidden space-y-2">
+                                    <button type="button" id="major-eval-upload-btn" class="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold px-3 py-2 rounded transition disabled:opacity-60 disabled:cursor-not-allowed">예시 파일 업로드</button>
+                                    <p id="major-eval-upload-info" class="text-xs text-gray-500 hidden"></p>
+                                    <input type="file" id="major-eval-upload-input" accept="application/pdf" class="hidden">
+                                </div>
+                                <div id="major-eval-modify-section" class="hidden space-y-6">
                                     <h4 class="text-base font-semibold">수정 테이블</h4>
                                     <p class="text-xs text-gray-500">수정 내용을 입력하고 엔터 또는 수정 버튼을 눌러주세요.</p>
                                     <textarea id="major-eval-modify-input" class="w-full border border-gray-300 rounded-md p-2 text-sm" rows="4" placeholder="예: 3번 문항을 난이도를 낮추어 수정해줘"></textarea>
@@ -709,6 +752,10 @@
         const majorEvalGenerateBtn = document.getElementById('major-eval-generate-btn');
         const majorEvalModifyInput = document.getElementById('major-eval-modify-input');
         const majorEvalModifyBtn = document.getElementById('major-eval-modify-btn');
+        const majorEvalUploadSection = document.getElementById('major-eval-upload-section');
+        const majorEvalUploadBtn = document.getElementById('major-eval-upload-btn');
+        const majorEvalUploadInput = document.getElementById('major-eval-upload-input');
+        const majorEvalUploadInfo = document.getElementById('major-eval-upload-info');
         const majorEvalModal = document.getElementById('major-eval-modal');
         const majorEvalModalTitle = document.getElementById('major-eval-modal-title');
         const majorEvalModalCancel = document.getElementById('major-eval-modal-cancel');
@@ -737,11 +784,19 @@
         let behaviorChartInstance = null;
         let currentUserProfile = null;
         let isLoadingHomeData = false;
+        const MAJOR_EVAL_STORAGE_KEY = 'aiedue:major-eval:entries:v1';
+        const MAJOR_EVAL_ACTIVE_STORAGE_KEY = 'aiedue:major-eval:active';
+        const PDFJS_WORKER_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         let majorEvalEntries = [];
         let activeMajorEvalId = '';
         let activeTemplateCategory = '';
         let isMajorEvalGenerating = false;
         let isMajorEvalModifying = false;
+        let isMajorEvalUploading = false;
+
+        if (typeof window !== 'undefined' && typeof pdfjsLib !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC;
+        }
 
         // --- AUTHENTICATION ---
         const authSections = {
@@ -1362,6 +1417,146 @@
             }
         }
 
+        function generateMajorEvalId() {
+            return `major-eval-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        }
+
+        function ensureMajorEvalEntryShape(entry) {
+            if (!entry || typeof entry !== 'object') {
+                return null;
+            }
+            const baseDetails = {
+                schoolName: '대전해듬학교',
+                domain: '',
+                numQuestions: 5,
+                evaluationTopic: '',
+                admissionYear: '2025',
+            };
+            const details = Object.assign({}, baseDetails, typeof entry.details === 'object' && entry.details ? entry.details : {});
+            details.numQuestions = Number(details.numQuestions) > 0 ? Number(details.numQuestions) : baseDetails.numQuestions;
+            const normalized = {
+                id: typeof entry.id === 'string' && entry.id ? entry.id : generateMajorEvalId(),
+                title: typeof entry.title === 'string' && entry.title.trim() ? entry.title.trim() : '새 심사표',
+                details,
+                aiData: Array.isArray(entry.aiData) ? entry.aiData.map(item => ({
+                    content: typeof item?.content === 'string' ? item.content : '',
+                    materials: typeof item?.materials === 'string' ? item.materials : '',
+                })) : [],
+                pdfContext: typeof entry.pdfContext === 'string' ? entry.pdfContext : '',
+                pdfFileName: typeof entry.pdfFileName === 'string' ? entry.pdfFileName : '',
+            };
+            return normalized;
+        }
+
+        function saveMajorEvalEntries() {
+            if (typeof window === 'undefined' || !window.localStorage) return;
+            try {
+                const payload = majorEvalEntries.map(entry => ({
+                    id: entry.id,
+                    title: entry.title,
+                    details: {
+                        schoolName: entry.details?.schoolName || '',
+                        domain: entry.details?.domain || '',
+                        numQuestions: Number(entry.details?.numQuestions) || (entry.aiData?.length || 5),
+                        evaluationTopic: entry.details?.evaluationTopic || '',
+                        admissionYear: entry.details?.admissionYear || '2025',
+                    },
+                    aiData: Array.isArray(entry.aiData) ? entry.aiData : [],
+                    pdfContext: entry.pdfContext || '',
+                    pdfFileName: entry.pdfFileName || '',
+                }));
+                localStorage.setItem(MAJOR_EVAL_STORAGE_KEY, JSON.stringify(payload));
+                if (activeMajorEvalId) {
+                    localStorage.setItem(MAJOR_EVAL_ACTIVE_STORAGE_KEY, activeMajorEvalId);
+                } else {
+                    localStorage.removeItem(MAJOR_EVAL_ACTIVE_STORAGE_KEY);
+                }
+            } catch (error) {
+                console.error('Failed to save major evaluation entries', error);
+            }
+        }
+
+        function loadMajorEvalEntries() {
+            if (typeof window === 'undefined' || !window.localStorage) return;
+            try {
+                const stored = localStorage.getItem(MAJOR_EVAL_STORAGE_KEY);
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (Array.isArray(parsed)) {
+                        majorEvalEntries = parsed
+                            .map(ensureMajorEvalEntryShape)
+                            .filter(Boolean);
+                    }
+                }
+                const savedActive = localStorage.getItem(MAJOR_EVAL_ACTIVE_STORAGE_KEY);
+                if (savedActive) {
+                    activeMajorEvalId = savedActive;
+                }
+            } catch (error) {
+                console.error('Failed to load major evaluation entries', error);
+                majorEvalEntries = [];
+            }
+            renderMajorEvalList();
+            updateMajorEvalWorkspace();
+            saveMajorEvalEntries();
+        }
+
+        function getMajorEvalPdfContext(entry, maxLength = 1800) {
+            const raw = (entry?.pdfContext || '').replace(/\s+/g, ' ').trim();
+            if (!raw) return '';
+            if (raw.length <= maxLength) return raw;
+            return `${raw.slice(0, maxLength)}...`;
+        }
+
+        function escapeCssSelector(value) {
+            if (typeof value !== 'string') return '';
+            if (window.CSS && typeof window.CSS.escape === 'function') {
+                return window.CSS.escape(value);
+            }
+            return value.replace(/[^a-zA-Z0-9_-]/g, match => `\\${match}`);
+        }
+
+        async function copyHtmlToClipboard(html) {
+            if (!html) return;
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                await navigator.clipboard.writeText(html);
+                return;
+            }
+            const textarea = document.createElement('textarea');
+            textarea.value = html;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+        }
+
+        async function extractTextFromPdf(file) {
+            if (!file) return '';
+            if (typeof pdfjsLib === 'undefined') {
+                throw new Error('pdfjsLib is not available');
+            }
+            const arrayBuffer = await file.arrayBuffer();
+            const uint8Array = new Uint8Array(arrayBuffer);
+            const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
+            let text = '';
+            for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+                const page = await pdf.getPage(pageNumber);
+                const content = await page.getTextContent();
+                const pageText = content.items
+                    .map(item => (typeof item.str === 'string' ? item.str : ''))
+                    .join(' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                if (pageText) {
+                    text += pageText + '\n';
+                }
+            }
+            return text.replace(/\s+\n/g, '\n').trim();
+        }
+
         function getActiveMajorEvalEntry() {
             return majorEvalEntries.find(entry => entry.id === activeMajorEvalId) || null;
         }
@@ -1375,30 +1570,70 @@
             if (!majorEvalEntries.length) {
                 activeMajorEvalId = '';
                 if (majorEvalEmpty) majorEvalEmpty.classList.remove('hidden');
+                if (majorEvalUploadSection) majorEvalUploadSection.classList.add('hidden');
                 return;
             }
 
             if (majorEvalEmpty) majorEvalEmpty.classList.add('hidden');
+            if (majorEvalUploadSection) majorEvalUploadSection.classList.remove('hidden');
 
-            majorEvalEntries.forEach(entry => {
+            majorEvalEntries.forEach((entry, index) => {
+                const normalizedEntry = ensureMajorEvalEntryShape(entry);
+                if (!normalizedEntry) return;
+                majorEvalEntries[index] = normalizedEntry;
                 const li = document.createElement('li');
+                li.className = 'flex items-center gap-2';
+
                 const button = document.createElement('button');
                 button.type = 'button';
-                button.dataset.entryId = entry.id;
-                button.className = `w-full text-left px-3 py-2 rounded border transition ${entry.id === activeMajorEvalId ? 'border-sky-500 bg-sky-50 text-sky-700' : 'border-gray-200 hover:border-sky-400 hover:bg-sky-50'}`;
-                const statusBadge = entry.aiData && entry.aiData.length ? '<span class="text-xs font-medium text-emerald-600">완료</span>' : '';
+                button.dataset.entryId = normalizedEntry.id;
+                button.dataset.role = 'select-major-eval';
+                button.className = `flex-1 text-left px-3 py-2 rounded border transition ${normalizedEntry.id === activeMajorEvalId ? 'border-sky-500 bg-sky-50 text-sky-700' : 'border-gray-200 hover:border-sky-400 hover:bg-sky-50'}`;
+
+                const badges = [];
+                if (normalizedEntry.pdfFileName) {
+                    badges.push('<span class="text-xs font-medium text-sky-600">PDF</span>');
+                }
+                if (normalizedEntry.aiData && normalizedEntry.aiData.length) {
+                    badges.push('<span class="text-xs font-medium text-emerald-600">완료</span>');
+                }
+                const badgeHtml = badges.length ? `<span class="flex items-center gap-1">${badges.join('')}</span>` : '';
+
                 button.innerHTML = `
                     <div class="flex items-center justify-between gap-2">
-                        <span class="truncate">${escapeHtml(entry.title)}</span>
-                        ${statusBadge}
+                        <span class="truncate">${escapeHtml(normalizedEntry.title)}</span>
+                        ${badgeHtml}
                     </div>
                 `;
+
+                const actions = document.createElement('div');
+                actions.className = 'flex items-center gap-1 shrink-0';
+
+                const renameBtn = document.createElement('button');
+                renameBtn.type = 'button';
+                renameBtn.dataset.action = 'rename';
+                renameBtn.dataset.entryId = normalizedEntry.id;
+                renameBtn.className = 'text-xs text-slate-500 hover:text-sky-600 px-2 py-1 rounded border border-transparent hover:border-sky-200 transition';
+                renameBtn.textContent = '이름 변경';
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.dataset.action = 'delete';
+                deleteBtn.dataset.entryId = normalizedEntry.id;
+                deleteBtn.className = 'text-xs text-red-500 hover:text-red-600 px-2 py-1 rounded border border-transparent hover:border-red-200 transition';
+                deleteBtn.textContent = '삭제';
+
+                actions.appendChild(renameBtn);
+                actions.appendChild(deleteBtn);
+
                 li.appendChild(button);
+                li.appendChild(actions);
                 majorEvalList.appendChild(li);
             });
 
             if (!activeMajorEvalId && majorEvalEntries.length) {
                 activeMajorEvalId = majorEvalEntries[0].id;
+                saveMajorEvalEntries();
             }
         }
 
@@ -1407,6 +1642,9 @@
             if (!majorEvalEntries.length) {
                 majorEvalInputSection?.classList.add('hidden');
                 majorEvalModifySection?.classList.add('hidden');
+                if (majorEvalUploadSection) majorEvalUploadSection.classList.add('hidden');
+                if (majorEvalUploadBtn) majorEvalUploadBtn.disabled = true;
+                if (majorEvalUploadInfo) majorEvalUploadInfo.classList.add('hidden');
                 renderMajorEvalOutput(null);
                 return;
             }
@@ -1417,19 +1655,63 @@
                 activeMajorEvalId = entry.id;
             }
 
-            if (!entry.details) {
-                entry.details = { schoolName: '', domain: '', numQuestions: 5, evaluationTopic: '' };
+            const entryIndex = majorEvalEntries.findIndex(item => item.id === entry.id);
+            let normalizedEntry = ensureMajorEvalEntryShape(entry);
+            if (!normalizedEntry) {
+                normalizedEntry = {
+                    id: entry.id || generateMajorEvalId(),
+                    title: entry.title || '새 심사표',
+                    details: { schoolName: '', domain: '', numQuestions: 5, evaluationTopic: '', admissionYear: '2025' },
+                    aiData: Array.isArray(entry.aiData) ? entry.aiData : [],
+                    pdfContext: '',
+                    pdfFileName: '',
+                };
             }
+            if (entryIndex !== -1) {
+                majorEvalEntries[entryIndex] = normalizedEntry;
+            }
+            entry = normalizedEntry;
 
             populateMajorEvalInputs(entry);
+
+            if (majorEvalUploadSection) majorEvalUploadSection.classList.remove('hidden');
+            if (majorEvalUploadBtn) {
+                majorEvalUploadBtn.disabled = !!isMajorEvalUploading;
+                majorEvalUploadBtn.textContent = isMajorEvalUploading ? '추출 중...' : '예시 파일 업로드';
+            }
+            if (majorEvalUploadInfo) {
+                if (entry.pdfFileName) {
+                    majorEvalUploadInfo.textContent = `${entry.pdfFileName}에서 추출한 내용을 참고하여 심사표를 생성합니다.`;
+                } else {
+                    majorEvalUploadInfo.textContent = '예시 PDF를 업로드하면 AI가 참고하여 심사표를 생성합니다.';
+                }
+                majorEvalUploadInfo.classList.remove('hidden');
+            }
 
             if (entry.aiData && entry.aiData.length) {
                 majorEvalInputSection?.classList.add('hidden');
                 majorEvalModifySection?.classList.remove('hidden');
-                if (majorEvalModifyInput) majorEvalModifyInput.value = '';
+                if (majorEvalModifyInput) {
+                    majorEvalModifyInput.value = '';
+                    majorEvalModifyInput.disabled = false;
+                }
+                if (majorEvalModifyBtn) {
+                    majorEvalModifyBtn.disabled = false;
+                    majorEvalModifyBtn.classList.remove('opacity-50');
+                    majorEvalModifyBtn.classList.remove('pointer-events-none');
+                }
             } else {
                 majorEvalInputSection?.classList.remove('hidden');
                 majorEvalModifySection?.classList.add('hidden');
+                if (majorEvalModifyInput) {
+                    majorEvalModifyInput.value = '';
+                    majorEvalModifyInput.disabled = true;
+                }
+                if (majorEvalModifyBtn) {
+                    majorEvalModifyBtn.disabled = true;
+                    majorEvalModifyBtn.classList.add('opacity-50');
+                    majorEvalModifyBtn.classList.add('pointer-events-none');
+                }
             }
 
             renderMajorEvalOutput(entry);
@@ -1444,16 +1726,19 @@
         }
 
         function createMajorEvalEntry(title) {
-            const newEntry = {
-                id: `major-eval-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            const newEntry = ensureMajorEvalEntryShape({
+                id: generateMajorEvalId(),
                 title: title.trim() || '새 심사표',
-                details: { schoolName: '', domain: '', numQuestions: 5, evaluationTopic: '' },
-                aiData: []
-            };
+                details: { schoolName: '', domain: '', numQuestions: 5, evaluationTopic: '', admissionYear: '2025' },
+                aiData: [],
+                pdfContext: '',
+                pdfFileName: '',
+            });
             majorEvalEntries = [newEntry, ...majorEvalEntries];
             activeMajorEvalId = newEntry.id;
             renderMajorEvalList();
             updateMajorEvalWorkspace();
+            saveMajorEvalEntries();
         }
 
         function showMajorEvalModal() {
@@ -1492,10 +1777,12 @@
                 return;
             }
 
-            const currentYear = new Date().getFullYear();
-            const schoolName = details.schoolName || '[학교 이름]';
+            const schoolName = details.schoolName || '대전해듬학교';
             const domain = details.domain || '영역';
             const evaluationTopic = details.evaluationTopic || '평가 주제';
+            const admissionYear = details.admissionYear || '2025';
+            const evaluationTableId = `${entry.id}-evaluation-table`;
+            const recordTableId = `${entry.id}-record-table`;
 
             const evaluationRows = normalizedItems.map((item, index) => {
                 const domainCell = index === 0 ? `<td rowspan="${normalizedItems.length}" class="border px-2 py-2 align-middle font-medium">${escapeHtml(domain)}</td>` : '';
@@ -1523,50 +1810,63 @@
             }).join('');
 
             majorEvalOutput.innerHTML = `
-                <div class="space-y-6">
-                    <div class="text-center space-y-1">
-                        <p class="text-sm text-gray-600">${currentYear}학년도 ${escapeHtml(schoolName)} 전공과 입학 전형</p>
-                        <h3 class="text-xl font-bold text-gray-800">직업능력평가 (${escapeHtml(evaluationTopic)} 심사표)</h3>
-                    </div>
-                    <div class="space-y-3">
-                        <h4 class="font-semibold text-lg text-gray-800">1페이지 · 직업능력평가 심사표</h4>
-                        <div class="text-sm text-gray-600">
-                            <p>○ 평가 기준: 100% 수행(2점), 못함(0점)</p>
-                            <p>○ 제한 시간: 문항당 30초 / ○ 준비물: 초시계</p>
+                <div class="space-y-8">
+                    <section class="major-eval-page" data-page="1">
+                        <div class="text-center space-y-2 mb-6">
+                            <p class="text-sm text-gray-600">${escapeHtml(admissionYear)}학년도 ${escapeHtml(schoolName)} 전공과 입학 전형</p>
+                            <h3 class="text-2xl font-bold text-gray-800">직업능력평가 (실무 능력 심사표)</h3>
+                            <p class="text-sm text-gray-500">평가 주제: ${escapeHtml(evaluationTopic)}</p>
                         </div>
-                        <table class="w-full border border-gray-300 text-sm">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="border px-2 py-2 w-32">영역</th>
-                                    <th class="border px-2 py-2 w-16">문항</th>
-                                    <th class="border px-2 py-2">내용</th>
-                                    <th class="border px-2 py-2 w-16">배점</th>
-                                    <th class="border px-2 py-2 w-32">자료(수)</th>
-                                </tr>
-                            </thead>
-                            <tbody>${evaluationRows}</tbody>
-                        </table>
-                    </div>
-                    <div class="space-y-3">
-                        <h4 class="font-semibold text-lg text-gray-800">2페이지 · 직업능력평가 기록지</h4>
-                        <table class="w-full border border-gray-300 text-sm">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="border px-2 py-2 w-32">영역</th>
-                                    <th class="border px-2 py-2 w-16">문항</th>
-                                    <th class="border px-2 py-2">내용</th>
-                                    <th class="border px-2 py-2 w-24">취득점수</th>
-                                </tr>
-                            </thead>
-                            <tbody>${recordRows}</tbody>
-                            <tfoot>
-                                <tr>
-                                    <th colspan="3" class="border px-2 py-2 text-right">합계</th>
-                                    <td class="border px-2 py-2"></td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between gap-3">
+                                <h4 class="font-semibold text-lg text-gray-800">1페이지 · 직업능력평가 심사표</h4>
+                                <button type="button" class="major-eval-copy-btn" data-copy-target="${evaluationTableId}">HTML 복사</button>
+                            </div>
+                            <div class="text-sm text-gray-600 space-y-1">
+                                <p>○ 평가 기준: 100% 수행(2점), 못함(0점)</p>
+                                <p>○ 제한 시간: 문항당 30초 / ○ 준비물: 초시계</p>
+                            </div>
+                            <table id="${evaluationTableId}" class="w-full border border-gray-300 text-sm bg-white">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="border px-2 py-2 w-32">영역</th>
+                                        <th class="border px-2 py-2 w-16">문항</th>
+                                        <th class="border px-2 py-2">내용</th>
+                                        <th class="border px-2 py-2 w-16">배점</th>
+                                        <th class="border px-2 py-2 w-32">자료(수)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${evaluationRows}</tbody>
+                            </table>
+                            <p class="text-xs text-gray-500 text-right">※ 본 심사표는 A4 용지 1페이지로 출력됩니다.</p>
+                        </div>
+                    </section>
+                    <section class="major-eval-page" data-page="2">
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between gap-3">
+                                <h4 class="font-semibold text-lg text-gray-800">2페이지 · 직업능력평가 기록지</h4>
+                                <button type="button" class="major-eval-copy-btn" data-copy-target="${recordTableId}">HTML 복사</button>
+                            </div>
+                            <table id="${recordTableId}" class="w-full border border-gray-300 text-sm bg-white">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="border px-2 py-2 w-32">영역</th>
+                                        <th class="border px-2 py-2 w-16">문항</th>
+                                        <th class="border px-2 py-2">내용</th>
+                                        <th class="border px-2 py-2 w-24">취득점수</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${recordRows}</tbody>
+                                <tfoot>
+                                    <tr>
+                                        <th colspan="3" class="border px-2 py-2 text-right">합계</th>
+                                        <td class="border px-2 py-2"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                            <p class="text-xs text-gray-500 text-right">※ 본 기록지는 A4 용지 2페이지로 출력됩니다.</p>
+                        </div>
+                    </section>
                 </div>
             `;
         }
@@ -1649,11 +1949,102 @@
 
         if (majorEvalList) {
             majorEvalList.addEventListener('click', (event) => {
-                const button = event.target.closest('button[data-entry-id]');
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) return;
+
+                const actionButton = target.closest('button[data-action]');
+                if (actionButton) {
+                    const entryId = actionButton.dataset.entryId;
+                    const action = actionButton.dataset.action;
+                    if (!entryId || !action) return;
+                    const entryIndex = majorEvalEntries.findIndex(item => item.id === entryId);
+                    if (entryIndex === -1) return;
+                    const entry = majorEvalEntries[entryIndex];
+
+                    if (action === 'rename') {
+                        const newTitle = prompt('새 이름을 입력하세요.', entry.title || '');
+                        if (newTitle && newTitle.trim()) {
+                            entry.title = newTitle.trim();
+                            saveMajorEvalEntries();
+                            renderMajorEvalList();
+                            updateMajorEvalWorkspace();
+                        }
+                    } else if (action === 'delete') {
+                        const confirmed = confirm('선택한 심사표를 삭제하시겠습니까?');
+                        if (!confirmed) return;
+                        majorEvalEntries.splice(entryIndex, 1);
+                        if (activeMajorEvalId === entryId) {
+                            activeMajorEvalId = majorEvalEntries[0]?.id || '';
+                        }
+                        saveMajorEvalEntries();
+                        renderMajorEvalList();
+                        updateMajorEvalWorkspace();
+                    }
+                    return;
+                }
+
+                const button = target.closest('button[data-role="select-major-eval"]');
                 if (!button) return;
-                activeMajorEvalId = button.dataset.entryId;
+                const entryId = button.dataset.entryId;
+                if (!entryId) return;
+                if (activeMajorEvalId === entryId) return;
+                activeMajorEvalId = entryId;
+                saveMajorEvalEntries();
                 renderMajorEvalList();
                 updateMajorEvalWorkspace();
+            });
+        }
+
+        if (majorEvalUploadBtn && majorEvalUploadInput) {
+            majorEvalUploadBtn.addEventListener('click', () => {
+                if (isMajorEvalUploading) return;
+                if (!getActiveMajorEvalEntry()) {
+                    alert('먼저 심사표를 선택해 주세요.');
+                    return;
+                }
+                majorEvalUploadInput.value = '';
+                majorEvalUploadInput.click();
+            });
+        }
+
+        if (majorEvalUploadInput) {
+            majorEvalUploadInput.addEventListener('change', async (event) => {
+                const file = event.target.files && event.target.files[0];
+                if (!file) return;
+                const entry = getActiveMajorEvalEntry();
+                if (!entry) {
+                    alert('먼저 심사표를 선택해 주세요.');
+                    majorEvalUploadInput.value = '';
+                    return;
+                }
+                if (file.type !== 'application/pdf') {
+                    alert('PDF 파일만 업로드할 수 있습니다.');
+                    majorEvalUploadInput.value = '';
+                    return;
+                }
+
+                isMajorEvalUploading = true;
+                updateMajorEvalWorkspace();
+
+                try {
+                    const extractedText = await extractTextFromPdf(file);
+                    if (!extractedText) {
+                        throw new Error('empty');
+                    }
+                    const condensedText = extractedText.length > 6000 ? `${extractedText.slice(0, 6000)}...` : extractedText;
+                    entry.pdfContext = condensedText;
+                    entry.pdfFileName = file.name;
+                    saveMajorEvalEntries();
+                    updateMajorEvalWorkspace();
+                    showToast('PDF에서 내용을 추출했습니다.');
+                } catch (error) {
+                    console.error('Failed to extract PDF text', error);
+                    alert('PDF 내용을 추출하지 못했습니다. 다른 파일로 시도해 주세요.');
+                } finally {
+                    isMajorEvalUploading = false;
+                    updateMajorEvalWorkspace();
+                    majorEvalUploadInput.value = '';
+                }
             });
         }
 
@@ -1669,7 +2060,7 @@
             input.addEventListener('input', () => {
                 const entry = getActiveMajorEvalEntry();
                 if (!entry) return;
-                if (!entry.details) entry.details = { schoolName: '', domain: '', numQuestions: 5, evaluationTopic: '' };
+                if (!entry.details) entry.details = { schoolName: '', domain: '', numQuestions: 5, evaluationTopic: '', admissionYear: '2025' };
                 if (key === 'numQuestions') {
                     let value = parseInt(input.value, 10);
                     if (!Number.isFinite(value) || value < 1) {
@@ -1680,6 +2071,7 @@
                 } else {
                     entry.details[key] = input.value;
                 }
+                saveMajorEvalEntries();
             });
         });
 
@@ -1705,22 +2097,26 @@
                     schoolName,
                     domain,
                     evaluationTopic,
-                    numQuestions
+                    numQuestions,
+                    admissionYear: entry.details?.admissionYear || '2025'
                 };
 
+                const pdfReference = getMajorEvalPdfContext(entry);
+                const referenceBlock = pdfReference ? `\n\n참고 자료(예시 PDF에서 추출):\n${pdfReference}` : '';
                 const prompt = `너는 특수학교 전공과 입학 전형 심사표를 만드는 전문가야. 아래 정보를 참고하여 직업능력평가 심사표 문항을 JSON 배열로 작성해줘.
 
 학교 이름: ${schoolName || '[학교 이름]'}
 영역: ${domain}
 평가 주제: ${evaluationTopic}
-문항 수: ${numQuestions}
+문항 수: ${numQuestions}${referenceBlock}
 
 요구사항:
 1. JSON 배열의 길이는 반드시 ${numQuestions}개여야 해.
 2. 각 요소는 {"content":"지시문", "materials":"준비물 목록"} 형식이어야 하며 다른 속성은 포함하지 마.
 3. content는 학생에게 명확히 지시하는 문장으로 작성하고 반드시 '~하시오.'로 끝내.
 4. materials는 과제 수행에 필요한 준비물을 쉼표로 구분된 한 줄 문자열로 작성해. 준비물이 없으면 '필요 준비물 없음'이라고 적어.
-5. 설명이나 주석 없이 JSON 배열만 반환해.`;
+5. 설명이나 주석 없이 JSON 배열만 반환해.
+6. 참고 자료가 제공되면 해당 표현과 절차를 참고하되, 문항은 특수학교 직업능력평가 심사표 형식에 맞게 조정해.`;
 
                 const originalText = majorEvalGenerateBtn.textContent;
                 majorEvalGenerateBtn.textContent = '생성 중...';
@@ -1734,6 +2130,7 @@
                         throw new Error('empty');
                     }
                     entry.aiData = normalized;
+                    saveMajorEvalEntries();
                     renderMajorEvalList();
                     updateMajorEvalWorkspace();
                     showToast('심사표가 생성되었습니다.');
@@ -1759,7 +2156,9 @@
                     return;
                 }
 
-                const prompt = `너는 특수학교 전공과 직업능력평가 심사표를 다듬는 전문가야. 아래 JSON 데이터를 사용자의 요청에 맞게 수정해줘.
+                const pdfReference = getMajorEvalPdfContext(entry);
+                const referenceBlock = pdfReference ? `\n\n참고 자료(예시 PDF에서 추출):\n${pdfReference}` : '';
+                const prompt = `너는 특수학교 전공과 직업능력평가 심사표를 다듬는 전문가야. 아래 JSON 데이터를 사용자의 요청에 맞게 수정해줘.${referenceBlock}
 
 현재 데이터:
 ${JSON.stringify(entry.aiData, null, 2)}
@@ -1784,6 +2183,7 @@ ${JSON.stringify(entry.aiData, null, 2)}
                         throw new Error('empty');
                     }
                     entry.aiData = normalized;
+                    saveMajorEvalEntries();
                     renderMajorEvalList();
                     renderMajorEvalOutput(entry);
                     if (majorEvalModifyInput) majorEvalModifyInput.value = '';
@@ -1807,6 +2207,33 @@ ${JSON.stringify(entry.aiData, null, 2)}
                 }
             });
         }
+
+        if (majorEvalOutput) {
+            majorEvalOutput.addEventListener('click', async (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) return;
+                const copyBtn = target.closest('button[data-copy-target]');
+                if (!copyBtn) return;
+                const targetId = copyBtn.dataset.copyTarget;
+                if (!targetId) return;
+                const selector = `#${escapeCssSelector(targetId)}`;
+                const table = majorEvalOutput.querySelector(selector);
+                if (!table) {
+                    alert('복사할 표를 찾을 수 없습니다.');
+                    return;
+                }
+                try {
+                    await copyHtmlToClipboard(table.outerHTML.trim());
+                    showToast('표 HTML이 클립보드에 복사되었습니다.');
+                } catch (error) {
+                    console.error('Failed to copy table HTML', error);
+                    alert('표 HTML을 복사하지 못했습니다. 다시 시도해 주세요.');
+                }
+            });
+        }
+
+        loadMajorEvalEntries();
+
         const achievementTables = {
             elementary: {
                 korean: `| **학년(군)** | **듣기⋅말하기** | **읽기** | **쓰기** | **문법** | **문학** | **매체** |
