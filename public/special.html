@@ -516,10 +516,28 @@
                                     <input type="file" id="major-eval-upload-input" accept="application/pdf" class="hidden">
                                 </div>
                                 <div id="major-eval-modify-section" class="hidden space-y-6">
-                                    <h4 class="text-base font-semibold">수정 테이블</h4>
-                                    <p class="text-xs text-gray-500">수정 내용을 입력하고 엔터 또는 수정 버튼을 눌러주세요.</p>
-                                    <textarea id="major-eval-modify-input" class="w-full border border-gray-300 rounded-md p-2 text-sm" rows="4" placeholder="예: 3번 문항을 난이도를 낮추어 수정해줘"></textarea>
-                                    <button type="button" id="major-eval-modify-btn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 rounded">수정</button>
+                                    <div class="space-y-3">
+                                        <h4 class="text-base font-semibold">저장 테이블</h4>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <button type="button" id="major-eval-edit-toggle-btn" class="bg-white border border-sky-300 text-sky-600 hover:bg-sky-50 text-sm font-semibold px-3 py-2 rounded transition">편집</button>
+                                            <button type="button" id="major-eval-save-btn" class="bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold px-3 py-2 rounded transition">저장</button>
+                                            <button type="button" id="major-eval-pdf-btn" class="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-3 py-2 rounded transition">PDF 저장</button>
+                                        </div>
+                                        <p class="text-xs text-gray-500">수동 편집을 완료한 후 저장 버튼을 누르면 편집 내용이 유지됩니다.</p>
+                                    </div>
+                                    <div class="space-y-3">
+                                        <h4 class="text-base font-semibold">수정 테이블</h4>
+                                        <p class="text-xs text-gray-500">수정 내용을 입력하고 엔터 또는 수정 버튼을 눌러주세요.</p>
+                                        <textarea id="major-eval-modify-input" class="w-full border border-gray-300 rounded-md p-2 text-sm" rows="4" placeholder="예: 3번 문항을 난이도를 낮추어 수정해줘"></textarea>
+                                        <button type="button" id="major-eval-modify-btn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 rounded">수정</button>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <input type="number" id="major-eval-question-increase" class="border border-gray-300 rounded-md p-2 text-sm w-20" min="1" value="1">
+                                            <button type="button" id="major-eval-question-increase-btn" class="bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold px-3 py-2 rounded transition">심사표/기록지 문항 늘리기</button>
+                                        </div>
+                                        <p class="text-xs text-gray-500">입력한 숫자만큼 심사표와 기록지에 빈 문항이 추가됩니다.</p>
+                                    </div>
                                 </div>
                             </aside>
                             <section class="flex-1">
@@ -756,6 +774,11 @@
         const majorEvalUploadBtn = document.getElementById('major-eval-upload-btn');
         const majorEvalUploadInput = document.getElementById('major-eval-upload-input');
         const majorEvalUploadInfo = document.getElementById('major-eval-upload-info');
+        const majorEvalEditToggleBtn = document.getElementById('major-eval-edit-toggle-btn');
+        const majorEvalSaveBtn = document.getElementById('major-eval-save-btn');
+        const majorEvalPdfBtn = document.getElementById('major-eval-pdf-btn');
+        const majorEvalQuestionIncreaseInput = document.getElementById('major-eval-question-increase');
+        const majorEvalQuestionIncreaseBtn = document.getElementById('major-eval-question-increase-btn');
         const majorEvalModal = document.getElementById('major-eval-modal');
         const majorEvalModalTitle = document.getElementById('major-eval-modal-title');
         const majorEvalModalCancel = document.getElementById('major-eval-modal-cancel');
@@ -793,6 +816,10 @@
         let isMajorEvalGenerating = false;
         let isMajorEvalModifying = false;
         let isMajorEvalUploading = false;
+        let isMajorEvalManualEditing = false;
+        let majorEvalManualNode = null;
+        let hasMajorEvalManualDraft = false;
+        let majorEvalManualDraftHtml = '';
 
         if (typeof window !== 'undefined' && typeof pdfjsLib !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
             pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC;
@@ -1444,6 +1471,7 @@
                 })) : [],
                 pdfContext: typeof entry.pdfContext === 'string' ? entry.pdfContext : '',
                 pdfFileName: typeof entry.pdfFileName === 'string' ? entry.pdfFileName : '',
+                customHtml: typeof entry.customHtml === 'string' ? entry.customHtml : '',
             };
             return normalized;
         }
@@ -1464,6 +1492,7 @@
                     aiData: Array.isArray(entry.aiData) ? entry.aiData : [],
                     pdfContext: entry.pdfContext || '',
                     pdfFileName: entry.pdfFileName || '',
+                    customHtml: entry.customHtml || '',
                 }));
                 localStorage.setItem(MAJOR_EVAL_STORAGE_KEY, JSON.stringify(payload));
                 if (activeMajorEvalId) {
@@ -1518,19 +1547,31 @@
 
         async function copyHtmlToClipboard(html) {
             if (!html) return;
+            if (navigator.clipboard && typeof navigator.clipboard.write === 'function' && typeof ClipboardItem !== 'undefined') {
+                const htmlBlob = new Blob([html], { type: 'text/html' });
+                const textBlob = new Blob([html], { type: 'text/plain' });
+                const clipboardItem = new ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob });
+                await navigator.clipboard.write([clipboardItem]);
+                return;
+            }
             if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
                 await navigator.clipboard.writeText(html);
                 return;
             }
-            const textarea = document.createElement('textarea');
-            textarea.value = html;
-            textarea.setAttribute('readonly', '');
-            textarea.style.position = 'absolute';
-            textarea.style.left = '-9999px';
-            document.body.appendChild(textarea);
-            textarea.select();
+            const container = document.createElement('div');
+            container.innerHTML = html;
+            container.setAttribute('contenteditable', 'true');
+            container.style.position = 'absolute';
+            container.style.left = '-9999px';
+            document.body.appendChild(container);
+            const range = document.createRange();
+            range.selectNodeContents(container);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
             document.execCommand('copy');
-            document.body.removeChild(textarea);
+            selection.removeAllRanges();
+            document.body.removeChild(container);
         }
 
         async function extractTextFromPdf(file) {
@@ -1637,6 +1678,107 @@
             }
         }
 
+        function hasMajorEvalOutputData(entry) {
+            if (!entry) return false;
+            if (Array.isArray(entry.aiData) && entry.aiData.length) return true;
+            if (typeof entry.customHtml === 'string' && entry.customHtml.trim()) return true;
+            return false;
+        }
+
+        function clearMajorEvalManualDraft() {
+            hasMajorEvalManualDraft = false;
+            majorEvalManualDraftHtml = '';
+        }
+
+        function updateMajorEvalActionButtons(entry = getActiveMajorEvalEntry()) {
+            const hasData = hasMajorEvalOutputData(entry) || (hasMajorEvalManualDraft && !!majorEvalManualDraftHtml.trim());
+            if (majorEvalEditToggleBtn) {
+                majorEvalEditToggleBtn.disabled = !hasData;
+                majorEvalEditToggleBtn.textContent = isMajorEvalManualEditing ? '완료' : '편집';
+            }
+            if (majorEvalSaveBtn) {
+                majorEvalSaveBtn.disabled = !hasData || isMajorEvalManualEditing;
+            }
+            if (majorEvalPdfBtn) {
+                majorEvalPdfBtn.disabled = !hasData || isMajorEvalManualEditing;
+            }
+            const canAdjustQuestions = Array.isArray(entry?.aiData) && entry.aiData.length > 0 && !isMajorEvalManualEditing;
+            if (majorEvalQuestionIncreaseBtn) majorEvalQuestionIncreaseBtn.disabled = !canAdjustQuestions;
+            if (majorEvalQuestionIncreaseInput) majorEvalQuestionIncreaseInput.disabled = !canAdjustQuestions;
+        }
+
+        function guardMajorEvalManualState(actionMessage) {
+            if (isMajorEvalManualEditing) {
+                alert(`수동 편집을 완료한 후 ${actionMessage}`);
+                return true;
+            }
+            if (hasMajorEvalManualDraft) {
+                alert(`편집 내용을 저장한 후 ${actionMessage}`);
+                return true;
+            }
+            return false;
+        }
+
+        function startMajorEvalManualEdit() {
+            if (isMajorEvalManualEditing) return;
+            const entry = getActiveMajorEvalEntry();
+            if (!hasMajorEvalOutputData(entry)) {
+                alert('편집할 심사표를 먼저 생성해 주세요.');
+                return;
+            }
+            if (!majorEvalOutput || !majorEvalOutput.innerHTML.trim()) {
+                alert('편집할 내용이 없습니다.');
+                return;
+            }
+            clearMajorEvalManualDraft();
+            isMajorEvalManualEditing = true;
+            majorEvalManualNode = majorEvalOutput;
+            majorEvalManualNode.setAttribute('contenteditable', 'true');
+            majorEvalManualNode.classList.add('manual-editing');
+            if (majorEvalModifyInput) majorEvalModifyInput.disabled = true;
+            if (majorEvalModifyBtn) {
+                majorEvalModifyBtn.disabled = true;
+                majorEvalModifyBtn.classList.add('opacity-50', 'pointer-events-none');
+            }
+            if (majorEvalQuestionIncreaseBtn) majorEvalQuestionIncreaseBtn.disabled = true;
+            if (majorEvalQuestionIncreaseInput) majorEvalQuestionIncreaseInput.disabled = true;
+            updateMajorEvalActionButtons(entry);
+            setTimeout(() => {
+                try {
+                    majorEvalManualNode?.focus();
+                } catch (error) {
+                    console.warn('Unable to focus manual edit node', error);
+                }
+            }, 0);
+        }
+
+        function finishMajorEvalManualEdit(options = {}) {
+            if (!isMajorEvalManualEditing) return;
+            if (majorEvalManualNode) {
+                majorEvalManualNode.removeAttribute('contenteditable');
+                majorEvalManualNode.classList.remove('manual-editing');
+            }
+            isMajorEvalManualEditing = false;
+            majorEvalManualNode = null;
+            majorEvalManualDraftHtml = majorEvalOutput?.innerHTML || '';
+            hasMajorEvalManualDraft = !!majorEvalManualDraftHtml.trim();
+            const entry = getActiveMajorEvalEntry();
+            const canModify = Array.isArray(entry?.aiData) && entry.aiData.length > 0;
+            if (majorEvalModifyInput) majorEvalModifyInput.disabled = !canModify;
+            if (majorEvalModifyBtn) {
+                majorEvalModifyBtn.disabled = !canModify;
+                majorEvalModifyBtn.classList.toggle('opacity-50', !canModify);
+                majorEvalModifyBtn.classList.toggle('pointer-events-none', !canModify);
+            }
+            updateMajorEvalActionButtons(entry);
+            if (!options.silent) {
+                const message = hasMajorEvalManualDraft
+                    ? '수동 편집이 완료되었습니다. 저장 버튼을 눌러주세요.'
+                    : '수동 편집이 완료되었습니다.';
+                showToast(message);
+            }
+        }
+
         function updateMajorEvalWorkspace() {
             if (!majorEvalWorkspace) return;
             if (!majorEvalEntries.length) {
@@ -1645,6 +1787,8 @@
                 if (majorEvalUploadSection) majorEvalUploadSection.classList.add('hidden');
                 if (majorEvalUploadBtn) majorEvalUploadBtn.disabled = true;
                 if (majorEvalUploadInfo) majorEvalUploadInfo.classList.add('hidden');
+                clearMajorEvalManualDraft();
+                updateMajorEvalActionButtons(null);
                 renderMajorEvalOutput(null);
                 return;
             }
@@ -1665,6 +1809,7 @@
                     aiData: Array.isArray(entry.aiData) ? entry.aiData : [],
                     pdfContext: '',
                     pdfFileName: '',
+                    customHtml: typeof entry.customHtml === 'string' ? entry.customHtml : '',
                 };
             }
             if (entryIndex !== -1) {
@@ -1681,24 +1826,31 @@
             }
             if (majorEvalUploadInfo) {
                 if (entry.pdfFileName) {
-                    majorEvalUploadInfo.textContent = `${entry.pdfFileName}에서 추출한 내용을 참고하여 심사표를 생성합니다.`;
+                    majorEvalUploadInfo.textContent = `업로드된 파일: ${entry.pdfFileName}`;
                 } else {
-                    majorEvalUploadInfo.textContent = '예시 PDF를 업로드하면 AI가 참고하여 심사표를 생성합니다.';
+                    majorEvalUploadInfo.textContent = '업로드된 파일이 없습니다.';
                 }
                 majorEvalUploadInfo.classList.remove('hidden');
             }
 
-            if (entry.aiData && entry.aiData.length) {
+            const hasGeneratedData = Array.isArray(entry.aiData) && entry.aiData.length > 0;
+            const hasCustomOutput = typeof entry.customHtml === 'string' && entry.customHtml.trim().length > 0;
+
+            if (hasGeneratedData || hasCustomOutput) {
                 majorEvalInputSection?.classList.add('hidden');
                 majorEvalModifySection?.classList.remove('hidden');
+                const canModify = hasGeneratedData;
                 if (majorEvalModifyInput) {
                     majorEvalModifyInput.value = '';
-                    majorEvalModifyInput.disabled = false;
+                    majorEvalModifyInput.disabled = !canModify;
                 }
                 if (majorEvalModifyBtn) {
-                    majorEvalModifyBtn.disabled = false;
-                    majorEvalModifyBtn.classList.remove('opacity-50');
-                    majorEvalModifyBtn.classList.remove('pointer-events-none');
+                    majorEvalModifyBtn.disabled = !canModify;
+                    majorEvalModifyBtn.classList.toggle('opacity-50', !canModify);
+                    majorEvalModifyBtn.classList.toggle('pointer-events-none', !canModify);
+                }
+                if (majorEvalQuestionIncreaseInput && !isMajorEvalManualEditing) {
+                    majorEvalQuestionIncreaseInput.value = '1';
                 }
             } else {
                 majorEvalInputSection?.classList.remove('hidden');
@@ -1715,6 +1867,7 @@
             }
 
             renderMajorEvalOutput(entry);
+            updateMajorEvalActionButtons(entry);
         }
 
         function populateMajorEvalInputs(entry) {
@@ -1758,8 +1911,15 @@
 
         function renderMajorEvalOutput(entry) {
             if (!majorEvalOutput) return;
+            if (hasMajorEvalManualDraft) return;
             if (!entry) {
                 majorEvalOutput.innerHTML = '<p class="text-gray-500">왼쪽 목록에서 심사표를 선택하면 결과가 표시됩니다.</p>';
+                return;
+            }
+
+            const customHtml = typeof entry.customHtml === 'string' ? entry.customHtml.trim() : '';
+            if (customHtml && !isMajorEvalManualEditing) {
+                majorEvalOutput.innerHTML = customHtml;
                 return;
             }
 
@@ -1838,7 +1998,6 @@
                                 </thead>
                                 <tbody>${evaluationRows}</tbody>
                             </table>
-                            <p class="text-xs text-gray-500 text-right">※ 본 심사표는 A4 용지 1페이지로 출력됩니다.</p>
                         </div>
                     </section>
                     <section class="major-eval-page" data-page="2">
@@ -1864,7 +2023,6 @@
                                     </tr>
                                 </tfoot>
                             </table>
-                            <p class="text-xs text-gray-500 text-right">※ 본 기록지는 A4 용지 2페이지로 출력됩니다.</p>
                         </div>
                     </section>
                 </div>
@@ -1911,6 +2069,7 @@
 
         if (majorEvalAddBtn) {
             majorEvalAddBtn.addEventListener('click', () => {
+                if (guardMajorEvalManualState('새 심사표를 추가해 주세요.')) return;
                 showMajorEvalModal();
             });
         }
@@ -1954,6 +2113,7 @@
 
                 const actionButton = target.closest('button[data-action]');
                 if (actionButton) {
+                    if (guardMajorEvalManualState('해당 작업을 진행해 주세요.')) return;
                     const entryId = actionButton.dataset.entryId;
                     const action = actionButton.dataset.action;
                     if (!entryId || !action) return;
@@ -1987,6 +2147,7 @@
                 if (!button) return;
                 const entryId = button.dataset.entryId;
                 if (!entryId) return;
+                if (guardMajorEvalManualState('다른 심사표를 선택해 주세요.')) return;
                 if (activeMajorEvalId === entryId) return;
                 activeMajorEvalId = entryId;
                 saveMajorEvalEntries();
@@ -1998,6 +2159,7 @@
         if (majorEvalUploadBtn && majorEvalUploadInput) {
             majorEvalUploadBtn.addEventListener('click', () => {
                 if (isMajorEvalUploading) return;
+                if (guardMajorEvalManualState('PDF를 업로드해 주세요.')) return;
                 if (!getActiveMajorEvalEntry()) {
                     alert('먼저 심사표를 선택해 주세요.');
                     return;
@@ -2009,6 +2171,10 @@
 
         if (majorEvalUploadInput) {
             majorEvalUploadInput.addEventListener('change', async (event) => {
+                if (guardMajorEvalManualState('PDF를 업로드해 주세요.')) {
+                    majorEvalUploadInput.value = '';
+                    return;
+                }
                 const file = event.target.files && event.target.files[0];
                 if (!file) return;
                 const entry = getActiveMajorEvalEntry();
@@ -2060,6 +2226,13 @@
             input.addEventListener('input', () => {
                 const entry = getActiveMajorEvalEntry();
                 if (!entry) return;
+                if (guardMajorEvalManualState('입력 값을 수정해 주세요.')) {
+                    const currentValue = key === 'numQuestions'
+                        ? entry.details?.numQuestions ?? 5
+                        : entry.details?.[key] ?? '';
+                    input.value = key === 'numQuestions' ? String(currentValue || 1) : currentValue;
+                    return;
+                }
                 if (!entry.details) entry.details = { schoolName: '', domain: '', numQuestions: 5, evaluationTopic: '', admissionYear: '2025' };
                 if (key === 'numQuestions') {
                     let value = parseInt(input.value, 10);
@@ -2071,7 +2244,11 @@
                 } else {
                     entry.details[key] = input.value;
                 }
+                entry.customHtml = '';
+                clearMajorEvalManualDraft();
                 saveMajorEvalEntries();
+                renderMajorEvalOutput(entry);
+                updateMajorEvalActionButtons(entry);
             });
         });
 
@@ -2079,6 +2256,7 @@
             majorEvalGenerateBtn.addEventListener('click', async () => {
                 const entry = getActiveMajorEvalEntry();
                 if (!entry || isMajorEvalGenerating) return;
+                if (guardMajorEvalManualState('생성 기능을 사용해 주세요.')) return;
 
                 const schoolName = (majorEvalSchoolInput?.value || '').trim();
                 const domain = (majorEvalDomainInput?.value || '').trim();
@@ -2100,6 +2278,8 @@
                     numQuestions,
                     admissionYear: entry.details?.admissionYear || '2025'
                 };
+                entry.customHtml = '';
+                clearMajorEvalManualDraft();
 
                 const pdfReference = getMajorEvalPdfContext(entry);
                 const referenceBlock = pdfReference ? `\n\n참고 자료(예시 PDF에서 추출):\n${pdfReference}` : '';
@@ -2130,6 +2310,8 @@
                         throw new Error('empty');
                     }
                     entry.aiData = normalized;
+                    entry.customHtml = '';
+                    clearMajorEvalManualDraft();
                     saveMajorEvalEntries();
                     renderMajorEvalList();
                     updateMajorEvalWorkspace();
@@ -2147,6 +2329,7 @@
 
         if (majorEvalModifyBtn) {
             majorEvalModifyBtn.addEventListener('click', async () => {
+                if (guardMajorEvalManualState('수정 기능을 사용해 주세요.')) return;
                 const entry = getActiveMajorEvalEntry();
                 if (!entry || !entry.aiData?.length || isMajorEvalModifying) return;
 
@@ -2183,6 +2366,8 @@ ${JSON.stringify(entry.aiData, null, 2)}
                         throw new Error('empty');
                     }
                     entry.aiData = normalized;
+                    entry.customHtml = '';
+                    clearMajorEvalManualDraft();
                     saveMajorEvalEntries();
                     renderMajorEvalList();
                     renderMajorEvalOutput(entry);
@@ -2198,6 +2383,120 @@ ${JSON.stringify(entry.aiData, null, 2)}
                 }
             });
         }
+
+        majorEvalEditToggleBtn?.addEventListener('click', () => {
+            const entry = getActiveMajorEvalEntry();
+            if (!entry || !hasMajorEvalOutputData(entry)) {
+                alert('편집할 심사표를 선택해 주세요.');
+                return;
+            }
+            if (isMajorEvalManualEditing) {
+                finishMajorEvalManualEdit();
+            } else {
+                startMajorEvalManualEdit();
+            }
+        });
+
+        majorEvalSaveBtn?.addEventListener('click', () => {
+            const entry = getActiveMajorEvalEntry();
+            if (!entry) {
+                alert('저장할 심사표를 선택해 주세요.');
+                return;
+            }
+            if (isMajorEvalManualEditing) {
+                alert('수동 편집을 완료한 후 저장해 주세요.');
+                return;
+            }
+            const htmlToSave = hasMajorEvalManualDraft && majorEvalManualDraftHtml.trim()
+                ? majorEvalManualDraftHtml
+                : (majorEvalOutput?.innerHTML || '');
+            if (!htmlToSave.trim()) {
+                alert('저장할 내용이 없습니다.');
+                return;
+            }
+            entry.customHtml = htmlToSave;
+            clearMajorEvalManualDraft();
+            saveMajorEvalEntries();
+            renderMajorEvalOutput(entry);
+            updateMajorEvalActionButtons(entry);
+            showToast('편집 내용이 저장되었습니다.');
+        });
+
+        majorEvalPdfBtn?.addEventListener('click', async () => {
+            const entry = getActiveMajorEvalEntry();
+            if (!entry) {
+                alert('저장할 심사표를 선택해 주세요.');
+                return;
+            }
+            if (isMajorEvalManualEditing) {
+                alert('수동 편집을 완료한 후 PDF를 저장해 주세요.');
+                return;
+            }
+            if (!majorEvalOutput || !majorEvalOutput.innerHTML.trim()) {
+                alert('저장할 내용이 없습니다.');
+                return;
+            }
+            const clone = majorEvalOutput.cloneNode(true);
+            clone.querySelectorAll('button').forEach(btn => btn.remove());
+            const schoolName = (entry.details?.schoolName || '').trim();
+            const title = (entry.title || '').trim();
+            const baseName = [schoolName, title || '전공과 심사표'].filter(Boolean).join('_') || '전공과_심사표';
+            const filename = `${sanitizeFileName(baseName) || '전공과_심사표'}.pdf`;
+            const options = {
+                margin: 10,
+                filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            const originalText = majorEvalPdfBtn.textContent;
+            majorEvalPdfBtn.disabled = true;
+            majorEvalPdfBtn.textContent = '저장 중...';
+            try {
+                await html2pdf().from(clone).set(options).save();
+                showToast('PDF로 저장했습니다.');
+            } catch (error) {
+                console.error('Failed to save major evaluation PDF', error);
+                alert('PDF 저장에 실패했습니다. 다시 시도해 주세요.');
+            } finally {
+                majorEvalPdfBtn.disabled = false;
+                majorEvalPdfBtn.textContent = originalText || 'PDF 저장';
+            }
+        });
+
+        majorEvalQuestionIncreaseBtn?.addEventListener('click', () => {
+            if (guardMajorEvalManualState('문항을 늘려 주세요.')) return;
+            const entry = getActiveMajorEvalEntry();
+            if (!entry) {
+                alert('문항을 늘릴 심사표를 선택해 주세요.');
+                return;
+            }
+            if (!Array.isArray(entry.aiData) || !entry.aiData.length) {
+                alert('생성된 심사표가 있어야 문항을 늘릴 수 있습니다.');
+                return;
+            }
+            let amount = parseInt(majorEvalQuestionIncreaseInput?.value || '0', 10);
+            if (!Number.isFinite(amount) || amount < 1) {
+                amount = 1;
+            }
+            if (majorEvalQuestionIncreaseInput) {
+                majorEvalQuestionIncreaseInput.value = String(amount);
+            }
+            const currentQuestions = Number(entry.details?.numQuestions) || entry.aiData.length;
+            const newTotal = currentQuestions + amount;
+            if (!entry.details) {
+                entry.details = { schoolName: '', domain: '', numQuestions: newTotal, evaluationTopic: '', admissionYear: '2025' };
+            }
+            entry.details.numQuestions = newTotal;
+            for (let i = entry.aiData.length; i < newTotal; i += 1) {
+                entry.aiData.push({ content: '내용을 확인해주세요.', materials: '필요 준비물 없음' });
+            }
+            entry.customHtml = '';
+            clearMajorEvalManualDraft();
+            saveMajorEvalEntries();
+            updateMajorEvalWorkspace();
+            showToast(`${amount}개의 문항이 추가되었습니다.`);
+        });
 
         if (majorEvalModifyInput) {
             majorEvalModifyInput.addEventListener('keydown', (event) => {
@@ -2224,10 +2523,10 @@ ${JSON.stringify(entry.aiData, null, 2)}
                 }
                 try {
                     await copyHtmlToClipboard(table.outerHTML.trim());
-                    showToast('표 HTML이 클립보드에 복사되었습니다.');
+                    showToast('표가 클립보드에 복사되었습니다.');
                 } catch (error) {
                     console.error('Failed to copy table HTML', error);
-                    alert('표 HTML을 복사하지 못했습니다. 다시 시도해 주세요.');
+                    alert('표를 복사하지 못했습니다. 다시 시도해 주세요.');
                 }
             });
         }
