@@ -14,6 +14,16 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
     }
 
+    // 특정 행동 기록에 접근 가능한지 확인 (소유자 또는 공유 받은 교사)
+    function canAccessBehavior(userId, behaviorId) {
+      return isTeacher() && (
+        request.auth.uid == userId ||
+        (let behaviorDoc = get(/databases/$(database)/documents/users/$(userId)/behaviors/$(behaviorId));
+          behaviorDoc.data.sharedWith != null &&
+          request.auth.uid in behaviorDoc.data.sharedWith)
+      );
+    }
+
     // ──────────────────────────────────────────────────────────────
     // 사용자 정보 및 하위 데이터
     // ──────────────────────────────────────────────────────────────
@@ -104,10 +114,17 @@ service cloud.firestore {
 
       // ✨ [에이두 스페셜] 행동 기록 및 로그
       match /behaviors/{behaviorId} {
-        allow read, write: if request.auth.uid == userId && isTeacher();
+        allow read: if canAccessBehavior(userId, behaviorId);
+        allow write: if request.auth.uid == userId && isTeacher();
 
         match /logs/{logId} {
-          allow read, write: if request.auth.uid == userId && isTeacher();
+          allow read: if canAccessBehavior(userId, behaviorId);
+          allow create: if canAccessBehavior(userId, behaviorId);
+          allow update: if canAccessBehavior(userId, behaviorId) && (
+            request.auth.uid == userId ||
+            request.auth.uid == resource.data.recordedBy
+          );
+          allow delete: if request.auth.uid == userId && isTeacher();
         }
       }
     }
