@@ -14,13 +14,18 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
     }
 
+    // 행동 기록이 공유되었는지 확인
+    function isBehaviorSharedWithRequestor(userId, behaviorId) {
+      let behaviorDoc = get(/databases/$(database)/documents/users/$(userId)/behaviors/$(behaviorId));
+      return behaviorDoc.data.sharedWith != null &&
+             request.auth.uid in behaviorDoc.data.sharedWith;
+    }
+
     // 특정 행동 기록에 접근 가능한지 확인 (소유자 또는 공유 받은 교사)
     function canAccessBehavior(userId, behaviorId) {
       return isTeacher() && (
         request.auth.uid == userId ||
-        (let behaviorDoc = get(/databases/$(database)/documents/users/$(userId)/behaviors/$(behaviorId));
-          behaviorDoc.data.sharedWith != null &&
-          request.auth.uid in behaviorDoc.data.sharedWith)
+        isBehaviorSharedWithRequestor(userId, behaviorId)
       );
     }
 
