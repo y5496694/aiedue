@@ -346,7 +346,7 @@
                         <!-- IEP navigation link; '개별화교육계획' is commonly referred to as 'IEP'. Modify this section when updating 'iep'. -->
                         <a href="#iep" id="nav-iep" class="nav-link">개별화교육계획(IEP)</a>
                         <a href="#templates" id="nav-templates" class="nav-link">서식 생성</a>
-                        <a href="#behavior" id="nav-behavior" class="nav-link">행동 중재</a>
+                        <a href="#behavior" id="nav-behavior" class="nav-link">행동 기록</a>
                         <button id="logout-btn" class="text-sm bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md transition-colors">로그아웃</button>
                     </nav>
                 </div>
@@ -364,12 +364,6 @@
                             <h3 class="text-xl font-bold mb-4">업무 통계</h3>
                              <div id="stats-chart-container" class="h-48 flex items-center justify-center">
                                 <canvas id="statsChart"></canvas>
-                            </div>
-                        </div>
-                        <div class="md:col-span-2 lg:col-span-3 bg-white p-6 rounded-lg shadow-lg">
-                            <h3 class="text-xl font-bold mb-4">내 학급 목록</h3>
-                            <div id="home-class-list" class="space-y-3">
-                                <!-- Class list will be dynamically inserted here -->
                             </div>
                         </div>
                     </div>
@@ -552,7 +546,7 @@
                 <!-- Behavior Intervention View -->
 
                 <div id="behavior-view" class="hidden">
-                    <h2 class="text-3xl font-bold mb-6">행동 중재</h2>
+                    <h2 class="text-3xl font-bold mb-6">행동 기록</h2>
                     <div class="flex flex-col lg:flex-row gap-6">
                         <aside class="w-full lg:w-1/3 bg-white p-6 rounded-lg shadow-lg h-fit lg:sticky top-24 space-y-4">
                             <div class="flex items-center justify-between">
@@ -560,8 +554,18 @@
                                 <button id="refresh-behavior-students" class="text-xs text-sky-600 hover:underline">새로고침</button>
                             </div>
                             <p class="text-sm text-gray-500">학생을 선택하면 오른쪽에서 행동 기록을 확인하고 추가할 수 있습니다.</p>
-                            <div id="behavior-student-list" class="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                            <div id="behavior-student-list" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 max-h-[520px] overflow-y-auto pr-1">
                                 <p class="text-sm text-gray-500">학생 목록을 불러오는 중입니다...</p>
+                            </div>
+                            <div>
+                                <div class="mt-6 flex items-center justify-between">
+                                    <h3 class="text-lg font-semibold">공유 기록 목록</h3>
+                                    <button id="refresh-shared-behaviors" class="text-xs text-sky-600 hover:underline">새로고침</button>
+                                </div>
+                                <p class="text-sm text-gray-500">공유 받은 행동 기록을 확인할 수 있습니다.</p>
+                                <div id="behavior-shared-list" class="mt-2 space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                                    <p class="text-sm text-gray-500">공유 받은 행동 기록이 없습니다.</p>
+                                </div>
                             </div>
                         </aside>
                         <section class="w-full lg:w-2/3 space-y-6">
@@ -581,10 +585,13 @@
                             </div>
                             <div id="behavior-detail-panel" class="bg-white p-6 rounded-lg shadow-lg hidden">
                                 <div class="flex flex-col gap-2 mb-6">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <h3 id="behavior-detail-title" class="text-2xl font-bold text-slate-800"></h3>
-                                        <span id="behavior-reinforcer-badge" class="hidden rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">강화물</span>
-                                        <span id="behavior-attention-badge" class="hidden rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">주의 토큰</span>
+                                    <div class="flex flex-wrap items-start justify-between gap-2">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <h3 id="behavior-detail-title" class="text-2xl font-bold text-slate-800"></h3>
+                                            <span id="behavior-reinforcer-badge" class="hidden rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">강화물</span>
+                                            <span id="behavior-attention-badge" class="hidden rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">주의 토큰</span>
+                                        </div>
+                                        <button id="behavior-share-btn" class="hidden inline-flex items-center gap-2 rounded-lg border border-sky-200 px-3 py-1.5 text-sm font-semibold text-sky-600 transition hover:bg-sky-50">공유</button>
                                     </div>
                                     <p id="behavior-operational-definition" class="text-sm text-gray-600 whitespace-pre-line"></p>
                                 </div>
@@ -676,6 +683,52 @@
             </div>
         </div>
 
+        <!-- Behavior Share Modal -->
+        <div id="behavior-share-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+            <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <h3 class="text-xl font-semibold text-slate-800">행동 기록 공유</h3>
+                        <p class="mt-1 text-sm text-gray-500">공유할 이용자를 선택하세요.</p>
+                    </div>
+                    <button id="behavior-share-close" type="button" class="text-2xl font-semibold text-slate-400 hover:text-slate-600">&times;</button>
+                </div>
+                <div id="behavior-share-user-list" class="mt-5 max-h-72 overflow-y-auto rounded-lg border border-slate-200 p-3 text-sm text-slate-700 space-y-2">
+                    <p class="text-sm text-gray-500">이용자 목록을 불러오는 중입니다...</p>
+                </div>
+                <div class="mt-6 flex justify-end gap-2">
+                    <button id="behavior-share-cancel" type="button" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">취소</button>
+                    <button id="behavior-share-confirm" type="button" class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-sky-700">공유</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Behavior Log Note Modal -->
+        <div id="behavior-log-note-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+            <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h3 class="text-xl font-semibold text-slate-800">특이 사항 기록</h3>
+                        <p id="behavior-log-note-meta" class="mt-1 text-sm text-gray-500"></p>
+                    </div>
+                    <button id="behavior-log-note-close" type="button" class="text-2xl font-semibold text-slate-400 hover:text-slate-600">&times;</button>
+                </div>
+                <div class="mt-5 space-y-3">
+                    <div>
+                        <label for="behavior-log-note-input" class="block text-sm font-medium text-gray-700">특이 사항</label>
+                        <textarea id="behavior-log-note-input" rows="4" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200" placeholder="특이 사항을 기록해주세요."></textarea>
+                    </div>
+                </div>
+                <div class="mt-6 flex items-center justify-between gap-2">
+                    <button id="behavior-log-note-delete" type="button" class="hidden rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">기록 삭제</button>
+                    <div class="ml-auto flex gap-2">
+                        <button id="behavior-log-note-cancel" type="button" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">취소</button>
+                        <button id="behavior-log-note-save" type="button" class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-sky-700">저장</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Major Evaluation Modal -->
         <div id="major-eval-modal" class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50 p-4">
             <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
@@ -699,7 +752,7 @@
         // Firebase v10 SDK
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, where, orderBy, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, where, orderBy, runTransaction, collectionGroup, deleteField } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         const firebaseConfig = {
             // Your web app's Firebase configuration
@@ -1097,6 +1150,8 @@
         onAuthStateChanged(auth, user => {
             if (user) {
                 currentUserProfile = null;
+                teacherDirectoryLoaded = false;
+                teacherDirectory = [];
                 ensureCurrentUserProfile();
                 authView.classList.add('hidden');
                 mainAppView.classList.remove('hidden');
@@ -1142,6 +1197,9 @@
                     activateTemplateCategory('major-eval');
                 } else if (view === 'behavior') {
                     prepareBehaviorView();
+                } else {
+                    closeBehaviorShareModal();
+                    closeBehaviorLogNoteModal();
                 }
 
             } else { // Fallback to home
@@ -1149,6 +1207,8 @@
                 if (navLinks.home) navLinks.home.classList.add('active');
                 window.location.hash = 'home';
                 loadHomeData();
+                closeBehaviorShareModal();
+                closeBehaviorLogNoteModal();
             }
         };
 
@@ -1213,53 +1273,20 @@
             if (!user || isLoadingHomeData) return;
             isLoadingHomeData = true;
             try {
-         const classRef = doc(db, "classes", user.uid);
-         const iepsRef = collection(db, "users", user.uid, "ieps");
+                const classRef = doc(db, 'classes', user.uid);
+                const iepsRef = collection(db, 'users', user.uid, 'ieps');
 
-         const [classSnap, iepSnap] = await Promise.all([getDoc(classRef), getDocs(iepsRef)]);
+                const [classSnap, iepSnap] = await Promise.all([getDoc(classRef), getDocs(iepsRef)]);
 
-         // Update home class list
-         const homeClassList = document.getElementById('home-class-list');
-         homeClassList.innerHTML = '';
-         if (!classSnap.exists()) {
-             homeClassList.innerHTML = `<p class="text-gray-500">아직 추가된 학급이 없습니다. '내 학급 관리'에서 추가해주세요.</p>`;
-         } else {
-             const data = classSnap.data();
-             const studentIds = data.students || [];
-             if (studentIds.length === 0) {
-                 homeClassList.innerHTML = '<p class="text-gray-500">학생이 없습니다.</p>';
-             } else {
-                 for (const sid of studentIds) {
-                     try {
-                         const sd = await getDoc(doc(db, 'users', sid));
-                         if (sd.exists()) {
-                             const s = sd.data();
-                            const studentEl = document.createElement('div');
-                            studentEl.className = 'p-3 border rounded-md flex justify-between items-center';
-                            studentEl.innerHTML = `<span>${s.name || sid}</span><button class="achievement-btn text-sky-600 hover:underline text-sm">성취 기준</button>`;
-                            studentEl.querySelector('.achievement-btn').addEventListener('click', () => {
-                                openAchievementView(s.name || sid);
-                            });
-                            homeClassList.appendChild(studentEl);
-                        }
-                     } catch (err) {
-                         console.error(err);
-                     }
-                 }
-             }
-         }
-
-
-            // Update stats chart
-         const statsData = {
-             labels: ['학급', 'IEP'],
-             datasets: [{
-                 label: '업무 수',
-                 data: [classSnap.exists() ? 1 : 0, iepSnap.size],
-                 backgroundColor: ['#38bdf8', '#fbbf24'], // sky-400, amber-400
-                 hoverOffset: 4
-             }]
-         };
+                const statsData = {
+                    labels: ['학급', 'IEP'],
+                    datasets: [{
+                        label: '업무 수',
+                        data: [classSnap.exists() ? 1 : 0, iepSnap.size],
+                        backgroundColor: ['#38bdf8', '#fbbf24'],
+                        hoverOffset: 4
+                    }]
+                };
             updateChart('statsChart', 'statsChartInstance', 'doughnut', statsData, {
                 responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { position: 'bottom' } }
@@ -4231,14 +4258,17 @@ ${JSON.stringify(entry.aiData, null, 2)}
         const behaviorStudentList = document.getElementById('behavior-student-list');
         const behaviorSelectedStudentLabel = document.getElementById('behavior-selected-student');
         const behaviorRecordList = document.getElementById('behavior-record-list');
+        const behaviorSharedList = document.getElementById('behavior-shared-list');
         const behaviorDetailPanel = document.getElementById('behavior-detail-panel');
         const behaviorDetailTitle = document.getElementById('behavior-detail-title');
         const behaviorOperationalDefinition = document.getElementById('behavior-operational-definition');
         const behaviorReinforcerBadge = document.getElementById('behavior-reinforcer-badge');
         const behaviorAttentionBadge = document.getElementById('behavior-attention-badge');
+        const behaviorShareBtn = document.getElementById('behavior-share-btn');
         const behaviorLogList = document.getElementById('behavior-log-list');
         const openBehaviorModalBtn = document.getElementById('open-behavior-modal');
         const refreshBehaviorStudentsBtn = document.getElementById('refresh-behavior-students');
+        const refreshSharedBehaviorsBtn = document.getElementById('refresh-shared-behaviors');
         const behaviorModal = document.getElementById('behavior-modal');
         const behaviorModalTitleInput = document.getElementById('behavior-modal-title');
         const behaviorModalReinforcerInput = document.getElementById('behavior-modal-reinforcer');
@@ -4246,17 +4276,43 @@ ${JSON.stringify(entry.aiData, null, 2)}
         const behaviorModalDefinitionInput = document.getElementById('behavior-modal-definition');
         const behaviorModalCancelBtn = document.getElementById('behavior-modal-cancel');
         const behaviorModalSaveBtn = document.getElementById('behavior-modal-save');
+        const behaviorShareModal = document.getElementById('behavior-share-modal');
+        const behaviorShareUserList = document.getElementById('behavior-share-user-list');
+        const behaviorShareCancelBtn = document.getElementById('behavior-share-cancel');
+        const behaviorShareConfirmBtn = document.getElementById('behavior-share-confirm');
+        const behaviorShareCloseBtn = document.getElementById('behavior-share-close');
+        const behaviorLogNoteModal = document.getElementById('behavior-log-note-modal');
+        const behaviorLogNoteInput = document.getElementById('behavior-log-note-input');
+        const behaviorLogNoteMeta = document.getElementById('behavior-log-note-meta');
+        const behaviorLogNoteSaveBtn = document.getElementById('behavior-log-note-save');
+        const behaviorLogNoteCancelBtn = document.getElementById('behavior-log-note-cancel');
+        const behaviorLogNoteDeleteBtn = document.getElementById('behavior-log-note-delete');
+        const behaviorLogNoteCloseBtn = document.getElementById('behavior-log-note-close');
         const logBehaviorBtn = document.getElementById('log-behavior-btn');
 
         let behaviorStudents = [];
         let behaviorEntries = [];
+        let sharedBehaviorEntries = [];
         let currentBehaviorStudentId = '';
         let currentBehaviorEntry = null;
+        let currentBehaviorOwnerId = '';
+        let currentBehaviorSource = 'own';
+        let currentBehaviorLogs = [];
+        let currentBehaviorLogEditing = null;
         let isLoadingBehaviorStudents = false;
         let isLoadingBehaviorEntries = false;
+        let isLoadingSharedBehaviors = false;
+        let isLoadingTeacherDirectory = false;
+        let teacherDirectoryLoaded = false;
+        let teacherDirectory = [];
+        let isUpdatingBehaviorShare = false;
 
         function resetBehaviorDetail() {
             currentBehaviorEntry = null;
+            currentBehaviorOwnerId = '';
+            currentBehaviorSource = 'own';
+            currentBehaviorLogs = [];
+            currentBehaviorLogEditing = null;
             if (behaviorDetailPanel) {
                 behaviorDetailPanel.classList.add('hidden');
             }
@@ -4274,6 +4330,9 @@ ${JSON.stringify(entry.aiData, null, 2)}
             if (logBehaviorBtn) {
                 logBehaviorBtn.disabled = true;
             }
+            closeBehaviorLogNoteModal();
+            updateSharedBehaviorActiveState();
+            updateBehaviorShareButtonState();
         }
 
         function updateBehaviorActionState() {
@@ -4283,6 +4342,7 @@ ${JSON.stringify(entry.aiData, null, 2)}
             if (logBehaviorBtn) {
                 logBehaviorBtn.disabled = !currentBehaviorEntry;
             }
+            updateBehaviorShareButtonState();
         }
 
         async function ensureCurrentUserProfile() {
@@ -4319,6 +4379,24 @@ ${JSON.stringify(entry.aiData, null, 2)}
                 button.classList.toggle('bg-sky-50', isActive);
                 button.classList.toggle('text-sky-700', isActive);
             });
+        }
+
+        function updateSharedBehaviorActiveState() {
+            if (!behaviorSharedList) return;
+            behaviorSharedList.querySelectorAll('button[data-shared-behavior-id]').forEach(button => {
+                const isActive = currentBehaviorEntry && currentBehaviorSource === 'shared' && button.dataset.sharedBehaviorId === currentBehaviorEntry.id && button.dataset.ownerId === currentBehaviorOwnerId;
+                button.classList.toggle('border-sky-500', isActive);
+                button.classList.toggle('bg-sky-50', isActive);
+                button.classList.toggle('text-sky-700', isActive);
+            });
+        }
+
+        function updateBehaviorShareButtonState() {
+            if (!behaviorShareBtn) return;
+            const user = auth.currentUser;
+            const isOwner = !!currentBehaviorEntry && user && currentBehaviorOwnerId === user.uid;
+            behaviorShareBtn.classList.toggle('hidden', !isOwner);
+            behaviorShareBtn.disabled = !isOwner;
         }
 
         function renderBehaviorStudents() {
@@ -4372,6 +4450,32 @@ ${JSON.stringify(entry.aiData, null, 2)}
                 behaviorRecordList.appendChild(button);
             });
             updateBehaviorEntriesActiveState();
+        }
+
+        function renderSharedBehaviorList() {
+            if (!behaviorSharedList) return;
+            behaviorSharedList.innerHTML = '';
+            if (!sharedBehaviorEntries.length) {
+                behaviorSharedList.innerHTML = '<p class="text-sm text-gray-500">공유 받은 행동 기록이 없습니다.</p>';
+                return;
+            }
+            sharedBehaviorEntries.forEach(entry => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.dataset.sharedBehaviorId = entry.id;
+                button.dataset.ownerId = entry.ownerId;
+                button.className = 'w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-sky-400 hover:bg-sky-50';
+                const studentName = escapeHtml(entry.studentName || '학생 미확인');
+                const title = escapeHtml(entry.title || '행동 기록');
+                button.innerHTML = `
+                    <div class="flex flex-col gap-1">
+                        <p class="font-semibold text-slate-800">${studentName}</p>
+                        <p class="text-xs text-slate-500">${title}</p>
+                    </div>
+                `;
+                behaviorSharedList.appendChild(button);
+            });
+            updateSharedBehaviorActiveState();
         }
 
         async function loadBehaviorStudents() {
@@ -4456,7 +4560,15 @@ ${JSON.stringify(entry.aiData, null, 2)}
                 const behaviorsRef = collection(db, 'users', user.uid, 'behaviors');
                 const q = query(behaviorsRef, where('studentId', '==', studentId));
                 const snapshot = await getDocs(q);
-                behaviorEntries = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+                behaviorEntries = snapshot.docs.map(docSnap => {
+                    const data = docSnap.data();
+                    return {
+                        id: docSnap.id,
+                        ...data,
+                        ownerId: data.ownerId || user.uid,
+                        sharedWith: Array.isArray(data.sharedWith) ? data.sharedWith : [],
+                    };
+                });
                 behaviorEntries.sort((a, b) => {
                     const aTime = a.createdAt?.toMillis?.() || 0;
                     const bTime = b.createdAt?.toMillis?.() || 0;
@@ -4469,7 +4581,12 @@ ${JSON.stringify(entry.aiData, null, 2)}
                         const legacyUpdates = [];
                         legacySnapshot.forEach(docSnap => {
                             const data = docSnap.data();
-                            behaviorEntries.push({ id: docSnap.id, ...data });
+                            behaviorEntries.push({
+                                id: docSnap.id,
+                                ...data,
+                                ownerId: data.ownerId || user.uid,
+                                sharedWith: Array.isArray(data.sharedWith) ? data.sharedWith : [],
+                            });
                             if (!data.studentId) {
                                 legacyUpdates.push(updateDoc(doc(db, 'users', user.uid, 'behaviors', docSnap.id), {
                                     studentId,
@@ -4508,11 +4625,262 @@ ${JSON.stringify(entry.aiData, null, 2)}
             }
         }
 
-        function selectBehaviorEntry(behaviorId) {
-            const entry = behaviorEntries.find(item => item.id === behaviorId);
+        async function loadSharedBehaviors() {
+            const user = auth.currentUser;
+            if (!user || !behaviorSharedList || isLoadingSharedBehaviors) return;
+            isLoadingSharedBehaviors = true;
+            behaviorSharedList.innerHTML = '<p class="text-sm text-gray-500">공유 받은 행동 기록을 불러오는 중입니다...</p>';
+            try {
+                const sharedQuery = query(collectionGroup(db, 'behaviors'), where('sharedWith', 'array-contains', user.uid));
+                const snapshot = await getDocs(sharedQuery);
+                sharedBehaviorEntries = snapshot.docs.map(docSnap => {
+                    const data = docSnap.data();
+                    const ownerRef = docSnap.ref.parent?.parent;
+                    const ownerId = ownerRef?.id || data.ownerId || '';
+                    return {
+                        id: docSnap.id,
+                        ownerId,
+                        studentId: data.studentId || '',
+                        studentName: data.studentName || data.studentId || '',
+                        title: data.title || '',
+                        operationalDefinition: data.operationalDefinition || '',
+                        useReinforcer: !!data.useReinforcer,
+                        useAttentionToken: !!data.useAttentionToken,
+                        sharedWith: Array.isArray(data.sharedWith) ? data.sharedWith : [],
+                        createdAt: data.createdAt,
+                    };
+                });
+                sharedBehaviorEntries.sort((a, b) => {
+                    const aTime = a.createdAt?.toMillis?.() || 0;
+                    const bTime = b.createdAt?.toMillis?.() || 0;
+                    return bTime - aTime;
+                });
+                if (currentBehaviorSource === 'shared') {
+                    const stillExists = sharedBehaviorEntries.some(entry => entry.id === currentBehaviorEntry?.id && entry.ownerId === currentBehaviorOwnerId);
+                    if (!stillExists) {
+                        resetBehaviorDetail();
+                        if (behaviorSelectedStudentLabel) {
+                            behaviorSelectedStudentLabel.textContent = '학생을 선택해주세요.';
+                        }
+                    }
+                }
+                renderSharedBehaviorList();
+            } catch (error) {
+                console.error('Failed to load shared behaviors', error);
+                sharedBehaviorEntries = [];
+                if (behaviorSharedList) {
+                    behaviorSharedList.innerHTML = '<p class="text-sm text-red-500">공유 받은 행동 기록을 불러오지 못했습니다.</p>';
+                }
+            } finally {
+                isLoadingSharedBehaviors = false;
+            }
+        }
+
+        async function loadTeacherDirectory() {
+            const user = auth.currentUser;
+            if (!user) return [];
+            if (teacherDirectoryLoaded || isLoadingTeacherDirectory) {
+                return teacherDirectory;
+            }
+            isLoadingTeacherDirectory = true;
+            try {
+                const snapshot = await getDocs(query(collection(db, 'users'), where('role', '==', 'teacher')));
+                teacherDirectory = snapshot.docs
+                    .map(docSnap => {
+                        const data = docSnap.data();
+                        return {
+                            id: docSnap.id,
+                            name: data.name || '',
+                            email: data.email || '',
+                        };
+                    })
+                    .filter(person => person.id && person.id !== user.uid);
+                teacherDirectory.sort((a, b) => {
+                    const nameA = (a.name || a.email || '').toLowerCase();
+                    const nameB = (b.name || b.email || '').toLowerCase();
+                    return nameA.localeCompare(nameB);
+                });
+                teacherDirectoryLoaded = true;
+            } catch (error) {
+                console.error('Failed to load teacher directory', error);
+                teacherDirectory = [];
+            } finally {
+                isLoadingTeacherDirectory = false;
+            }
+            return teacherDirectory;
+        }
+
+        function renderBehaviorShareUserList(selectedIds = []) {
+            if (!behaviorShareUserList) return;
+            behaviorShareUserList.innerHTML = '';
+            if (!teacherDirectory.length) {
+                behaviorShareUserList.innerHTML = '<p class="text-sm text-gray-500">공유 가능한 이용자가 없습니다.</p>';
+                return;
+            }
+            teacherDirectory.forEach(user => {
+                const isChecked = selectedIds.includes(user.id);
+                const label = document.createElement('label');
+                label.className = 'flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 transition hover:border-sky-300';
+                label.innerHTML = `
+                    <input type="checkbox" value="${user.id}" class="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500" ${isChecked ? 'checked' : ''}>
+                    <div class="flex flex-col">
+                        <span class="font-medium text-slate-700">${escapeHtml(user.name || user.email || '이름 미확인')}</span>
+                        ${user.email ? `<span class="text-xs text-slate-500">${escapeHtml(user.email)}</span>` : ''}
+                    </div>
+                `;
+                behaviorShareUserList.appendChild(label);
+            });
+        }
+
+        function openBehaviorShareModal() {
+            const user = auth.currentUser;
+            if (!behaviorShareModal || !behaviorShareBtn || !behaviorShareUserList || !currentBehaviorEntry || !user) return;
+            if (currentBehaviorOwnerId !== user.uid) return;
+            behaviorShareModal.classList.remove('hidden');
+            behaviorShareModal.classList.add('flex');
+            if (behaviorShareConfirmBtn) behaviorShareConfirmBtn.disabled = true;
+            behaviorShareUserList.innerHTML = '<p class="text-sm text-gray-500">이용자 목록을 불러오는 중입니다...</p>';
+            loadTeacherDirectory().then(() => {
+                renderBehaviorShareUserList(currentBehaviorEntry.sharedWith || []);
+                if (behaviorShareConfirmBtn) behaviorShareConfirmBtn.disabled = false;
+            });
+        }
+
+        function closeBehaviorShareModal() {
+            if (!behaviorShareModal) return;
+            behaviorShareModal.classList.add('hidden');
+            behaviorShareModal.classList.remove('flex');
+        }
+
+        async function handleBehaviorShareConfirm() {
+            const user = auth.currentUser;
+            if (!user || !currentBehaviorEntry || currentBehaviorOwnerId !== user.uid || !behaviorShareUserList) return;
+            if (isUpdatingBehaviorShare) return;
+            const selectedIds = Array.from(behaviorShareUserList.querySelectorAll('input[type="checkbox"]:checked')).map(input => input.value);
+            isUpdatingBehaviorShare = true;
+            if (behaviorShareConfirmBtn) behaviorShareConfirmBtn.disabled = true;
+            try {
+                const behaviorRef = doc(db, 'users', user.uid, 'behaviors', currentBehaviorEntry.id);
+                await updateDoc(behaviorRef, {
+                    sharedWith: selectedIds,
+                    ownerId: user.uid,
+                });
+                currentBehaviorEntry.sharedWith = selectedIds;
+                const entryIndex = behaviorEntries.findIndex(entry => entry.id === currentBehaviorEntry.id);
+                if (entryIndex !== -1) {
+                    behaviorEntries[entryIndex].sharedWith = selectedIds;
+                }
+                showToast('공유 설정이 저장되었습니다.');
+                closeBehaviorShareModal();
+                loadSharedBehaviors();
+            } catch (error) {
+                console.error('Failed to update behavior sharing', error);
+                alert('공유 설정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.');
+            } finally {
+                isUpdatingBehaviorShare = false;
+                if (behaviorShareConfirmBtn) behaviorShareConfirmBtn.disabled = false;
+            }
+        }
+
+        function canEditLogItem(logItem) {
+            const user = auth.currentUser;
+            if (!user) return false;
+            if (currentBehaviorOwnerId === user.uid) return true;
+            return logItem.recordedBy === user.uid;
+        }
+
+        function canDeleteLogItem(logItem) {
+            const user = auth.currentUser;
+            if (!user) return false;
+            return currentBehaviorOwnerId === user.uid;
+        }
+
+        function openBehaviorLogNoteModal(logId) {
+            if (!behaviorLogNoteModal || !currentBehaviorEntry) return;
+            const logItem = currentBehaviorLogs.find(item => item.id === logId);
+            if (!logItem) return;
+            if (!canEditLogItem(logItem)) {
+                alert('해당 기록에 특이 사항을 남길 권한이 없습니다.');
+                return;
+            }
+            currentBehaviorLogEditing = logItem;
+            const name = logItem.recordedByName || '기록자 미상';
+            const time = logItem.timestamp ? formatTimestamp(logItem.timestamp) : '시간 정보 없음';
+            if (behaviorLogNoteMeta) {
+                behaviorLogNoteMeta.textContent = `${name} · ${time}`;
+            }
+            if (behaviorLogNoteInput) {
+                behaviorLogNoteInput.value = logItem.note || '';
+            }
+            if (behaviorLogNoteDeleteBtn) {
+                behaviorLogNoteDeleteBtn.classList.toggle('hidden', !canDeleteLogItem(logItem));
+            }
+            behaviorLogNoteModal.classList.remove('hidden');
+            behaviorLogNoteModal.classList.add('flex');
+            setTimeout(() => behaviorLogNoteInput?.focus(), 50);
+        }
+
+        function closeBehaviorLogNoteModal() {
+            if (!behaviorLogNoteModal) return;
+            currentBehaviorLogEditing = null;
+            behaviorLogNoteModal.classList.add('hidden');
+            behaviorLogNoteModal.classList.remove('flex');
+        }
+
+        async function saveBehaviorLogNote() {
+            const user = auth.currentUser;
+            if (!user || !currentBehaviorEntry || !currentBehaviorLogEditing) return;
+            if (!canEditLogItem(currentBehaviorLogEditing)) {
+                alert('해당 기록에 특이 사항을 남길 권한이 없습니다.');
+                return;
+            }
+            const noteValue = (behaviorLogNoteInput?.value || '').trim();
+            const ownerId = currentBehaviorOwnerId || user.uid;
+            try {
+                const logRef = doc(db, 'users', ownerId, 'behaviors', currentBehaviorEntry.id, 'logs', currentBehaviorLogEditing.id);
+                if (noteValue) {
+                    await updateDoc(logRef, { note: noteValue });
+                } else {
+                    await updateDoc(logRef, { note: deleteField() });
+                }
+                showToast('특이 사항이 저장되었습니다.');
+                closeBehaviorLogNoteModal();
+                loadBehaviorLogs(currentBehaviorEntry.id, currentBehaviorOwnerId);
+            } catch (error) {
+                console.error('Failed to save behavior log note', error);
+                alert('특이 사항을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.');
+            }
+        }
+
+        async function deleteBehaviorLogEntry() {
+            const user = auth.currentUser;
+            if (!user || !currentBehaviorEntry || !currentBehaviorLogEditing) return;
+            if (!canDeleteLogItem(currentBehaviorLogEditing)) {
+                alert('행동 기록을 삭제할 권한이 없습니다.');
+                return;
+            }
+            if (!confirm('해당 행동 기록을 삭제하시겠습니까?')) return;
+            const ownerId = currentBehaviorOwnerId || user.uid;
+            try {
+                await deleteDoc(doc(db, 'users', ownerId, 'behaviors', currentBehaviorEntry.id, 'logs', currentBehaviorLogEditing.id));
+                showToast('행동 기록이 삭제되었습니다.');
+                closeBehaviorLogNoteModal();
+                loadBehaviorLogs(currentBehaviorEntry.id, currentBehaviorOwnerId);
+            } catch (error) {
+                console.error('Failed to delete behavior log', error);
+                alert('행동 기록을 삭제하지 못했습니다. 잠시 후 다시 시도해주세요.');
+            }
+        }
+
+        function selectBehaviorEntry(behaviorId, options = {}) {
+            const entry = options.entry || behaviorEntries.find(item => item.id === behaviorId);
             if (!entry) return;
             currentBehaviorEntry = entry;
+            const user = auth.currentUser;
+            currentBehaviorOwnerId = options.ownerId || entry.ownerId || user?.uid || '';
+            currentBehaviorSource = options.source || 'own';
             updateBehaviorEntriesActiveState();
+            updateSharedBehaviorActiveState();
             showBehaviorDetail(entry);
         }
 
@@ -4537,15 +4905,17 @@ ${JSON.stringify(entry.aiData, null, 2)}
                 renderBehaviorChart([], [], entry.title || '');
             });
             updateBehaviorActionState();
-            loadBehaviorLogs(entry.id);
+            loadBehaviorLogs(entry.id, currentBehaviorOwnerId);
         }
 
-        async function loadBehaviorLogs(behaviorId) {
+        async function loadBehaviorLogs(behaviorId, ownerId) {
             if (!currentBehaviorEntry || currentBehaviorEntry.id !== behaviorId) return;
             const user = auth.currentUser;
             if (!user) return;
+            const targetOwnerId = ownerId || currentBehaviorOwnerId || user.uid;
+            if (!targetOwnerId) return;
             try {
-                const logsRef = collection(db, 'users', user.uid, 'behaviors', behaviorId, 'logs');
+                const logsRef = collection(db, 'users', targetOwnerId, 'behaviors', behaviorId, 'logs');
                 const logSnapshot = await getDocs(query(logsRef, orderBy('timestamp', 'asc')));
                 const dailyCounts = new Map();
                 const logItems = [];
@@ -4560,15 +4930,18 @@ ${JSON.stringify(entry.aiData, null, 2)}
                         id: docSnap.id,
                         timestamp,
                         recordedByName: data.recordedByName || '',
-                        recordedBy: data.recordedBy || ''
+                        recordedBy: data.recordedBy || '',
+                        note: data.note || '',
                     });
                 });
+                currentBehaviorLogs = logItems;
                 renderBehaviorLogList(logItems);
                 const labels = Array.from(dailyCounts.keys());
                 const dataPoints = labels.map(label => dailyCounts.get(label));
                 renderBehaviorChart(labels, dataPoints, currentBehaviorEntry.title);
             } catch (error) {
                 console.error('Failed to load behavior logs', error);
+                currentBehaviorLogs = [];
                 if (behaviorLogList) {
                     behaviorLogList.innerHTML = '<li class="text-sm text-red-500">기록을 불러오지 못했습니다.</li>';
                 }
@@ -4587,7 +4960,17 @@ ${JSON.stringify(entry.aiData, null, 2)}
                 li.className = 'rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm';
                 const name = escapeHtml(item.recordedByName || '기록자 미상');
                 const time = item.timestamp ? formatTimestamp(item.timestamp) : '시간 정보 없음';
-                li.innerHTML = `<div class="flex flex-col gap-1"><span class="font-semibold text-slate-700">${name}</span><span class="text-xs text-slate-500">${escapeHtml(time)}</span></div>`;
+                const note = (item.note || '').trim();
+                const noteContent = note
+                    ? `<p class="text-sm text-slate-600 whitespace-pre-line">특이 사항: ${escapeHtml(note)}</p>`
+                    : '<p class="text-xs text-sky-600">특이 사항을 추가하려면 클릭하세요.</p>';
+                li.innerHTML = `
+                    <button type="button" data-log-id="${item.id}" class="flex w-full flex-col gap-1 text-left">
+                        <span class="font-semibold text-slate-700">${name}</span>
+                        <span class="text-xs text-slate-500">${escapeHtml(time)}</span>
+                        ${noteContent}
+                    </button>
+                `;
                 behaviorLogList.appendChild(li);
             });
         }
@@ -4706,7 +5089,29 @@ ${JSON.stringify(entry.aiData, null, 2)}
             });
         }
 
-        refreshBehaviorStudentsBtn?.addEventListener('click', () => loadBehaviorStudents());
+        if (behaviorSharedList) {
+            behaviorSharedList.addEventListener('click', (event) => {
+                const button = event.target.closest('button[data-shared-behavior-id]');
+                if (!button) return;
+                const behaviorId = button.dataset.sharedBehaviorId;
+                const ownerId = button.dataset.ownerId;
+                const entry = sharedBehaviorEntries.find(item => item.id === behaviorId && item.ownerId === ownerId);
+                if (!entry) return;
+                if (behaviorSelectedStudentLabel) {
+                    const displayName = entry.studentName || '학생';
+                    behaviorSelectedStudentLabel.textContent = `${displayName} 학생 (공유)`;
+                }
+                currentBehaviorStudentId = '';
+                selectBehaviorEntry(behaviorId, { entry, ownerId, source: 'shared' });
+                updateBehaviorActionState();
+            });
+        }
+
+        refreshBehaviorStudentsBtn?.addEventListener('click', () => {
+            loadBehaviorStudents();
+            loadSharedBehaviors();
+        });
+        refreshSharedBehaviorsBtn?.addEventListener('click', () => loadSharedBehaviors());
 
         openBehaviorModalBtn?.addEventListener('click', () => {
             if (!currentBehaviorStudentId) {
@@ -4724,6 +5129,34 @@ ${JSON.stringify(entry.aiData, null, 2)}
         });
         behaviorModalSaveBtn?.addEventListener('click', handleBehaviorModalSave);
 
+        behaviorShareBtn?.addEventListener('click', openBehaviorShareModal);
+        behaviorShareCancelBtn?.addEventListener('click', closeBehaviorShareModal);
+        behaviorShareCloseBtn?.addEventListener('click', closeBehaviorShareModal);
+        behaviorShareModal?.addEventListener('click', (event) => {
+            if (event.target === behaviorShareModal) {
+                closeBehaviorShareModal();
+            }
+        });
+        behaviorShareConfirmBtn?.addEventListener('click', handleBehaviorShareConfirm);
+
+        if (behaviorLogList) {
+            behaviorLogList.addEventListener('click', (event) => {
+                const button = event.target.closest('button[data-log-id]');
+                if (!button) return;
+                openBehaviorLogNoteModal(button.dataset.logId);
+            });
+        }
+
+        behaviorLogNoteCancelBtn?.addEventListener('click', closeBehaviorLogNoteModal);
+        behaviorLogNoteCloseBtn?.addEventListener('click', closeBehaviorLogNoteModal);
+        behaviorLogNoteModal?.addEventListener('click', (event) => {
+            if (event.target === behaviorLogNoteModal) {
+                closeBehaviorLogNoteModal();
+            }
+        });
+        behaviorLogNoteSaveBtn?.addEventListener('click', saveBehaviorLogNote);
+        behaviorLogNoteDeleteBtn?.addEventListener('click', deleteBehaviorLogEntry);
+
         if (logBehaviorBtn) {
             logBehaviorBtn.addEventListener('click', async () => {
                 if (!currentBehaviorEntry) {
@@ -4734,14 +5167,15 @@ ${JSON.stringify(entry.aiData, null, 2)}
                 if (!user) return;
                 const recorderName = await getRecorderDisplayName();
                 try {
-                    await addDoc(collection(db, 'users', user.uid, 'behaviors', currentBehaviorEntry.id, 'logs'), {
+                    const ownerId = currentBehaviorOwnerId || user.uid;
+                    await addDoc(collection(db, 'users', ownerId, 'behaviors', currentBehaviorEntry.id, 'logs'), {
                         timestamp: serverTimestamp(),
                         recordedBy: user.uid,
                         recordedByName: recorderName
                     });
                     const title = currentBehaviorEntry.title || '행동';
                     showToast(`${title}이 기록되었습니다.`);
-                    loadBehaviorLogs(currentBehaviorEntry.id);
+                    loadBehaviorLogs(currentBehaviorEntry.id, currentBehaviorOwnerId);
                 } catch (error) {
                     console.error('Failed to record behavior log', error);
                     alert('행동을 기록하지 못했습니다. 잠시 후 다시 시도해주세요.');
@@ -4752,6 +5186,10 @@ ${JSON.stringify(entry.aiData, null, 2)}
         window.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && behaviorModal && !behaviorModal.classList.contains('hidden')) {
                 closeBehaviorModal();
+            } else if (event.key === 'Escape' && behaviorShareModal && !behaviorShareModal.classList.contains('hidden')) {
+                closeBehaviorShareModal();
+            } else if (event.key === 'Escape' && behaviorLogNoteModal && !behaviorLogNoteModal.classList.contains('hidden')) {
+                closeBehaviorLogNoteModal();
             }
         });
 
@@ -4762,6 +5200,7 @@ ${JSON.stringify(entry.aiData, null, 2)}
             resetBehaviorDetail();
             updateBehaviorActionState();
             loadBehaviorStudents();
+            loadSharedBehaviors();
         }
 
         // --- UTILITY FUNCTIONS ---
