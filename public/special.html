@@ -397,6 +397,18 @@
                             <p class="text-sm text-gray-500">행동 기록을 불러오는 중입니다...</p>
                         </div>
                     </div>
+                    <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                            <div>
+                                <h3 class="text-lg sm:text-xl font-bold text-slate-800">🎨 에이두 스케치북</h3>
+                                <p class="text-xs text-slate-500">수업 자료와 활동을 자유롭게 기록해보세요.</p>
+                            </div>
+                            <button id="create-sketch-btn" class="self-start rounded-md bg-sky-600 px-3 py-2 text-xs sm:text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">스케치북 만들기</button>
+                        </div>
+                        <ul id="sketchbook-list" class="space-y-2 max-h-80 overflow-y-auto">
+                            <li class="text-sm text-gray-500">스케치북을 불러오는 중입니다...</li>
+                        </ul>
+                    </div>
                 </div>
                 
                 <!-- My Class View -->
@@ -635,11 +647,10 @@
                                         </div>
                                         <div class="w-full lg:w-56 rounded-lg border border-slate-200 bg-slate-50 p-4">
                                             <h5 class="text-sm font-semibold text-slate-700 mb-3">그래프 보기</h5>
-                                            <div class="space-y-2">
-                                                <button class="w-full rounded-md border border-sky-200 px-3 py-2 text-sm font-medium text-sky-600 transition hover:bg-sky-50">오늘 하루 시간별로 보기</button>
-                                                <button class="w-full rounded-md border border-sky-200 px-3 py-2 text-sm font-medium text-sky-600 transition hover:bg-sky-50">일별로 보기</button>
-                                                <button class="w-full rounded-md border border-sky-200 px-3 py-2 text-sm font-medium text-sky-600 transition hover:bg-sky-50">월별로 보기</button>
-                                                <button class="w-full rounded-md border border-sky-200 px-3 py-2 text-sm font-medium text-sky-600 transition hover:bg-sky-50">기타(몇일부터 몇일 지정해서 일별로 그래프화)</button>
+                                            <div id="behavior-graph-view-buttons" class="space-y-2">
+                                                <button type="button" data-view="hourly" class="graph-view-btn w-full rounded-md border border-sky-200 bg-white px-3 py-2 text-sm font-medium text-sky-600 transition hover:bg-sky-50">시간별</button>
+                                                <button type="button" data-view="daily" class="graph-view-btn w-full rounded-md border border-sky-600 bg-sky-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-700">일별</button>
+                                                <button type="button" data-view="monthly" class="graph-view-btn w-full rounded-md border border-sky-200 bg-white px-3 py-2 text-sm font-medium text-sky-600 transition hover:bg-sky-50">월별</button>
                                             </div>
                                         </div>
                                     </div>
@@ -796,6 +807,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, where, orderBy, runTransaction, collectionGroup, deleteField } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getStorage, ref as storageRef, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
         const firebaseConfig = {
             // Your web app's Firebase configuration
@@ -810,6 +822,7 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const storage = getStorage(app);
 
         // --- DOM Elements ---
         const authView = document.getElementById('auth-view');
@@ -845,6 +858,8 @@
         const userEmailSpan = document.getElementById('user-email');
         const homeBehaviorTable = document.getElementById('home-behavior-table');
         const homeBehaviorRefreshBtn = document.getElementById('home-behavior-refresh');
+        const createSketchBtn = document.getElementById('create-sketch-btn');
+        const sketchbookListEl = document.getElementById('sketchbook-list');
         const toast = document.getElementById('toast');
         const levelButtons = document.getElementById('level-buttons');
         const subjectButtons = document.getElementById('subject-buttons');
@@ -905,6 +920,7 @@
         let currentUserProfile = null;
         let isLoadingHomeData = false;
         let isLoadingHomeBehaviors = false;
+        let isLoadingSketchbooks = false;
         let homeBehaviorEntries = [];
         const MAJOR_EVAL_STORAGE_KEY = 'aiedue:major-eval:entries:v1';
         const MAJOR_EVAL_ACTIVE_STORAGE_KEY = 'aiedue:major-eval:active';
@@ -1216,6 +1232,9 @@
                 if (studentCodeInput) studentCodeInput.value = '';
                 if (teacherEmailInput) teacherEmailInput.value = '';
                 if (teacherPasswordInput) teacherPasswordInput.value = '';
+                if (sketchbookListEl) {
+                    sketchbookListEl.innerHTML = '<li class="text-sm text-gray-500">스케치북을 불러오려면 로그인해주세요.</li>';
+                }
             }
         });
 
@@ -1318,6 +1337,7 @@
             if (!user || isLoadingHomeData) return;
             isLoadingHomeData = true;
             loadHomeBehaviorOverview();
+            renderSketchbookList();
             try {
                 const classRef = doc(db, 'classes', user.uid);
                 const iepsRef = collection(db, 'users', user.uid, 'ieps');
@@ -1435,16 +1455,14 @@
 
                 container.innerHTML = `
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-                        <div class="sm:w-20">
-                            <button type="button" class="w-full rounded-md border border-sky-200 bg-white px-3 py-2 text-center text-xs font-semibold text-sky-600 transition hover:bg-sky-50" data-entry-index="${index}" data-action="view">이동</button>
-                        </div>
                         <div class="flex-1 min-w-0">
                             <p class="font-semibold text-slate-800 break-words">${studentLabel}</p>
                             <p class="text-sm text-slate-600 break-words">${behaviorLabel}</p>
                             ${badgesHtml}
                             <p class="mt-2 text-xs text-slate-500 break-words">${definition}</p>
                         </div>
-                        <div class="sm:w-20">
+                        <div class="flex items-center gap-2 sm:flex-col sm:items-stretch sm:w-36">
+                            <button type="button" class="w-full rounded-md border border-sky-200 bg-white px-3 py-2 text-center text-xs font-semibold text-sky-600 transition hover:bg-sky-50" data-entry-index="${index}" data-action="view">이동</button>
                             <button type="button" class="w-full rounded-md bg-emerald-500 px-3 py-2 text-center text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-600" data-entry-index="${index}" data-action="log">기록</button>
                         </div>
                     </div>
@@ -1454,9 +1472,175 @@
             });
         }
 
+        function generateUniqueSketchCode(existingCodes = new Set()) {
+            const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            const codeLength = 6;
+            const codes = existingCodes instanceof Set ? existingCodes : new Set(existingCodes);
+            let code = '';
+            do {
+                code = Array.from({ length: codeLength }, () => characters[Math.floor(Math.random() * characters.length)]).join('');
+            } while (codes.has(code));
+            return code;
+        }
+
+        async function renderSketchbookList() {
+            const user = auth.currentUser;
+            if (!user || !sketchbookListEl) return;
+            if (isLoadingSketchbooks) return;
+            isLoadingSketchbooks = true;
+            sketchbookListEl.innerHTML = '<li class="p-3 text-sm text-gray-500">스케치북을 불러오는 중입니다...</li>';
+            try {
+                const snap = await getDocs(collection(db, 'users', user.uid, 'sketches'));
+                const sketches = [];
+                const existingCodes = new Set();
+
+                snap.forEach(docSnap => {
+                    const data = docSnap.data() || {};
+                    if (data.code) existingCodes.add(data.code);
+                    sketches.push({ id: docSnap.id, ...data });
+                });
+
+                for (const sketch of sketches) {
+                    if (!sketch.code) {
+                        const newCode = generateUniqueSketchCode(existingCodes);
+                        existingCodes.add(newCode);
+                        try {
+                            await updateDoc(doc(db, 'users', user.uid, 'sketches', sketch.id), { code: newCode });
+                        } catch (error) {
+                            console.error('Failed to assign sketch code', error);
+                        }
+                        sketch.code = newCode;
+                    }
+                }
+
+                sketchbookListEl.innerHTML = '';
+
+                if (!sketches.length) {
+                    const emptyMessage = document.createElement('li');
+                    emptyMessage.className = 'p-4 bg-slate-50 rounded text-center text-sm text-gray-500 border border-dashed border-slate-200';
+                    emptyMessage.textContent = '아직 만든 스케치북이 없습니다. 새로운 스케치북을 만들어보세요!';
+                    sketchbookListEl.appendChild(emptyMessage);
+                    return;
+                }
+
+                sketches.sort((a, b) => {
+                    const timeA = a.createdAt?.toMillis?.() || 0;
+                    const timeB = b.createdAt?.toMillis?.() || 0;
+                    return timeB - timeA;
+                });
+
+                sketches.forEach(sketch => {
+                    const li = document.createElement('li');
+                    li.className = 'p-3 bg-white rounded border border-slate-200 shadow-sm flex items-center justify-between gap-4';
+
+                    const infoBtn = document.createElement('button');
+                    infoBtn.type = 'button';
+                    infoBtn.className = 'flex-1 text-left';
+                    const sketchName = escapeHtml(sketch.name || '새 스케치북');
+                    const sketchCode = escapeHtml(sketch.code || '생성 중');
+                    infoBtn.innerHTML = `
+                        <div class="font-semibold text-slate-800">${sketchName}</div>
+                        <div class="text-xs text-slate-500 mt-1">코드: ${sketchCode}</div>
+                    `;
+                    infoBtn.addEventListener('click', () => {
+                        window.open(`sketch.html?sketchId=${encodeURIComponent(sketch.id)}&code=${encodeURIComponent(sketch.code || '')}`, '_blank');
+                    });
+                    li.appendChild(infoBtn);
+
+                    const buttonGroup = document.createElement('div');
+                    buttonGroup.className = 'flex items-center gap-3';
+
+                    const renameBtn = document.createElement('button');
+                    renameBtn.type = 'button';
+                    renameBtn.className = 'text-sm text-sky-600 hover:underline';
+                    renameBtn.textContent = '이름 변경';
+                    renameBtn.addEventListener('click', async (event) => {
+                        event.preventDefault();
+                        const newName = prompt('새 이름을 입력하세요', sketch.name || '새 스케치북');
+                        if (!newName) return;
+                        try {
+                            await updateDoc(doc(db, 'users', user.uid, 'sketches', sketch.id), { name: newName });
+                            await renderSketchbookList();
+                        } catch (error) {
+                            console.error('Failed to rename sketchbook', error);
+                            alert('스케치북 이름을 변경하지 못했습니다. 잠시 후 다시 시도해주세요.');
+                        }
+                    });
+                    buttonGroup.appendChild(renameBtn);
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'text-sm text-red-500 hover:underline';
+                    deleteBtn.textContent = '삭제';
+                    deleteBtn.addEventListener('click', async (event) => {
+                        event.preventDefault();
+                        if (!confirm('정말 삭제하시겠습니까?')) return;
+                        try {
+                            await deleteDoc(doc(db, 'users', user.uid, 'sketches', sketch.id));
+                            try {
+                                await deleteObject(storageRef(storage, `sketch/${user.uid}/${sketch.id}.excalidraw`));
+                            } catch (storageError) {
+                                if (storageError?.code !== 'storage/object-not-found') {
+                                    console.error('Failed to delete sketch file', storageError);
+                                }
+                            }
+                            await renderSketchbookList();
+                        } catch (error) {
+                            console.error('Failed to delete sketchbook', error);
+                            alert('스케치북을 삭제하지 못했습니다. 잠시 후 다시 시도해주세요.');
+                        }
+                    });
+                    buttonGroup.appendChild(deleteBtn);
+
+                    li.appendChild(buttonGroup);
+                    sketchbookListEl.appendChild(li);
+                });
+            } catch (error) {
+                console.error('Failed to load sketchbooks', error);
+                sketchbookListEl.innerHTML = '<li class="p-3 text-sm text-red-500">스케치북을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.</li>';
+            } finally {
+                isLoadingSketchbooks = false;
+            }
+        }
+
+        async function logBehaviorFromHome(entry) {
+            const user = auth.currentUser;
+            if (!user) return;
+            if (!entry?.id) {
+                alert('행동 정보가 올바르지 않습니다.');
+                return;
+            }
+            try {
+                const recorderName = await getRecorderDisplayName();
+                const ownerId = entry.ownerId || user.uid;
+                await addDoc(collection(db, 'users', ownerId, 'behaviors', entry.id, 'logs'), {
+                    timestamp: serverTimestamp(),
+                    recordedBy: user.uid,
+                    recordedByName: recorderName
+                });
+                const title = entry.title || '행동';
+                showToast(`${title}이 기록되었습니다.`);
+                if (currentBehaviorEntry && currentBehaviorEntry.id === entry.id) {
+                    const expectedOwnerId = currentBehaviorOwnerId || user.uid;
+                    if (expectedOwnerId === ownerId) {
+                        loadBehaviorLogs(entry.id, ownerId);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to record behavior log from home', error);
+                alert('행동을 기록하지 못했습니다. 잠시 후 다시 시도해주세요.');
+            }
+        }
+
         async function handleHomeBehaviorAction(entryIndex, action = 'view') {
             const entry = homeBehaviorEntries[entryIndex];
             if (!entry) return;
+
+            if (action === 'log') {
+                await logBehaviorFromHome(entry);
+                return;
+            }
+
             try {
                 if (entry.source === 'mine') {
                     currentBehaviorStudentId = entry.studentId || '';
@@ -1491,14 +1675,6 @@
                     updateSharedBehaviorActiveState();
                     updateBehaviorActionState();
                 }
-
-                if (action === 'log') {
-                    if (logBehaviorBtn?.disabled) {
-                        alert('행동 기록을 선택해주세요.');
-                        return;
-                    }
-                    logBehaviorBtn.click();
-                }
             } catch (error) {
                 console.error('Failed to open behavior entry from home', error);
             }
@@ -1508,13 +1684,54 @@
             loadHomeBehaviorOverview({ force: true });
         });
 
-        homeBehaviorTable?.addEventListener('click', (event) => {
+        createSketchBtn?.addEventListener('click', async () => {
+            const user = auth.currentUser;
+            if (!user || createSketchBtn.disabled) return;
+            createSketchBtn.disabled = true;
+            createSketchBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            try {
+                const snap = await getDocs(collection(db, 'users', user.uid, 'sketches'));
+                const existingCodes = new Set();
+                snap.forEach(docSnap => {
+                    const data = docSnap.data() || {};
+                    if (data.code) existingCodes.add(data.code);
+                });
+                const newCode = generateUniqueSketchCode(existingCodes);
+                const docRef = await addDoc(collection(db, 'users', user.uid, 'sketches'), {
+                    name: '새 스케치북',
+                    createdAt: serverTimestamp(),
+                    code: newCode
+                });
+                await renderSketchbookList();
+                window.open(`sketch.html?sketchId=${encodeURIComponent(docRef.id)}&code=${encodeURIComponent(newCode)}`, '_blank');
+            } catch (error) {
+                console.error('Failed to create sketchbook', error);
+                alert('스케치북을 만들지 못했습니다. 잠시 후 다시 시도해주세요.');
+            } finally {
+                createSketchBtn.disabled = false;
+                createSketchBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        });
+
+        homeBehaviorTable?.addEventListener('click', async (event) => {
             const button = event.target.closest('button[data-entry-index]');
             if (!button) return;
             const index = Number(button.dataset.entryIndex);
             if (Number.isNaN(index)) return;
             const action = button.dataset.action || 'view';
-            handleHomeBehaviorAction(index, action);
+            const shouldDisable = action === 'log';
+            if (shouldDisable) {
+                button.disabled = true;
+                button.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+            try {
+                await handleHomeBehaviorAction(index, action);
+            } finally {
+                if (shouldDisable) {
+                    button.disabled = false;
+                    button.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
         });
 
         // --- My Class View Logic ---
@@ -4525,6 +4742,7 @@ ${JSON.stringify(entry.aiData, null, 2)}
         const behaviorAttentionBadge = document.getElementById('behavior-attention-badge');
         const behaviorShareBtn = document.getElementById('behavior-share-btn');
         const behaviorLogList = document.getElementById('behavior-log-list');
+        const behaviorGraphViewButtons = document.getElementById('behavior-graph-view-buttons');
         const openBehaviorModalBtn = document.getElementById('open-behavior-modal');
         const refreshBehaviorStudentsBtn = document.getElementById('refresh-behavior-students');
         const refreshSharedBehaviorsBtn = document.getElementById('refresh-shared-behaviors');
@@ -4557,6 +4775,8 @@ ${JSON.stringify(entry.aiData, null, 2)}
         let currentBehaviorOwnerId = '';
         let currentBehaviorSource = 'own';
         let currentBehaviorLogs = [];
+        let currentBehaviorChartView = 'daily';
+        let currentBehaviorChartData = createEmptyBehaviorChartData();
         let currentBehaviorLogEditing = null;
         let isLoadingBehaviorStudents = false;
         let isLoadingBehaviorEntries = false;
@@ -4571,6 +4791,9 @@ ${JSON.stringify(entry.aiData, null, 2)}
             currentBehaviorOwnerId = '';
             currentBehaviorSource = 'own';
             currentBehaviorLogs = [];
+            currentBehaviorChartView = 'daily';
+            currentBehaviorChartData = createEmptyBehaviorChartData();
+            setBehaviorChartView('daily', false);
             currentBehaviorLogEditing = null;
             if (behaviorDetailPanel) {
                 behaviorDetailPanel.classList.add('hidden');
@@ -5273,9 +5496,9 @@ ${JSON.stringify(entry.aiData, null, 2)}
             if (behaviorLogList) {
                 behaviorLogList.innerHTML = '<li class="text-gray-500">기록을 불러오는 중입니다...</li>';
             }
-            requestAnimationFrame(() => {
-                renderBehaviorChart([], [], entry.title || '');
-            });
+            currentBehaviorChartData = createEmptyBehaviorChartData();
+            currentBehaviorChartView = 'daily';
+            setBehaviorChartView('daily');
             updateBehaviorActionState();
             loadBehaviorLogs(entry.id, currentBehaviorOwnerId);
         }
@@ -5286,17 +5509,33 @@ ${JSON.stringify(entry.aiData, null, 2)}
             if (!user) return;
             const targetOwnerId = ownerId || currentBehaviorOwnerId || user.uid;
             if (!targetOwnerId) return;
+            currentBehaviorChartData = createEmptyBehaviorChartData();
             try {
                 const logsRef = collection(db, 'users', targetOwnerId, 'behaviors', behaviorId, 'logs');
                 const logSnapshot = await getDocs(query(logsRef, orderBy('timestamp', 'asc')));
                 const dailyCounts = new Map();
+                const monthlyCounts = new Map();
+                const hourlyCounts = new Map();
                 const logItems = [];
+                let latestDateKey = '';
+                let latestTimestamp = null;
+
                 logSnapshot.forEach(docSnap => {
                     const data = docSnap.data();
                     const timestamp = data.timestamp?.toDate?.() || null;
+                    let dateKey = '';
+                    let hour = null;
                     if (timestamp) {
-                        const dateLabel = timestamp.toLocaleDateString('ko-KR');
-                        dailyCounts.set(dateLabel, (dailyCounts.get(dateLabel) || 0) + 1);
+                        dateKey = formatDateKey(timestamp);
+                        hour = timestamp.getHours();
+                        const dayLabel = timestamp.toLocaleDateString('ko-KR');
+                        dailyCounts.set(dayLabel, (dailyCounts.get(dayLabel) || 0) + 1);
+                        const monthKey = `${timestamp.getFullYear()}-${String(timestamp.getMonth() + 1).padStart(2, '0')}`;
+                        monthlyCounts.set(monthKey, (monthlyCounts.get(monthKey) || 0) + 1);
+                        if (!latestTimestamp || timestamp > latestTimestamp) {
+                            latestTimestamp = timestamp;
+                            latestDateKey = dateKey;
+                        }
                     }
                     logItems.push({
                         id: docSnap.id,
@@ -5304,16 +5543,48 @@ ${JSON.stringify(entry.aiData, null, 2)}
                         recordedByName: data.recordedByName || '',
                         recordedBy: data.recordedBy || '',
                         note: data.note || '',
+                        dateKey,
+                        hour
                     });
                 });
-                currentBehaviorLogs = logItems;
-                renderBehaviorLogList(logItems);
-                const labels = Array.from(dailyCounts.keys());
-                const dataPoints = labels.map(label => dailyCounts.get(label));
-                renderBehaviorChart(labels, dataPoints, currentBehaviorEntry.title);
+
+                if (latestDateKey) {
+                    logItems.forEach(item => {
+                        if (item.dateKey === latestDateKey && item.hour !== null) {
+                            const label = `${String(item.hour).padStart(2, '0')}시`;
+                            hourlyCounts.set(label, (hourlyCounts.get(label) || 0) + 1);
+                        }
+                    });
+                }
+
+                currentBehaviorLogs = logItems.map(({ dateKey, hour, ...rest }) => rest);
+                renderBehaviorLogList(currentBehaviorLogs);
+
+                const hourlyLabels = Array.from(hourlyCounts.keys());
+                const dailyLabels = Array.from(dailyCounts.keys());
+                const monthlyKeys = Array.from(monthlyCounts.keys());
+
+                currentBehaviorChartData = {
+                    hourly: {
+                        labels: hourlyLabels,
+                        data: hourlyLabels.map(label => hourlyCounts.get(label) || 0)
+                    },
+                    daily: {
+                        labels: dailyLabels,
+                        data: dailyLabels.map(label => dailyCounts.get(label) || 0)
+                    },
+                    monthly: {
+                        labels: monthlyKeys.map(formatMonthLabel),
+                        data: monthlyKeys.map(key => monthlyCounts.get(key) || 0)
+                    }
+                };
+
+                setBehaviorChartView(currentBehaviorChartView, true);
             } catch (error) {
                 console.error('Failed to load behavior logs', error);
                 currentBehaviorLogs = [];
+                currentBehaviorChartData = createEmptyBehaviorChartData();
+                setBehaviorChartView(currentBehaviorChartView, true);
                 if (behaviorLogList) {
                     behaviorLogList.innerHTML = '<li class="text-sm text-red-500">기록을 불러오지 못했습니다.</li>';
                 }
@@ -5345,6 +5616,38 @@ ${JSON.stringify(entry.aiData, null, 2)}
                 `;
                 behaviorLogList.appendChild(li);
             });
+        }
+
+        function createEmptyBehaviorChartData() {
+            return {
+                hourly: { labels: [], data: [] },
+                daily: { labels: [], data: [] },
+                monthly: { labels: [], data: [] }
+            };
+        }
+
+        function setBehaviorChartView(view, render = true) {
+            if (!['hourly', 'daily', 'monthly'].includes(view)) {
+                view = 'daily';
+            }
+            currentBehaviorChartView = view;
+            if (behaviorGraphViewButtons) {
+                behaviorGraphViewButtons.querySelectorAll('button[data-view]').forEach(button => {
+                    const isActive = button.dataset.view === view;
+                    if (isActive) {
+                        button.classList.add('bg-sky-600', 'border-sky-600', 'text-white', 'hover:bg-sky-700');
+                        button.classList.remove('bg-white', 'text-sky-600', 'border-sky-200', 'hover:bg-sky-50');
+                    } else {
+                        button.classList.remove('bg-sky-600', 'border-sky-600', 'text-white', 'hover:bg-sky-700');
+                        button.classList.add('bg-white', 'text-sky-600', 'border-sky-200', 'hover:bg-sky-50');
+                    }
+                });
+            }
+            if (render) {
+                const dataset = currentBehaviorChartData[view] || { labels: [], data: [] };
+                const labelText = currentBehaviorEntry?.title || '';
+                renderBehaviorChart(dataset.labels, dataset.data, labelText);
+            }
         }
 
         function renderBehaviorChart(labels, dataPoints, labelText) {
@@ -5479,6 +5782,12 @@ ${JSON.stringify(entry.aiData, null, 2)}
             });
         }
 
+        behaviorGraphViewButtons?.addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-view]');
+            if (!button) return;
+            setBehaviorChartView(button.dataset.view);
+        });
+
         refreshBehaviorStudentsBtn?.addEventListener('click', () => {
             loadBehaviorStudents();
             loadSharedBehaviors();
@@ -5575,6 +5884,23 @@ ${JSON.stringify(entry.aiData, null, 2)}
         }
 
         // --- UTILITY FUNCTIONS ---
+        function formatDateKey(date) {
+            if (!(date instanceof Date)) return '';
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function formatMonthLabel(key = '') {
+            const [year, month] = key.split('-');
+            if (!year || !month) return key || '';
+            const yearNum = Number(year);
+            const monthNum = Number(month);
+            if (Number.isNaN(yearNum) || Number.isNaN(monthNum)) return key;
+            return `${yearNum}년 ${monthNum}월`;
+        }
+
         function formatTimestamp(date) {
             if (!(date instanceof Date)) {
                 return '시간 정보 없음';
