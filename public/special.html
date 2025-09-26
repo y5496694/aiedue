@@ -397,14 +397,6 @@
                             <p class="text-sm text-gray-500">행동 기록을 불러오는 중입니다...</p>
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
-                            <h3 class="text-lg sm:text-xl font-bold mb-4">업무 통계</h3>
-                             <div id="stats-chart-container" class="h-48 flex items-center justify-center">
-                                <canvas id="statsChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
                 </div>
                 
                 <!-- My Class View -->
@@ -634,9 +626,22 @@
                                     <p id="behavior-operational-definition" class="text-sm text-gray-600 whitespace-pre-line"></p>
                                 </div>
                                 <div class="mb-6">
-                                    <h4 class="text-lg font-semibold mb-2">행동 관찰 그래프</h4>
-                                    <div class="h-72">
-                                        <canvas id="behaviorChart"></canvas>
+                                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start">
+                                        <div class="flex-1">
+                                            <h4 class="text-lg font-semibold mb-2">행동 관찰 그래프</h4>
+                                            <div class="h-72">
+                                                <canvas id="behaviorChart"></canvas>
+                                            </div>
+                                        </div>
+                                        <div class="w-full lg:w-56 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                            <h5 class="text-sm font-semibold text-slate-700 mb-3">그래프 보기</h5>
+                                            <div class="space-y-2">
+                                                <button class="w-full rounded-md border border-sky-200 px-3 py-2 text-sm font-medium text-sky-600 transition hover:bg-sky-50">오늘 하루 시간별로 보기</button>
+                                                <button class="w-full rounded-md border border-sky-200 px-3 py-2 text-sm font-medium text-sky-600 transition hover:bg-sky-50">일별로 보기</button>
+                                                <button class="w-full rounded-md border border-sky-200 px-3 py-2 text-sm font-medium text-sky-600 transition hover:bg-sky-50">월별로 보기</button>
+                                                <button class="w-full rounded-md border border-sky-200 px-3 py-2 text-sm font-medium text-sky-600 transition hover:bg-sky-50">기타(몇일부터 몇일 지정해서 일별로 그래프화)</button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="flex items-center justify-between mb-4">
