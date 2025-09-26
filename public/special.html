@@ -268,6 +268,18 @@
             background-color: #e0f2fe;
             border-color: #7dd3fc;
         }
+        @media (max-width: 640px) {
+            .app-header nav {
+                gap: 0.2rem;
+            }
+            .app-header .nav-link {
+                font-size: 0.625rem;
+                padding: 0.25rem 0.5rem;
+            }
+            .app-title {
+                font-size: 1rem;
+            }
+        }
         @media print {
             .major-eval-page {
                 box-shadow: none;
@@ -354,32 +366,40 @@
 
         <!-- Main App View -->
         <div id="main-app-view" class="hidden flex-col min-h-screen">
-            <header class="bg-white shadow-md w-full sticky top-0 z-50">
-                <div class="container mx-auto px-6 py-3 flex justify-between items-center">
-                    <h1 class="text-2xl font-bold text-sky-600"><a href="#home" id="home-link">📝 에이두 스페셜</a></h1>
-                    <nav class="flex items-center gap-4">
-                        <span id="user-email" class="text-sm text-gray-600"></span>
-                        <a href="#home" id="nav-home" class="nav-link">홈</a>
-                        <a href="#my-class" id="nav-my-class" class="nav-link">내 학급 관리</a>
+            <header class="app-header bg-white shadow-md w-full sticky top-0 z-50">
+                <div class="container mx-auto px-4 sm:px-6 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <h1 class="app-title text-lg sm:text-2xl font-bold text-sky-600"><a href="#home" id="home-link">📝 에이두 스페셜</a></h1>
+                    <nav class="flex flex-wrap items-center gap-2 sm:gap-4 text-[0.7rem] sm:text-sm">
+                        <span id="user-email" class="text-[0.65rem] sm:text-xs text-gray-600"></span>
+                        <a href="#home" id="nav-home" class="nav-link text-[0.7rem] sm:text-sm">홈</a>
+                        <a href="#my-class" id="nav-my-class" class="nav-link text-[0.7rem] sm:text-sm">내 학급 관리</a>
                         <!-- IEP navigation link; '개별화교육계획' is commonly referred to as 'IEP'. Modify this section when updating 'iep'. -->
-                        <a href="#iep" id="nav-iep" class="nav-link">개별화교육계획(IEP)</a>
-                        <a href="#templates" id="nav-templates" class="nav-link">서식 생성</a>
-                        <a href="#behavior" id="nav-behavior" class="nav-link">행동 기록</a>
-                        <button id="logout-btn" class="text-sm bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md transition-colors">로그아웃</button>
+                        <a href="#iep" id="nav-iep" class="nav-link text-[0.7rem] sm:text-sm">개별화교육계획(IEP)</a>
+                        <a href="#templates" id="nav-templates" class="nav-link text-[0.7rem] sm:text-sm">서식 생성</a>
+                        <a href="#behavior" id="nav-behavior" class="nav-link text-[0.7rem] sm:text-sm">행동 기록</a>
+                        <button id="logout-btn" class="text-xs sm:text-sm bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md transition-colors">로그아웃</button>
                     </nav>
                 </div>
             </header>
-            <main class="flex-grow container mx-auto p-6">
+            <main class="flex-grow container mx-auto p-4 sm:p-6">
                 <!-- Home View -->
-                <div id="home-view">
-                    <h2 class="text-3xl font-bold mb-6">홈</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-lg">
-                            <h3 class="text-xl font-bold mb-2">안녕하세요, <span id="home-user-email"></span> 선생님!</h3>
-                            <p class="text-gray-600 mb-4">에이두 스페셜과 함께 특수학급 업무를 효율적으로 관리해보세요.</p>
+                <div id="home-view" class="space-y-6">
+                    <h2 class="text-3xl font-bold">홈</h2>
+                    <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                            <div>
+                                <h3 class="text-lg sm:text-xl font-bold text-slate-800">간편 행동 기록</h3>
+                                <p class="text-xs text-slate-500">공유받은 행동과 나의 행동을 한 자리에서 빠르게 기록하세요.</p>
+                            </div>
+                            <button id="home-behavior-refresh" class="self-start rounded-md border border-sky-200 px-3 py-1 text-xs font-medium text-sky-600 transition hover:bg-sky-50">새로고침</button>
                         </div>
-                        <div class="bg-white p-6 rounded-lg shadow-lg">
-                            <h3 class="text-xl font-bold mb-4">업무 통계</h3>
+                        <div id="home-behavior-table" class="space-y-3">
+                            <p class="text-sm text-gray-500">행동 기록을 불러오는 중입니다...</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
+                            <h3 class="text-lg sm:text-xl font-bold mb-4">업무 통계</h3>
                              <div id="stats-chart-container" class="h-48 flex items-center justify-center">
                                 <canvas id="statsChart"></canvas>
                             </div>
@@ -818,7 +838,8 @@
         const teacherRegisterBtn = document.getElementById('teacher-register-btn');
         const logoutBtn = document.getElementById('logout-btn');
         const userEmailSpan = document.getElementById('user-email');
-        const homeUserEmailSpan = document.getElementById('home-user-email');
+        const homeBehaviorTable = document.getElementById('home-behavior-table');
+        const homeBehaviorRefreshBtn = document.getElementById('home-behavior-refresh');
         const toast = document.getElementById('toast');
         const levelButtons = document.getElementById('level-buttons');
         const subjectButtons = document.getElementById('subject-buttons');
@@ -878,6 +899,8 @@
         let behaviorChartInstance = null;
         let currentUserProfile = null;
         let isLoadingHomeData = false;
+        let isLoadingHomeBehaviors = false;
+        let homeBehaviorEntries = [];
         const MAJOR_EVAL_STORAGE_KEY = 'aiedue:major-eval:entries:v1';
         const MAJOR_EVAL_ACTIVE_STORAGE_KEY = 'aiedue:major-eval:active';
         const PDFJS_WORKER_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -1174,10 +1197,9 @@
                 authView.classList.add('hidden');
                 mainAppView.classList.remove('hidden');
                 mainAppView.classList.add('flex');
-                userEmailSpan.textContent = user.email;
-                homeUserEmailSpan.textContent = user.email;
+                if (userEmailSpan) userEmailSpan.textContent = user.email;
                 const currentView = window.location.hash.replace('#', '') || 'home';
-                switchView(currentView);
+                switchView(currentView).catch(console.error);
             } else {
                 currentUserProfile = null;
                 authView.classList.remove('hidden');
@@ -1193,7 +1215,7 @@
         });
 
         // --- NAVIGATION ---
-        const switchView = (view) => {
+        const switchView = async (view) => {
             Object.values(views).forEach(v => v.classList.add('hidden'));
             Object.values(navLinks).forEach(l => l.classList.remove('active'));
             if (views[view]) {
@@ -1203,9 +1225,9 @@
 
                 // Load data for the activated view
                 if (view === 'home') {
-                    loadHomeData();
+                    await loadHomeData();
                 } else if (view === 'my-class') {
-                    loadClasses();
+                    await loadClasses();
                 } else if (view === 'iep') {
                     loadIepStudents();
                     if (iepOutputContainer) {
@@ -1214,7 +1236,7 @@
                 } else if (view === 'templates') {
                     activateTemplateCategory('major-eval');
                 } else if (view === 'behavior') {
-                    prepareBehaviorView();
+                    await prepareBehaviorView();
                 } else {
                     closeBehaviorShareModal();
                     closeBehaviorLogNoteModal();
@@ -1224,7 +1246,7 @@
                 views.home.classList.remove('hidden');
                 if (navLinks.home) navLinks.home.classList.add('active');
                 window.location.hash = 'home';
-                loadHomeData();
+                await loadHomeData();
                 closeBehaviorShareModal();
                 closeBehaviorLogNoteModal();
             }
@@ -1233,15 +1255,15 @@
         Object.entries(navLinks).forEach(([key, link]) => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                switchView(key);
+                switchView(key).catch(console.error);
             });
         });
         document.getElementById('home-link').addEventListener('click', (e) => {
              e.preventDefault();
-             switchView('home');
+             switchView('home').catch(console.error);
         });
 
-        backToClassBtn.addEventListener('click', () => switchView('my-class'));
+        backToClassBtn.addEventListener('click', () => switchView('my-class').catch(console.error));
 
         levelButtons.querySelectorAll('button').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -1290,6 +1312,7 @@
             const user = auth.currentUser;
             if (!user || isLoadingHomeData) return;
             isLoadingHomeData = true;
+            loadHomeBehaviorOverview();
             try {
                 const classRef = doc(db, 'classes', user.uid);
                 const iepsRef = collection(db, 'users', user.uid, 'ieps');
@@ -1316,6 +1339,178 @@
         }
 
         }
+
+        async function loadHomeBehaviorOverview(options = {}) {
+            const { showLoader = true, force = false } = options;
+            const user = auth.currentUser;
+            if (!user || !homeBehaviorTable) return;
+            if (isLoadingHomeBehaviors && !force) return;
+            isLoadingHomeBehaviors = true;
+            if (showLoader) {
+                homeBehaviorTable.innerHTML = '<p class="text-sm text-gray-500">행동 기록을 불러오는 중입니다...</p>';
+            }
+            try {
+                const behaviorsRef = collection(db, 'users', user.uid, 'behaviors');
+                const [behaviorSnapshot] = await Promise.all([
+                    getDocs(behaviorsRef),
+                    loadSharedBehaviors()
+                ]);
+
+                const personalEntries = behaviorSnapshot.docs.map(docSnap => {
+                    const data = docSnap.data() || {};
+                    const createdAt = data.updatedAt?.toMillis?.() || data.createdAt?.toMillis?.() || 0;
+                    return {
+                        id: docSnap.id,
+                        ownerId: user.uid,
+                        studentId: data.studentId || '',
+                        studentName: data.studentName || data.studentId || '',
+                        title: data.title || '',
+                        operationalDefinition: data.operationalDefinition || '',
+                        useReinforcer: !!data.useReinforcer,
+                        useAttentionToken: !!data.useAttentionToken,
+                        sortTime: createdAt,
+                        source: 'mine'
+                    };
+                });
+
+                const sharedEntries = sharedBehaviorEntries.map(entry => ({
+                    id: entry.id,
+                    ownerId: entry.ownerId,
+                    studentId: entry.studentId || '',
+                    studentName: entry.studentName || entry.studentId || '',
+                    title: entry.title || '',
+                    operationalDefinition: entry.operationalDefinition || '',
+                    useReinforcer: !!entry.useReinforcer,
+                    useAttentionToken: !!entry.useAttentionToken,
+                    sortTime: entry.sharedAt?.toMillis?.() || entry.createdAt?.toMillis?.() || 0,
+                    source: 'shared'
+                }));
+
+                homeBehaviorEntries = [...personalEntries, ...sharedEntries].sort((a, b) => (b.sortTime || 0) - (a.sortTime || 0));
+                renderHomeBehaviorTable();
+            } catch (error) {
+                console.error('Failed to load home behavior overview', error);
+                homeBehaviorEntries = [];
+                if (homeBehaviorTable) {
+                    homeBehaviorTable.innerHTML = '<p class="text-sm text-red-500">행동 기록을 불러오지 못했습니다. 새로고침을 눌러주세요.</p>';
+                }
+            } finally {
+                isLoadingHomeBehaviors = false;
+            }
+        }
+
+        function renderHomeBehaviorTable() {
+            if (!homeBehaviorTable) return;
+            homeBehaviorTable.innerHTML = '';
+            if (!homeBehaviorEntries.length) {
+                homeBehaviorTable.innerHTML = '<p class="text-sm text-gray-500">아직 등록된 행동 기록이 없습니다. 행동 기록 탭에서 새로운 행동을 추가해보세요.</p>';
+                return;
+            }
+
+            homeBehaviorEntries.forEach((entry, index) => {
+                const container = document.createElement('div');
+                container.className = 'rounded-xl border border-slate-200 bg-slate-50 p-3';
+
+                const badges = [];
+                if (entry.source === 'shared') {
+                    badges.push('<span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[0.65rem] font-semibold text-indigo-600">공유</span>');
+                }
+                if (entry.useReinforcer) {
+                    badges.push('<span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-semibold text-emerald-700">강화물</span>');
+                }
+                if (entry.useAttentionToken) {
+                    badges.push('<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[0.65rem] font-semibold text-amber-700">주의 토큰</span>');
+                }
+
+                const studentLabel = escapeHtml(entry.studentName || '학생 미확인');
+                const behaviorLabel = escapeHtml(entry.title || '행동 기록');
+                const definitionLine = (entry.operationalDefinition || '').split('\n').map(line => line.trim()).find(Boolean) || '조작적 정의가 등록되지 않았습니다.';
+                const definition = escapeHtml(definitionLine);
+                const badgesHtml = badges.length ? `<div class="mt-2 flex flex-wrap items-center gap-1">${badges.join('')}</div>` : '';
+
+                container.innerHTML = `
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                        <div class="sm:w-20">
+                            <button type="button" class="w-full rounded-md border border-sky-200 bg-white px-3 py-2 text-center text-xs font-semibold text-sky-600 transition hover:bg-sky-50" data-entry-index="${index}" data-action="view">이동</button>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-semibold text-slate-800 break-words">${studentLabel}</p>
+                            <p class="text-sm text-slate-600 break-words">${behaviorLabel}</p>
+                            ${badgesHtml}
+                            <p class="mt-2 text-xs text-slate-500 break-words">${definition}</p>
+                        </div>
+                        <div class="sm:w-20">
+                            <button type="button" class="w-full rounded-md bg-emerald-500 px-3 py-2 text-center text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-600" data-entry-index="${index}" data-action="log">기록</button>
+                        </div>
+                    </div>
+                `;
+
+                homeBehaviorTable.appendChild(container);
+            });
+        }
+
+        async function handleHomeBehaviorAction(entryIndex, action = 'view') {
+            const entry = homeBehaviorEntries[entryIndex];
+            if (!entry) return;
+            try {
+                if (entry.source === 'mine') {
+                    currentBehaviorStudentId = entry.studentId || '';
+                } else {
+                    currentBehaviorStudentId = '';
+                }
+
+                await switchView('behavior');
+
+                if (entry.source === 'mine') {
+                    if (!entry.studentId) {
+                        showToast('학생 정보가 없는 행동 기록입니다.');
+                        return;
+                    }
+                    const student = behaviorStudents.find(s => s.id === entry.studentId);
+                    if (behaviorSelectedStudentLabel) {
+                        behaviorSelectedStudentLabel.textContent = `${student?.name || '학생'} 학생`;
+                    }
+                    await loadBehaviorEntries(entry.studentId, entry.id);
+                } else {
+                    await loadSharedBehaviors();
+                    const sharedEntry = sharedBehaviorEntries.find(item => item.id === entry.id && item.ownerId === entry.ownerId);
+                    if (!sharedEntry) {
+                        showToast('공유 받은 행동 기록을 불러오지 못했습니다.');
+                        return;
+                    }
+                    selectBehaviorEntry(sharedEntry.id, { entry: sharedEntry, ownerId: sharedEntry.ownerId, source: 'shared' });
+                    if (behaviorSelectedStudentLabel) {
+                        const displayName = sharedEntry.studentName || sharedEntry.studentId || '학생';
+                        behaviorSelectedStudentLabel.textContent = `${displayName} 학생 (공유)`;
+                    }
+                    updateSharedBehaviorActiveState();
+                    updateBehaviorActionState();
+                }
+
+                if (action === 'log') {
+                    if (logBehaviorBtn?.disabled) {
+                        alert('행동 기록을 선택해주세요.');
+                        return;
+                    }
+                    logBehaviorBtn.click();
+                }
+            } catch (error) {
+                console.error('Failed to open behavior entry from home', error);
+            }
+        }
+
+        homeBehaviorRefreshBtn?.addEventListener('click', () => {
+            loadHomeBehaviorOverview({ force: true });
+        });
+
+        homeBehaviorTable?.addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-entry-index]');
+            if (!button) return;
+            const index = Number(button.dataset.entryIndex);
+            if (Number.isNaN(index)) return;
+            const action = button.dataset.action || 'view';
+            handleHomeBehaviorAction(index, action);
+        });
 
         // --- My Class View Logic ---
         const addClassBtn = document.getElementById('add-class-btn');
@@ -2850,7 +3045,7 @@ ${JSON.stringify(entry.aiData, null, 2)}
             setActiveButton(subjectButtons, 'korean');
             updateGradeButtons();
             loadAchievementTable();
-            switchView('achievement');
+            switchView('achievement').catch(console.error);
         }
 
 
@@ -5365,14 +5560,13 @@ ${JSON.stringify(entry.aiData, null, 2)}
             }
         });
 
-        function prepareBehaviorView() {
+        async function prepareBehaviorView() {
             if (behaviorSelectedStudentLabel && !currentBehaviorStudentId) {
                 behaviorSelectedStudentLabel.textContent = '학생을 선택해주세요.';
             }
             resetBehaviorDetail();
             updateBehaviorActionState();
-            loadBehaviorStudents();
-            loadSharedBehaviors();
+            await Promise.all([loadBehaviorStudents(), loadSharedBehaviors()]);
         }
 
         // --- UTILITY FUNCTIONS ---
@@ -5427,7 +5621,7 @@ ${JSON.stringify(entry.aiData, null, 2)}
         // Initial load
         window.addEventListener('hashchange', () => {
             const currentView = window.location.hash.replace('#', '') || 'home';
-            switchView(currentView);
+            switchView(currentView).catch(console.error);
         });
 
     </script>
