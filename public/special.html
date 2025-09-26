@@ -371,13 +371,14 @@
                     <h1 class="app-title text-lg sm:text-2xl font-bold text-sky-600"><a href="#home" id="home-link">📝 에이두 스페셜</a></h1>
                     <nav class="flex flex-wrap items-center gap-2 sm:gap-4 text-[0.7rem] sm:text-sm">
                         <span id="user-email" class="text-[0.65rem] sm:text-xs text-gray-600"></span>
-                        <a href="#home" id="nav-home" class="nav-link text-[0.7rem] sm:text-sm">홈</a>
-                        <a href="#my-class" id="nav-my-class" class="nav-link text-[0.7rem] sm:text-sm">내 학급 관리</a>
-                        <a href="#sketchbook" id="nav-sketchbook" class="nav-link text-[0.7rem] sm:text-sm">에이두 스케치북</a>
+                        <a href="#home" id="nav-home" data-view="home" class="nav-link text-[0.7rem] sm:text-sm">홈</a>
+                        <a href="#my-class" id="nav-my-class" data-view="my-class" class="nav-link text-[0.7rem] sm:text-sm">내 학급 관리</a>
+                        <a href="#sketchbook" id="nav-sketchbook" data-view="sketchbook" class="nav-link text-[0.7rem] sm:text-sm">에이두 스케치북</a>
                         <!-- IEP navigation link; '개별화교육계획' is commonly referred to as 'IEP'. Modify this section when updating 'iep'. -->
-                        <a href="#iep" id="nav-iep" class="nav-link text-[0.7rem] sm:text-sm">개별화교육계획(IEP)</a>
-                        <a href="#templates" id="nav-templates" class="nav-link text-[0.7rem] sm:text-sm">서식 생성</a>
-                        <a href="#behavior" id="nav-behavior" class="nav-link text-[0.7rem] sm:text-sm">행동 기록</a>
+                        <a href="#iep" id="nav-iep" data-view="iep" class="nav-link text-[0.7rem] sm:text-sm">개별화교육계획(IEP)</a>
+                        <a href="#templates" id="nav-templates" data-view="templates" class="nav-link text-[0.7rem] sm:text-sm">서식 생성</a>
+                        <a href="#behavior" id="nav-behavior" data-view="behavior" class="nav-link text-[0.7rem] sm:text-sm">행동 기록</a>
+                        <a href="#sketchbook" id="nav-sketchbook-secondary" data-view="sketchbook" class="nav-link text-[0.7rem] sm:text-sm">에이두 스케치북</a>
                         <button id="logout-btn" class="text-xs sm:text-sm bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md transition-colors">로그아웃</button>
                     </nav>
                 </div>
@@ -653,24 +654,8 @@
                                         <span>추가</span>
                                     </button>
                                 </div>
-                                <div class="flex flex-col xl:flex-row gap-6">
-                                    <div class="flex-1">
-                                        <div id="behavior-record-list" class="space-y-2">
-                                            <p class="text-sm text-gray-500">학생을 선택하면 행동 기록이 표시됩니다.</p>
-                                        </div>
-                                    </div>
-                                    <aside class="w-full xl:w-80 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                                        <div class="flex items-start justify-between gap-3">
-                                            <div>
-                                                <h4 class="text-base font-semibold text-slate-800">🎨 에이두 스케치북</h4>
-                                                <p class="mt-1 text-xs text-slate-500">수업 자료와 활동을 바로 확인해보세요.</p>
-                                            </div>
-                                            <button data-action="create-sketch" class="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700">만들기</button>
-                                        </div>
-                                        <ul id="behavior-sketchbook-list" class="mt-4 space-y-2 max-h-72 overflow-y-auto">
-                                            <li class="text-sm text-gray-500">스케치북을 불러오는 중입니다...</li>
-                                        </ul>
-                                    </aside>
+                                <div id="behavior-record-list" class="mt-4 space-y-2">
+                                    <p class="text-sm text-gray-500">학생을 선택하면 행동 기록이 표시됩니다.</p>
                                 </div>
                             </div>
                             <div id="behavior-detail-panel" class="bg-white p-6 rounded-lg shadow-lg hidden">
@@ -964,14 +949,14 @@
             behavior: document.getElementById('behavior-view'),
             achievement: document.getElementById('achievement-view'),
         };
-        const navLinks = {
-            home: document.getElementById('nav-home'),
-            'my-class': document.getElementById('nav-my-class'),
-            sketchbook: document.getElementById('nav-sketchbook'),
-            iep: document.getElementById('nav-iep'),
-            templates: document.getElementById('nav-templates'),
-            behavior: document.getElementById('nav-behavior'),
-        };
+        const navLinkElements = Array.from(document.querySelectorAll('a.nav-link[data-view]'));
+        const navLinks = navLinkElements.reduce((acc, link) => {
+            const viewName = link.dataset.view;
+            if (!viewName) return acc;
+            if (!acc[viewName]) acc[viewName] = [];
+            acc[viewName].push(link);
+            return acc;
+        }, {});
         
         let statsChartInstance = null;
         let behaviorChartInstance = null;
@@ -1299,10 +1284,12 @@
         // --- NAVIGATION ---
         const switchView = async (view) => {
             Object.values(views).forEach(v => v.classList.add('hidden'));
-            Object.values(navLinks).forEach(l => l.classList.remove('active'));
+            navLinkElements.forEach(link => link.classList.remove('active'));
             if (views[view]) {
                 views[view].classList.remove('hidden');
-                if (navLinks[view]) navLinks[view].classList.add('active');
+                if (navLinks[view]) {
+                    navLinks[view].forEach(link => link.classList.add('active'));
+                }
                 window.location.hash = view;
 
                 // Load data for the activated view
@@ -1328,7 +1315,9 @@
 
             } else { // Fallback to home
                 views.home.classList.remove('hidden');
-                if (navLinks.home) navLinks.home.classList.add('active');
+                if (navLinks.home) {
+                    navLinks.home.forEach(link => link.classList.add('active'));
+                }
                 window.location.hash = 'home';
                 await loadHomeData();
                 closeBehaviorShareModal();
@@ -1336,10 +1325,13 @@
             }
         };
 
-        Object.entries(navLinks).forEach(([key, link]) => {
+        navLinkElements.forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                switchView(key).catch(console.error);
+                const targetView = link.dataset.view;
+                if (targetView) {
+                    switchView(targetView).catch(console.error);
+                }
             });
         });
         document.getElementById('home-link').addEventListener('click', (e) => {
