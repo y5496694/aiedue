@@ -136,8 +136,14 @@ service cloud.firestore {
       // ✨ [에이두 스페셜] 공유 받은 행동 기록 인덱스
       match /sharedBehaviors/{sharedId} {
         allow read: if request.auth.uid == userId || isTeacher();
-        allow create, update: if isTeacher() && request.resource.data.ownerId == request.auth.uid;
-        allow delete: if isTeacher() && resource.data.ownerId == request.auth.uid;
+        allow create, update: if isTeacher() && (
+          request.resource.data.ownerId == request.auth.uid ||
+          request.auth.uid == userId
+        );
+        allow delete: if isTeacher() && (
+          resource.data.ownerId == request.auth.uid ||
+          request.auth.uid == userId
+        );
       }
     }
 
