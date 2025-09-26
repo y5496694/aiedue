@@ -4690,28 +4690,37 @@ ${JSON.stringify(entry.aiData, null, 2)}
             isLoadingSharedBehaviors = true;
             behaviorSharedList.innerHTML = '<p class="text-sm text-gray-500">공유 받은 행동 기록을 불러오는 중입니다...</p>';
             try {
-                const sharedInboxRef = collection(db, 'users', user.uid, 'sharedBehaviors');
-                const sharedInboxSnapshot = await getDocs(query(sharedInboxRef, orderBy('sharedAt', 'desc')));
-                const inboxEntries = sharedInboxSnapshot.docs
-                    .map(docSnap => {
-                        const data = docSnap.data();
-                        const ownerId = data.ownerId || '';
-                        const behaviorId = data.behaviorId || '';
-                        return {
-                            id: behaviorId || docSnap.id,
-                            ownerId,
-                            studentId: data.studentId || '',
-                            studentName: data.studentName || data.studentId || '',
-                            title: data.title || '',
-                            operationalDefinition: data.operationalDefinition || '',
-                            useReinforcer: !!data.useReinforcer,
-                            useAttentionToken: !!data.useAttentionToken,
-                            sharedWith: Array.isArray(data.sharedWith) ? data.sharedWith : [],
-                            createdAt: data.createdAt,
-                            sharedAt: data.sharedAt || data.updatedAt || data.createdAt,
-                        };
-                    })
-                    .filter(entry => entry.id && entry.ownerId);
+                let inboxEntries = [];
+                try {
+                    const sharedInboxRef = collection(db, 'users', user.uid, 'sharedBehaviors');
+                    const sharedInboxSnapshot = await getDocs(query(sharedInboxRef, orderBy('sharedAt', 'desc')));
+                    inboxEntries = sharedInboxSnapshot.docs
+                        .map(docSnap => {
+                            const data = docSnap.data();
+                            const ownerId = data.ownerId || '';
+                            const behaviorId = data.behaviorId || '';
+                            return {
+                                id: behaviorId || docSnap.id,
+                                ownerId,
+                                studentId: data.studentId || '',
+                                studentName: data.studentName || data.studentId || '',
+                                title: data.title || '',
+                                operationalDefinition: data.operationalDefinition || '',
+                                useReinforcer: !!data.useReinforcer,
+                                useAttentionToken: !!data.useAttentionToken,
+                                sharedWith: Array.isArray(data.sharedWith) ? data.sharedWith : [],
+                                createdAt: data.createdAt,
+                                sharedAt: data.sharedAt || data.updatedAt || data.createdAt,
+                            };
+                        })
+                        .filter(entry => entry.id && entry.ownerId);
+                } catch (error) {
+                    if (error?.code === 'permission-denied') {
+                        console.warn('Permission denied when loading shared behavior inbox, falling back to legacy query.', error);
+                    } else {
+                        throw error;
+                    }
+                }
                 sharedBehaviorEntries = inboxEntries;
 
                 if (!sharedBehaviorEntries.length) {
